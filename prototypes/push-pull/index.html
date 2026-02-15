@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>밀당 (Push & Pull)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;touch-action:none;font-family:'Segoe UI',sans-serif;user-select:none}
+canvas{display:block;cursor:crosshair}
+#ui{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;pointer-events:none;z-index:10}
+#ui>div{background:rgba(0,0,0,0.5);padding:8px 14px;border-radius:20px;font-size:14px;color:#b0bec5;font-weight:bold}
+#orbStatus{position:fixed;top:52px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:none;z-index:10}
+.orbCount{padding:4px 12px;border-radius:12px;font-size:13px;font-weight:bold;color:#fff;opacity:0.8}
+.orbCount.done{opacity:0.4;text-decoration:line-through}
+
+#startScreen{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 50%,#0d1b3e 0%,#0a0a1a 50%,#1a0a2e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#startScreen h1{font-size:56px;margin-bottom:4px}
+#startScreen .sub{font-size:18px;color:#78909c;margin-bottom:24px}
+#startScreen .rules{background:rgba(255,255,255,0.05);border-radius:16px;padding:20px 28px;margin-bottom:28px;max-width:360px;text-align:left;line-height:1.8;font-size:14px;color:#b0bec5}
+#startScreen .rules b{color:#fff}
+#startScreen .rules .pull{color:#ce93d8}
+#startScreen .rules .push{color:#64b5f6}
+#startScreen .rules .danger{color:#ef5350}
+#startScreen button{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;border:none;padding:16px 52px;border-radius:30px;font-size:20px;cursor:pointer;font-weight:bold;box-shadow:0 4px 20px rgba(26,35,126,0.6);border:1px solid rgba(255,255,255,0.1)}
+#startScreen button:active{transform:scale(0.95)}
+
+#gameOver{position:fixed;inset:0;background:rgba(0,0,0,0);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100;transition:background 0.5s}
+#gameOver.show{background:rgba(20,0,0,0.92)}
+#gameOver h2{font-size:40px;color:#ef5350;margin-bottom:8px}
+#gameOver .reason{font-size:16px;color:#ef9a9a;margin-bottom:20px}
+#gameOver .stats{font-size:18px;color:#b0bec5;margin-bottom:24px}
+#gameOver button{background:linear-gradient(135deg,#b71c1c,#e53935);color:#fff;border:none;padding:14px 40px;border-radius:30px;font-size:18px;cursor:pointer;font-weight:bold;margin:6px;box-shadow:0 4px 15px rgba(183,28,28,0.4)}
+
+#levelComplete{position:fixed;inset:0;background:rgba(10,10,26,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#levelComplete h2{font-size:32px;margin-bottom:12px}
+#lcStars{font-size:48px;color:#ffd54f;margin-bottom:8px}
+#lcInfo{font-size:18px;color:#b0bec5;margin-bottom:24px}
+#levelComplete button{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;border:none;padding:14px 36px;border-radius:30px;font-size:18px;cursor:pointer;font-weight:bold;margin:6px;box-shadow:0 4px 15px rgba(26,35,126,0.4)}
+
+#skillBar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
+.skill-btn{padding:10px 20px;border-radius:16px;font-size:14px;font-weight:bold;cursor:pointer;border:2px solid transparent;transition:all 0.2s;opacity:0.7}
+.skill-btn.active{opacity:1;transform:scale(1.05)}
+#btnPull{background:rgba(156,39,176,0.3);color:#ce93d8;border-color:rgba(156,39,176,0.5)}
+#btnPull.active{background:rgba(156,39,176,0.5);box-shadow:0 0 20px rgba(156,39,176,0.4)}
+#btnPush{background:rgba(30,136,229,0.3);color:#64b5f6;border-color:rgba(30,136,229,0.5)}
+#btnPush.active{background:rgba(30,136,229,0.5);box-shadow:0 0 20px rgba(30,136,229,0.4)}
+
+#skillIndicator{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);font-size:13px;color:#78909c;pointer-events:none;z-index:10;text-align:center}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>밀당</h1>
+  <div class="sub">Push & Pull</div>
+  <div class="rules">
+    <b class="pull">좌클릭 (꾹)</b> → 끌어당기기 (블랙홀)<br>
+    <b class="push">우클릭</b> → 밀어내기 (파동)<br><br>
+    같은 색 구슬 충돌 → <b>합체!</b><br>
+    다른 색 구슬 충돌 → <b class="danger">게임 오버!</b><br><br>
+    모든 색을 합치면 클리어!<br>
+    적은 액션 = 높은 점수
+  </div>
+  <button onclick="startGame()">시작하기</button>
+</div>
+
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="scoreDisplay">점수: 0</div>
+  <div id="actionDisplay">액션: 0</div>
+</div>
+<div id="orbStatus"></div>
+
+<div id="skillBar">
+  <div id="btnPull" class="skill-btn active" onclick="setSkill('pull')">끌기 (좌클릭)</div>
+  <div id="btnPush" class="skill-btn" onclick="setSkill('push')">밀기 (우클릭)</div>
+</div>
+<div id="skillIndicator">모바일: 버튼으로 스킬 선택 후 탭 | PC: 좌클릭=끌기, 우클릭=밀기</div>
+
+<div id="gameOver">
+  <h2>게임 오버</h2>
+  <div class="reason" id="goReason"></div>
+  <div class="stats" id="goStats"></div>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+
+<div id="levelComplete">
+  <h2 id="lcTitle">레벨 클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+// Prevent context menu
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ─── Audio ───
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(f, d, t = 'sine', v = 0.12) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = t; o.frequency.value = f;
+  g.gain.setValueAtTime(v, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
+  o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
+}
+function playPull() { playSound(180, 0.3, 'sine', 0.08); playSound(120, 0.4, 'sine', 0.05); }
+function playPush() { playSound(300, 0.4, 'sine', 0.1); playSound(450, 0.3, 'sine', 0.06); }
+function playMerge(c) { const b = 400 + c * 80; playSound(b, 0.5, 'sine', 0.2); playSound(b * 1.5, 0.3, 'sine', 0.1); }
+function playCharge() { playSound(80, 0.15, 'sine', 0.03); }
+function playDanger() { playSound(200, 0.15, 'sawtooth', 0.08); }
+function playGameOver() {
+  playSound(300, 0.3, 'sawtooth', 0.15); playSound(200, 0.4, 'sawtooth', 0.12);
+  setTimeout(() => playSound(100, 0.6, 'sawtooth', 0.1), 200);
+}
+function playClear() {
+  playSound(523, 0.2, 'sine', 0.15);
+  setTimeout(() => playSound(659, 0.2, 'sine', 0.15), 150);
+  setTimeout(() => playSound(784, 0.3, 'sine', 0.15), 300);
+  setTimeout(() => playSound(1047, 0.4, 'sine', 0.12), 450);
+}
+
+// ─── Colors ───
+const COLORS = [
+  { fill: '#ef5350', glow: 'rgba(239,83,80,', name: '빨강' },
+  { fill: '#42a5f5', glow: 'rgba(66,165,245,', name: '파랑' },
+  { fill: '#66bb6a', glow: 'rgba(102,187,106,', name: '초록' },
+  { fill: '#ffa726', glow: 'rgba(255,167,38,', name: '주황' },
+  { fill: '#ab47bc', glow: 'rgba(171,71,188,', name: '보라' },
+  { fill: '#ffee58', glow: 'rgba(255,238,88,', name: '노랑' },
+];
+
+// ─── Game State ───
+let orbs = [], ripples = [], particles = [], flashes = [];
+let activeWell = null;   // current pull gravity well
+let dyingWells = [];     // fading pull wells
+let actionCount = 0, score = 0, totalScore = 0, level = 1;
+let gameActive = false, comboCount = 0;
+let dangerLevel = 0;     // 0-1, how close different colors are
+let dangerPairs = [];    // pairs of orbs that are dangerously close
+let shakeTimer = 0, shakeX = 0, shakeY = 0;
+let gameOverAnim = 0;    // for slow-mo effect
+let collisionPoint = null; // where the fatal collision happened
+let mobileSkill = 'pull'; // for mobile skill toggle
+let slowMo = false, slowMoTimer = 0;
+
+const FRICTION = 0.982;
+const ORB_RADIUS = 24;
+const RIPPLE_SPEED = 5.5;
+const RIPPLE_FORCE = 3.2;
+const DANGER_DIST = 120;  // distance to start warning
+const COLLISION_THRESHOLD = 0.7; // overlap ratio for game over
+
+// ─── Level configs ───
+const levels = [
+  { colors: 2, perColor: 2, par: 3 },
+  { colors: 2, perColor: 3, par: 4 },
+  { colors: 3, perColor: 2, par: 4 },
+  { colors: 2, perColor: 4, par: 5 },
+  { colors: 3, perColor: 3, par: 5 },
+  { colors: 4, perColor: 2, par: 5 },
+  { colors: 3, perColor: 4, par: 6 },
+  { colors: 4, perColor: 3, par: 7 },
+  { colors: 5, perColor: 2, par: 6 },
+  { colors: 5, perColor: 3, par: 8 },
+  { colors: 4, perColor: 4, par: 8 },
+  { colors: 6, perColor: 3, par: 9 },
+];
+
+function initLevel(lvl) {
+  const cfg = levels[Math.min(lvl - 1, levels.length - 1)];
+  orbs = []; ripples = []; particles = []; flashes = [];
+  dyingWells = []; activeWell = null;
+  actionCount = 0; score = 0; comboCount = 0;
+  dangerLevel = 0; dangerPairs = [];
+  shakeTimer = 0; gameOverAnim = 0; collisionPoint = null;
+  slowMo = false; slowMoTimer = 0;
+
+  // Place orbs with good spacing, group same colors loosely
+  const margin = 90;
+  const playW = W - margin * 2;
+  const playH = H - margin * 2 - 100;
+
+  for (let c = 0; c < cfg.colors; c++) {
+    // Assign a rough zone for each color to avoid instant death
+    const zoneAngle = (Math.PI * 2 / cfg.colors) * c;
+    const zoneCX = W / 2 + Math.cos(zoneAngle) * Math.min(playW, playH) * 0.25;
+    const zoneCY = H / 2 + Math.sin(zoneAngle) * Math.min(playW, playH) * 0.2;
+
+    for (let n = 0; n < cfg.perColor; n++) {
+      let x, y, ok, att = 0;
+      do {
+        x = zoneCX + (Math.random() - 0.5) * 160;
+        y = zoneCY + (Math.random() - 0.5) * 140;
+        // Clamp to play area
+        x = Math.max(margin, Math.min(W - margin, x));
+        y = Math.max(margin + 80, Math.min(H - margin - 60, y));
+        ok = true;
+        for (const o of orbs) {
+          const dx = x - o.x, dy = y - o.y;
+          if (Math.sqrt(dx * dx + dy * dy) < ORB_RADIUS * 3.5) { ok = false; break; }
+        }
+        att++;
+      } while (!ok && att < 200);
+
+      orbs.push({
+        x, y, vx: 0, vy: 0,
+        radius: ORB_RADIUS, color: c,
+        mergeCount: 0, pulse: Math.random() * Math.PI * 2,
+        dangerGlow: 0,
+      });
+    }
+  }
+
+  updateUI();
+  updateOrbStatus();
+}
+
+function getColorCount(colorIdx) {
+  return orbs.filter(o => o.color === colorIdx).length;
+}
+
+function isColorComplete(colorIdx) {
+  return getColorCount(colorIdx) <= 1;
+}
+
+function updateUI() {
+  document.getElementById('levelDisplay').textContent = `레벨 ${level}`;
+  document.getElementById('scoreDisplay').textContent = `점수: ${totalScore + score}`;
+  document.getElementById('actionDisplay').textContent = `액션: ${actionCount}`;
+}
+
+function updateOrbStatus() {
+  const el = document.getElementById('orbStatus');
+  const cfg = levels[Math.min(level - 1, levels.length - 1)];
+  let html = '';
+  for (let c = 0; c < cfg.colors; c++) {
+    const count = getColorCount(c);
+    const done = count <= 1;
+    html += `<div class="orbCount${done ? ' done' : ''}" style="background:${COLORS[c].fill}${done ? '44' : 'aa'}">${COLORS[c].name} ${count > 1 ? 'x' + count : 'OK'}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function setSkill(s) {
+  mobileSkill = s;
+  document.getElementById('btnPull').classList.toggle('active', s === 'pull');
+  document.getElementById('btnPush').classList.toggle('active', s === 'push');
+}
+
+// ─── Input ───
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (!gameActive) return;
+
+  const x = e.clientX, y = e.clientY;
+  const isRightClick = e.button === 2;
+  const isPush = isRightClick || (e.pointerType === 'touch' && mobileSkill === 'push');
+
+  actionCount++;
+  comboCount = 0;
+
+  if (isPush) {
+    // RIPPLE (push)
+    ripples.push({
+      x, y, radius: 0,
+      maxRadius: Math.min(W, H) * 0.55,
+      alpha: 1, force: RIPPLE_FORCE,
+    });
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI * 2 / 10) * i;
+      particles.push({ x, y, vx: Math.cos(angle) * 2.5, vy: Math.sin(angle) * 2.5, life: 1, color: 'rgba(100,181,246,', size: 3 });
+    }
+    playPush();
+  } else {
+    // BLACKHOLE (pull)
+    activeWell = { x, y, strength: 0, age: 0 };
+    playPull();
+  }
+  updateUI();
+});
+
+canvas.addEventListener('pointermove', e => {
+  e.preventDefault();
+  if (activeWell) { activeWell.x = e.clientX; activeWell.y = e.clientY; }
+});
+
+canvas.addEventListener('pointerup', e => {
+  e.preventDefault();
+  if (activeWell) {
+    dyingWells.push({ ...activeWell, dieTimer: 25 });
+    activeWell = null;
+  }
+});
+
+// ─── Background ───
+const bgStars = [];
+for (let i = 0; i < 80; i++) bgStars.push({ x: Math.random() * 2000, y: Math.random() * 2000, s: Math.random() * 2 + 0.5, a: Math.random() * 0.4 + 0.05, sp: Math.random() * 0.02 });
+
+// ─── Update ───
+function update() {
+  if (!gameActive) return;
+
+  // Slow motion on near-death
+  const dt = slowMo ? 0.3 : 1;
+
+  if (slowMo) {
+    slowMoTimer--;
+    if (slowMoTimer <= 0) slowMo = false;
+  }
+
+  // Active pull well
+  if (activeWell) {
+    activeWell.age++;
+    activeWell.strength = Math.min(6, activeWell.age * 0.06);
+    if (activeWell.age % 10 === 0) playCharge();
+
+    for (const orb of orbs) {
+      const dx = activeWell.x - orb.x, dy = activeWell.y - orb.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 5) {
+        const force = activeWell.strength / (dist * 0.35) * dt;
+        orb.vx += dx / dist * force;
+        orb.vy += dy / dist * force;
+      }
+    }
+
+    // Spiral particles
+    if (activeWell.age % 3 === 0) {
+      const angle = activeWell.age * 0.15;
+      const r = 80 + Math.random() * 60;
+      particles.push({
+        x: activeWell.x + Math.cos(angle) * r,
+        y: activeWell.y + Math.sin(angle) * r,
+        vx: -Math.cos(angle) * r * 0.03,
+        vy: -Math.sin(angle) * r * 0.03,
+        life: 0.8, color: 'rgba(206,147,216,', size: 2.5 + Math.random() * 2
+      });
+    }
+  }
+
+  // Dying wells (residual pull)
+  for (let i = dyingWells.length - 1; i >= 0; i--) {
+    const w = dyingWells[i];
+    w.dieTimer--;
+    const str = w.strength * (w.dieTimer / 25) * dt;
+    for (const orb of orbs) {
+      const dx = w.x - orb.x, dy = w.y - orb.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 5) { const f = str / (dist * 0.4); orb.vx += dx / dist * f; orb.vy += dy / dist * f; }
+    }
+    if (w.dieTimer <= 0) dyingWells.splice(i, 1);
+  }
+
+  // Ripples push orbs
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.radius += RIPPLE_SPEED * dt;
+    r.alpha = Math.max(0, 1 - r.radius / r.maxRadius);
+
+    for (const orb of orbs) {
+      const dx = orb.x - r.x, dy = orb.y - r.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0 && Math.abs(dist - r.radius) < 28) {
+        const intensity = 1 - Math.abs(dist - r.radius) / 28;
+        const force = r.force * r.alpha * intensity * dt;
+        orb.vx += dx / dist * force;
+        orb.vy += dy / dist * force;
+      }
+    }
+    if (r.radius >= r.maxRadius) ripples.splice(i, 1);
+  }
+
+  // Update orbs
+  const friction = Math.pow(FRICTION, dt);
+  for (const orb of orbs) {
+    orb.x += orb.vx * dt;
+    orb.y += orb.vy * dt;
+    orb.vx *= friction;
+    orb.vy *= friction;
+    orb.pulse += 0.03;
+    orb.dangerGlow *= 0.95;
+
+    // Wall bounce
+    const m = 12;
+    if (orb.x - orb.radius < m) { orb.x = m + orb.radius; orb.vx = Math.abs(orb.vx) * 0.6; }
+    if (orb.x + orb.radius > W - m) { orb.x = W - m - orb.radius; orb.vx = -Math.abs(orb.vx) * 0.6; }
+    if (orb.y - orb.radius < m + 55) { orb.y = m + 55 + orb.radius; orb.vy = Math.abs(orb.vy) * 0.6; }
+    if (orb.y + orb.radius > H - m - 50) { orb.y = H - m - 50 - orb.radius; orb.vy = -Math.abs(orb.vy) * 0.6; }
+  }
+
+  // ─── Collision Detection ───
+  dangerPairs = [];
+  dangerLevel = 0;
+
+  for (let i = 0; i < orbs.length; i++) {
+    for (let j = i + 1; j < orbs.length; j++) {
+      const a = orbs[i], b = orbs[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = a.radius + b.radius;
+
+      if (a.color === b.color) {
+        // Same color: MERGE
+        if (dist < minDist - 4) {
+          const nx = (a.x + b.x) / 2, ny = (a.y + b.y) / 2;
+          const nm = Math.max(a.mergeCount, b.mergeCount) + 1;
+          comboCount++;
+          const pts = 150 * comboCount;
+          score += pts;
+
+          flashes.push({ x: nx, y: ny, radius: 0, maxRadius: 90, alpha: 1, color: COLORS[a.color].glow });
+
+          // Secondary ripple from merge (pushes other orbs away for safety)
+          ripples.push({ x: nx, y: ny, radius: 0, maxRadius: 100 + nm * 25, alpha: 0.5, force: RIPPLE_FORCE * 0.4 });
+
+          for (let p = 0; p < 16; p++) {
+            const ang = (Math.PI * 2 / 16) * p, spd = 2 + Math.random() * 3;
+            particles.push({ x: nx, y: ny, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1.2, color: COLORS[a.color].glow, size: 4 + Math.random() * 3 });
+          }
+          particles.push({ x: nx, y: ny - 25, vx: 0, vy: -1.2, life: 1.8, color: 'rgba(255,255,255,', size: 0, text: `+${pts}`, isText: true });
+
+          // Check if this was the last merge for this color
+          const wasCount = getColorCount(a.color);
+          orbs.splice(j, 1); // Remove j first (higher index is j since j < i... wait, j > i? no, j = i+1 so j > i)
+          // Actually i < j, so splice j first then i
+          // Wait: the loop is i then j=i+1, so j > i. Remove j first.
+          // But we already spliced j... let me redo this
+          // Actually let me just mark and remove after
+          const newOrb = {
+            x: nx, y: ny,
+            vx: (a.vx + b.vx) * 0.3, vy: (a.vy + b.vy) * 0.3,
+            radius: ORB_RADIUS + nm * 4, color: a.color,
+            mergeCount: nm, pulse: 0, dangerGlow: 0,
+          };
+          // Remove both, add new
+          orbs.splice(j, 1);
+          orbs.splice(i, 1);
+          orbs.push(newOrb);
+
+          playMerge(comboCount);
+          updateUI();
+          updateOrbStatus();
+
+          // Check if color just completed
+          if (getColorCount(newOrb.color) === 1 && wasCount === 2) {
+            particles.push({ x: nx, y: ny - 45, vx: 0, vy: -0.8, life: 2, color: 'rgba(255,215,0,', size: 0, text: `${COLORS[newOrb.color].name} 완성!`, isText: true });
+            playSound(800, 0.3, 'sine', 0.12);
+          }
+
+          // Restart collision loop
+          i = -1; break;
+        }
+      } else {
+        // Different color: check danger / game over
+        const aComplete = isColorComplete(a.color);
+        const bComplete = isColorComplete(b.color);
+
+        if (dist < minDist * COLLISION_THRESHOLD) {
+          // Collision!
+          if (!aComplete || !bComplete) {
+            // GAME OVER!
+            triggerGameOver(a, b, (a.x + b.x) / 2, (a.y + b.y) / 2);
+            return;
+          } else {
+            // Both complete: safe bounce
+            const overlap = minDist - dist;
+            const nx = dx / dist, ny2 = dy / dist;
+            a.x += nx * overlap * 0.5; a.y += ny2 * overlap * 0.5;
+            b.x -= nx * overlap * 0.5; b.y -= ny2 * overlap * 0.5;
+            const relV = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny2;
+            if (relV > 0) {
+              a.vx -= relV * nx * 0.5; a.vy -= relV * ny2 * 0.5;
+              b.vx += relV * nx * 0.5; b.vy += relV * ny2 * 0.5;
+            }
+          }
+        } else if (dist < DANGER_DIST && (!aComplete || !bComplete)) {
+          // Danger zone!
+          const danger = 1 - (dist - minDist) / (DANGER_DIST - minDist);
+          if (danger > 0) {
+            dangerPairs.push({ a: i, b: j, danger, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 });
+            dangerLevel = Math.max(dangerLevel, danger);
+            a.dangerGlow = Math.max(a.dangerGlow, danger);
+            b.dangerGlow = Math.max(b.dangerGlow, danger);
+            if (danger > 0.7 && !slowMo) {
+              // Near death slow-mo
+              slowMo = true;
+              slowMoTimer = 30;
+            }
+          }
+
+          // Soft repulsion between dangerous pairs
+          if (dist < minDist * 1.2 && dist > 0) {
+            const push = (minDist * 1.2 - dist) * 0.15 * dt;
+            a.vx += dx / dist * push; a.vy += dy / dist * push;
+            b.vx -= dx / dist * push; b.vy -= dy / dist * push;
+          }
+        }
+      }
+    }
+  }
+
+  // Danger sound
+  if (dangerLevel > 0.6 && Math.random() < dangerLevel * 0.1) playDanger();
+
+  // Screen shake
+  if (shakeTimer > 0) {
+    shakeTimer--;
+    shakeX = (Math.random() - 0.5) * shakeTimer * 1.5;
+    shakeY = (Math.random() - 0.5) * shakeTimer * 1.5;
+  } else { shakeX = shakeY = 0; }
+
+  // Win check
+  const cfg = levels[Math.min(level - 1, levels.length - 1)];
+  let allComplete = true;
+  for (let c = 0; c < cfg.colors; c++) {
+    if (!isColorComplete(c)) { allComplete = false; break; }
+  }
+  if (allComplete && ripples.length === 0 && !activeWell && dyingWells.length === 0) {
+    const allStill = orbs.every(o => Math.abs(o.vx) < 0.5 && Math.abs(o.vy) < 0.5);
+    if (allStill) {
+      gameActive = false;
+      setTimeout(() => showLevelComplete(), 600);
+    }
+  }
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.life -= 0.02 * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    flashes[i].radius += 4 * dt; flashes[i].alpha -= 0.04 * dt;
+    if (flashes[i].alpha <= 0) flashes.splice(i, 1);
+  }
+}
+
+function triggerGameOver(orbA, orbB, cx, cy) {
+  gameActive = false;
+  collisionPoint = { x: cx, y: cy, a: orbA, b: orbB };
+  shakeTimer = 30;
+  playGameOver();
+
+  // Explosion at collision point
+  for (let i = 0; i < 30; i++) {
+    const ang = Math.random() * Math.PI * 2, spd = 2 + Math.random() * 5;
+    const c = Math.random() > 0.5 ? COLORS[orbA.color].glow : COLORS[orbB.color].glow;
+    particles.push({ x: cx, y: cy, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1.5, color: c, size: 3 + Math.random() * 5 });
+  }
+
+  setTimeout(() => {
+    document.getElementById('goReason').textContent = `${COLORS[orbA.color].name}과 ${COLORS[orbB.color].name}이 충돌했습니다!`;
+    document.getElementById('goStats').textContent = `레벨 ${level} | 액션 ${actionCount}회 | 점수 ${totalScore + score}`;
+    const el = document.getElementById('gameOver');
+    el.style.display = 'flex';
+    setTimeout(() => el.classList.add('show'), 10);
+  }, 800);
+}
+
+// ─── Draw ───
+function draw() {
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // Background
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+  bg.addColorStop(0, '#111122');
+  bg.addColorStop(1, '#0a0a14');
+  ctx.fillStyle = bg;
+  ctx.fillRect(-20, -20, W + 40, H + 40);
+
+  // Danger tint
+  if (dangerLevel > 0) {
+    ctx.fillStyle = `rgba(180,20,20,${dangerLevel * 0.12})`;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+  }
+
+  // BG Stars
+  const time = Date.now() * 0.001;
+  for (const s of bgStars) {
+    const tw = 0.5 + Math.sin(time * s.sp * 10 + s.x) * 0.5;
+    ctx.fillStyle = `rgba(180,180,220,${s.a * tw})`;
+    ctx.beginPath(); ctx.arc(s.x % W, s.y % H, s.s, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Active gravity well
+  if (activeWell) {
+    const aw = activeWell, str = aw.strength;
+    for (let r = 0; r < 5; r++) {
+      const ring = ((aw.age * 2.5 + r * 35) % 160);
+      const radius = 160 - ring;
+      if (radius < 5) continue;
+      ctx.strokeStyle = `rgba(206,147,216,${(0.12 + str * 0.025) * (radius / 160)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(aw.x, aw.y, radius, 0, Math.PI * 2); ctx.stroke();
+    }
+    const glow = ctx.createRadialGradient(aw.x, aw.y, 0, aw.x, aw.y, 25 + str * 4);
+    glow.addColorStop(0, `rgba(156,39,176,${0.25 + str * 0.04})`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(aw.x, aw.y, 25 + str * 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Ripples
+  for (const r of ripples) {
+    ctx.strokeStyle = `rgba(100,181,246,${r.alpha * 0.6})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2); ctx.stroke();
+    if (r.radius > 10) {
+      ctx.strokeStyle = `rgba(100,181,246,${r.alpha * 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.radius - 8, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  // Danger lines between close different-color orbs
+  for (const dp of dangerPairs) {
+    const a = orbs[dp.a], b = orbs[dp.b];
+    if (!a || !b) continue;
+    const flash = Math.sin(time * 8) * 0.5 + 0.5;
+    ctx.strokeStyle = `rgba(255,50,50,${dp.danger * 0.4 * flash})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // DANGER text
+    if (dp.danger > 0.5) {
+      ctx.fillStyle = `rgba(255,80,80,${dp.danger * 0.7 * flash})`;
+      ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('DANGER', dp.mx, dp.my - 12);
+    }
+  }
+
+  // Flashes
+  for (const f of flashes) {
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius);
+    g.addColorStop(0, f.color + `${f.alpha * 0.5})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Orbs
+  for (const orb of orbs) {
+    const c = COLORS[orb.color];
+    const complete = isColorComplete(orb.color);
+    const pulse = 1 + Math.sin(orb.pulse) * 0.05;
+    const r = orb.radius * pulse;
+
+    // Danger glow
+    if (orb.dangerGlow > 0.1) {
+      const dg = ctx.createRadialGradient(orb.x, orb.y, r, orb.x, orb.y, r * 2);
+      dg.addColorStop(0, `rgba(255,50,50,${orb.dangerGlow * 0.3})`);
+      dg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = dg; ctx.beginPath(); ctx.arc(orb.x, orb.y, r * 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Color glow
+    const glow = ctx.createRadialGradient(orb.x, orb.y, r * 0.5, orb.x, orb.y, r * 2.5);
+    glow.addColorStop(0, c.glow + '0.35)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(orb.x, orb.y, r * 2.5, 0, Math.PI * 2); ctx.fill();
+
+    // Body
+    const bodyG = ctx.createRadialGradient(orb.x - r * 0.3, orb.y - r * 0.3, r * 0.1, orb.x, orb.y, r);
+    bodyG.addColorStop(0, '#fff'); bodyG.addColorStop(0.3, c.fill); bodyG.addColorStop(1, c.fill);
+    ctx.fillStyle = bodyG; ctx.beginPath(); ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2); ctx.fill();
+
+    // Complete indicator (golden ring)
+    if (complete) {
+      ctx.strokeStyle = `rgba(255,215,0,${0.4 + Math.sin(orb.pulse * 2) * 0.2})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(orb.x, orb.y, r + 4, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(orb.x - r * 0.25, orb.y - r * 0.25, r * 0.35, 0, Math.PI * 2); ctx.fill();
+
+    // Merge count
+    if (orb.mergeCount > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = `bold ${12 + orb.mergeCount * 2}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`x${orb.mergeCount + 1}`, orb.x, orb.y);
+    }
+  }
+
+  // Collision point explosion
+  if (collisionPoint) {
+    const cp = collisionPoint;
+    const flash = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+    const eg = ctx.createRadialGradient(cp.x, cp.y, 0, cp.x, cp.y, 80);
+    eg.addColorStop(0, `rgba(255,50,50,${0.4 * flash})`);
+    eg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(cp.x, cp.y, 80, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Particles
+  for (const p of particles) {
+    if (p.isText) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(1, p.life)})`;
+      ctx.font = `bold ${p.text.includes('완성') ? 22 : 18}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+    } else {
+      ctx.fillStyle = `${p.color}${Math.min(1, p.life)})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * Math.min(1, p.life), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Combo
+  if (comboCount > 1) {
+    ctx.fillStyle = `rgba(255,215,0,${Math.min(1, comboCount * 0.3)})`;
+    ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`${comboCount}x COMBO!`, W / 2, H / 2 - 60);
+  }
+
+  // Slow-mo indicator
+  if (slowMo) {
+    ctx.fillStyle = 'rgba(255,100,100,0.15)';
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+    ctx.fillStyle = 'rgba(255,150,150,0.6)';
+    ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('위험!', W / 2, 100);
+  }
+
+  ctx.restore();
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ─── Screens ───
+function showLevelComplete() {
+  const cfg = levels[Math.min(level - 1, levels.length - 1)];
+  const par = cfg.par;
+  let starCount = 1;
+  if (actionCount <= par) starCount = 3;
+  else if (actionCount <= par + 2) starCount = 2;
+
+  // Bonus points for efficiency
+  const bonus = Math.max(0, (par + 3 - actionCount)) * 200;
+  score += bonus;
+
+  document.getElementById('lcStars').textContent = '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
+  document.getElementById('lcTitle').textContent = `레벨 ${level} 클리어!`;
+  document.getElementById('lcInfo').textContent = `점수: ${score}${bonus > 0 ? ` (+${bonus} 효율 보너스)` : ''} | 액션: ${actionCount}회 (기준: ${par}회)`;
+  document.getElementById('levelComplete').style.display = 'flex';
+  totalScore += score;
+  playClear();
+}
+
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('levelComplete').style.display = 'none';
+  const go = document.getElementById('gameOver');
+  go.style.display = 'none'; go.classList.remove('show');
+  level = 1; totalScore = 0;
+  initLevel(level);
+  gameActive = true;
+}
+
+function nextLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  level++;
+  initLevel(level);
+  gameActive = true;
+}
+
+function retryLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  const go = document.getElementById('gameOver');
+  go.style.display = 'none'; go.classList.remove('show');
+  collisionPoint = null;
+  initLevel(level);
+  gameActive = true;
+}
+
+gameLoop();
+</script>
+</body>
+</html>
