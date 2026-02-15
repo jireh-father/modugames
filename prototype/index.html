@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>말랑소트 Mochi Sort</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+:root {
+  --bg: #FFF8F0;
+  --bg2: #FFF0E6;
+  --plate-bg: #F5E6D3;
+  --plate-border: #E0C9A8;
+  --ui-brown: #8B7355;
+  --ui-dark: #5D4037;
+  --accent: #FF6B9D;
+  --accent-light: #FFB5C2;
+
+  --mochi-pink: #FFB5C2;
+  --mochi-orange: #FFD4A3;
+  --mochi-yellow: #FFF0A3;
+  --mochi-mint: #B8E6C8;
+  --mochi-lavender: #D4B8E6;
+  --mochi-sky: #A3D4FF;
+  --mochi-white: #FFF5EE;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Nunito', 'Apple SD Gothic Neo', sans-serif;
+  touch-action: manipulation;
+}
+
+/* ===== SCREENS ===== */
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.4s, transform 0.4s;
+  opacity: 0; pointer-events: none;
+  transform: scale(0.95);
+}
+.screen.active {
+  opacity: 1; pointer-events: all;
+  transform: scale(1);
+}
+
+/* ===== TITLE SCREEN ===== */
+#title-screen {
+  background: linear-gradient(180deg, #FFF0E6 0%, #FFE4D6 50%, #FFD6E8 100%);
+}
+.title-mochi {
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  background: var(--mochi-pink);
+  position: relative;
+  margin-bottom: 20px;
+  animation: titleBounce 2s ease-in-out infinite;
+  box-shadow: 0 10px 30px rgba(255, 107, 157, 0.3);
+}
+.title-mochi::before {
+  content: '◕  ◕';
+  position: absolute;
+  top: 38%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  letter-spacing: 16px;
+  color: var(--ui-dark);
+}
+.title-mochi::after {
+  content: 'ω';
+  position: absolute;
+  top: 58%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+  color: var(--ui-dark);
+}
+.title-blush-l, .title-blush-r {
+  position: absolute;
+  width: 28px; height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 150, 170, 0.5);
+  top: 52%;
+}
+.title-blush-l { left: 14%; }
+.title-blush-r { right: 14%; }
+
+@keyframes titleBounce {
+  0%, 100% { transform: translateY(0) scaleX(1) scaleY(1); }
+  30% { transform: translateY(-20px) scaleX(0.95) scaleY(1.05); }
+  50% { transform: translateY(0) scaleX(1.05) scaleY(0.95); }
+  70% { transform: translateY(-8px) scaleX(0.98) scaleY(1.02); }
+}
+
+.title-text {
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--ui-dark);
+  margin-bottom: 6px;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.08);
+}
+.title-sub {
+  font-size: 16px;
+  color: var(--ui-brown);
+  margin-bottom: 40px;
+  font-weight: 600;
+}
+
+.btn {
+  border: none; outline: none; cursor: pointer;
+  font-family: inherit;
+  border-radius: 16px;
+  font-weight: 800;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn:active {
+  transform: scale(0.95) !important;
+}
+.btn-play {
+  background: var(--accent);
+  color: white;
+  font-size: 22px;
+  padding: 16px 60px;
+  box-shadow: 0 6px 0 #E0557F, 0 8px 20px rgba(255,107,157,0.3);
+  margin-bottom: 16px;
+}
+.btn-play:active {
+  box-shadow: 0 2px 0 #E0557F;
+  transform: scale(0.95) translateY(4px) !important;
+}
+.btn-collection {
+  background: var(--mochi-lavender);
+  color: var(--ui-dark);
+  font-size: 16px;
+  padding: 12px 36px;
+  box-shadow: 0 4px 0 #B89DD4;
+}
+
+/* ===== GAME SCREEN ===== */
+#game-screen {
+  background: var(--bg);
+  justify-content: flex-start;
+}
+
+.game-hud {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  margin-top: 8px;
+}
+.hud-level {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ui-dark);
+}
+.hud-coins {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ui-brown);
+  background: var(--bg2);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+.hud-coins span { color: #E8A800; }
+
+.game-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 420px;
+  padding: 0 10px;
+  gap: 8px;
+}
+
+.plates-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 0;
+}
+
+/* ===== PLATE ===== */
+.plate {
+  width: 72px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s;
+  padding-bottom: 8px;
+}
+.plate.selected {
+  transform: translateY(-6px);
+}
+.plate.hint-glow .plate-base {
+  box-shadow: 0 0 16px 4px rgba(255, 107, 157, 0.6);
+}
+.plate-base {
+  width: 72px;
+  height: 14px;
+  background: var(--plate-bg);
+  border-radius: 0 0 20px 20px;
+  border: 2px solid var(--plate-border);
+  border-top: none;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+}
+.plate-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 2px;
+  min-height: 180px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== MOCHI ===== */
+.mochi {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  position: relative;
+  transition: transform 0.12s;
+  animation: mochiIdle 3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.mochi.color-0 { background: var(--mochi-pink); }
+.mochi.color-1 { background: var(--mochi-orange); }
+.mochi.color-2 { background: var(--mochi-yellow); }
+.mochi.color-3 { background: var(--mochi-mint); }
+.mochi.color-4 { background: var(--mochi-lavender); }
+.mochi.color-5 { background: var(--mochi-sky); }
+.mochi.color-6 { background: var(--mochi-white); border: 2px solid #EEE5D8; }
+
+/* face */
+.mochi-eyes {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  letter-spacing: 10px;
+  color: var(--ui-dark);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.mochi-mouth {
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  color: var(--ui-dark);
+  pointer-events: none;
+}
+.mochi-blush {
+  position: absolute;
+  width: 14px;
+  height: 8px;
+  border-radius: 50%;
+  top: 48%;
+  pointer-events: none;
+}
+.mochi-blush.left {
+  left: 10%;
+  background: rgba(255, 130, 160, 0.35);
+}
+.mochi-blush.right {
+  right: 10%;
+  background: rgba(255, 130, 160, 0.35);
+}
+
+.mochi.color-0 .mochi-blush.left,
+.mochi.color-0 .mochi-blush.right { background: rgba(255, 100, 130, 0.3); }
+
+@keyframes mochiIdle {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50% { transform: scaleX(1.03) scaleY(0.97); }
+}
+
+.mochi.selected {
+  animation: mochiSelected 0.5s ease-in-out infinite;
+  filter: brightness(1.08);
+  z-index: 10;
+}
+@keyframes mochiSelected {
+  0%, 100% { transform: scaleX(1) scaleY(1) translateY(0); }
+  50% { transform: scaleX(0.95) scaleY(1.05) translateY(-6px); }
+}
+
+.mochi.landing {
+  animation: mochiLand 0.35s ease-out forwards;
+}
+@keyframes mochiLand {
+  0% { transform: scaleX(0.85) scaleY(1.2) translateY(-30px); opacity: 0.7; }
+  50% { transform: scaleX(1.15) scaleY(0.85) translateY(0); opacity: 1; }
+  75% { transform: scaleX(0.95) scaleY(1.05); }
+  100% { transform: scaleX(1) scaleY(1); }
+}
+
+.mochi.completing {
+  animation: mochiComplete 0.6s ease-out forwards;
+}
+@keyframes mochiComplete {
+  0% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+.mochi.locked::after {
+  content: '🧊';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  pointer-events: none;
+}
+
+/* ===== GAME BOTTOM BAR ===== */
+.game-bottom {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 20px 24px;
+}
+.btn-action {
+  background: var(--bg2);
+  color: var(--ui-brown);
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  box-shadow: 0 3px 0 #E0D0BE;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.btn-action .icon { font-size: 18px; }
+.btn-action.ad-btn {
+  background: var(--accent-light);
+  color: var(--ui-dark);
+  box-shadow: 0 3px 0 #E89AB0;
+}
+
+/* ===== OVERLAYS ===== */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(93, 64, 55, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+  backdrop-filter: blur(4px);
+}
+.overlay.active {
+  opacity: 1; pointer-events: all;
+}
+.overlay-card {
+  background: white;
+  border-radius: 24px;
+  padding: 32px 28px;
+  text-align: center;
+  max-width: 320px;
+  width: 85%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  transform: scale(0.9);
+  transition: transform 0.3s;
+}
+.overlay.active .overlay-card {
+  transform: scale(1);
+}
+.overlay-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--ui-dark);
+  margin-bottom: 8px;
+}
+.overlay-sub {
+  font-size: 15px;
+  color: var(--ui-brown);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.overlay-reward {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.reward-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: var(--ui-dark);
+}
+.reward-item .icon { font-size: 32px; }
+.reward-item .val { font-size: 18px; }
+
+.btn-next {
+  background: var(--accent);
+  color: white;
+  font-size: 18px;
+  padding: 14px 40px;
+  box-shadow: 0 5px 0 #E0557F;
+  margin-bottom: 10px;
+}
+.btn-double {
+  background: var(--mochi-yellow);
+  color: var(--ui-dark);
+  font-size: 14px;
+  padding: 10px 24px;
+  box-shadow: 0 3px 0 #E0D48A;
+}
+
+/* fail overlay */
+.fail-mochi {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--mochi-sky);
+  margin: 0 auto 16px;
+  position: relative;
+  animation: failSad 2s ease-in-out infinite;
+}
+.fail-mochi::before {
+  content: '◠  ◠';
+  position: absolute;
+  top: 35%; left: 50%;
+  transform: translate(-50%, -50%) rotate(180deg);
+  font-size: 14px;
+  letter-spacing: 10px;
+  color: var(--ui-dark);
+}
+.fail-mochi::after {
+  content: '︵';
+  position: absolute;
+  top: 60%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: var(--ui-dark);
+}
+@keyframes failSad {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.btn-revive {
+  background: var(--mochi-mint);
+  color: var(--ui-dark);
+  font-size: 16px;
+  padding: 12px 32px;
+  box-shadow: 0 4px 0 #8DC8A0;
+  margin-bottom: 10px;
+}
+.btn-retry {
+  background: var(--bg2);
+  color: var(--ui-brown);
+  font-size: 14px;
+  padding: 10px 28px;
+  box-shadow: 0 3px 0 #E0D0BE;
+}
+
+/* ad simulation overlay */
+.ad-overlay {
+  position: fixed; inset: 0;
+  background: #111;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 200;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+  color: white;
+}
+.ad-overlay.active { opacity: 1; pointer-events: all; }
+.ad-text { font-size: 18px; margin-bottom: 20px; font-weight: 600; }
+.ad-timer {
+  font-size: 48px; font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 30px;
+}
+.ad-skip {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.ad-skip.visible { opacity: 1; }
+
+/* ===== PARTICLES ===== */
+.particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 150;
+  font-size: 20px;
+  animation: particleFly 1s ease-out forwards;
+}
+@keyframes particleFly {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0) rotate(360deg); opacity: 0; }
+}
+
+/* ===== COLLECTION SCREEN ===== */
+#collection-screen {
+  background: var(--bg);
+  justify-content: flex-start;
+}
+.collection-header {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 12px;
+}
+.btn-back {
+  background: var(--bg2);
+  color: var(--ui-brown);
+  font-size: 20px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  box-shadow: 0 3px 0 #E0D0BE;
+}
+.collection-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ui-dark);
+}
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  overflow-y: auto;
+  flex: 1;
+}
+.collection-item {
+  aspect-ratio: 1;
+  border-radius: 16px;
+  background: var(--bg2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px solid var(--plate-border);
+}
+.collection-item.unlocked {
+  border-color: var(--accent-light);
+  background: white;
+}
+.collection-item .c-mochi {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  position: relative;
+}
+.collection-item .c-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ui-brown);
+}
+.collection-item.locked .c-mochi {
+  background: #DDD !important;
+  filter: grayscale(1);
+}
+.collection-item.locked .c-mochi::before,
+.collection-item.locked .c-mochi::after,
+.collection-item.locked .mochi-blush { display: none; }
+.collection-item.locked::after {
+  content: '?';
+  position: absolute;
+  font-size: 24px;
+  font-weight: 900;
+  color: #BBB;
+}
+.collection-item.locked { position: relative; }
+.collection-progress {
+  width: 100%;
+  max-width: 420px;
+  padding: 0 20px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ui-brown);
+  text-align: center;
+}
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--bg2);
+  border-radius: 5px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-light), var(--accent));
+  border-radius: 5px;
+  transition: width 0.5s;
+}
+
+/* ===== LEVEL SELECT ===== */
+#level-screen {
+  background: var(--bg);
+  justify-content: flex-start;
+}
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  overflow-y: auto;
+  flex: 1;
+}
+.level-btn {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  background: white;
+  border: 2px solid var(--plate-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ui-dark);
+  cursor: pointer;
+  transition: transform 0.15s;
+  position: relative;
+}
+.level-btn:active { transform: scale(0.92); }
+.level-btn.cleared {
+  background: var(--mochi-mint);
+  border-color: #8DC8A0;
+}
+.level-btn.cleared::after {
+  content: '⭐';
+  position: absolute;
+  top: -4px; right: -4px;
+  font-size: 14px;
+}
+.level-btn.current {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  animation: currentPulse 1.5s ease-in-out infinite;
+}
+@keyframes currentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,157,0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(255,107,157,0); }
+}
+.level-btn.locked {
+  background: var(--bg2);
+  color: #CCC;
+  cursor: default;
+}
+
+/* move counter */
+.move-counter {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ui-brown);
+  background: var(--bg2);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-height: 700px) {
+  .mochi { width: 48px; height: 48px; }
+  .plate { width: 64px; }
+  .plate-base { width: 64px; }
+  .mochi-eyes { font-size: 9px; letter-spacing: 8px; }
+  .mochi-mouth { font-size: 9px; }
+  .plate-stack { min-height: 140px; }
+}
+@media (min-width: 500px) {
+  .mochi { width: 60px; height: 60px; }
+  .plate { width: 78px; }
+  .plate-base { width: 78px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== TITLE SCREEN ===== -->
+<div id="title-screen" class="screen active">
+  <div class="title-mochi">
+    <div class="title-blush-l"></div>
+    <div class="title-blush-r"></div>
+  </div>
+  <div class="title-text">말랑소트</div>
+  <div class="title-sub">세상에서 가장 말랑말랑한 퍼즐</div>
+  <button class="btn btn-play" onclick="showScreen('level-screen')">시작하기</button>
+  <button class="btn btn-collection" onclick="showScreen('collection-screen'); renderCollection();">모찌 도감</button>
+</div>
+
+<!-- ===== LEVEL SELECT ===== -->
+<div id="level-screen" class="screen">
+  <div class="collection-header">
+    <button class="btn btn-back" onclick="showScreen('title-screen')">←</button>
+    <div class="collection-title">레벨 선택</div>
+    <div class="hud-coins"><span>🪙</span> <span id="level-coins">0</span></div>
+  </div>
+  <div class="level-grid" id="level-grid"></div>
+</div>
+
+<!-- ===== GAME SCREEN ===== -->
+<div id="game-screen" class="screen">
+  <div class="game-hud">
+    <button class="btn btn-back" onclick="confirmQuit()" style="font-size:16px;">←</button>
+    <div class="hud-level" id="hud-level">레벨 1</div>
+    <div class="move-counter" id="move-counter">이동: 0</div>
+    <div class="hud-coins"><span>🪙</span> <span id="hud-coins">0</span></div>
+  </div>
+  <div class="game-area">
+    <div class="plates-container" id="plates-container"></div>
+  </div>
+  <div class="game-bottom">
+    <button class="btn btn-action" onclick="undoMove()">
+      <span class="icon">↩️</span> 되돌리기
+    </button>
+    <button class="btn btn-action ad-btn" onclick="useHint()">
+      <span class="icon">💡</span> 힌트
+    </button>
+    <button class="btn btn-action" onclick="addEmptyPlate()">
+      <span class="icon">➕</span> 접시추가
+    </button>
+  </div>
+</div>
+
+<!-- ===== WIN OVERLAY ===== -->
+<div id="win-overlay" class="overlay">
+  <div class="overlay-card">
+    <div class="overlay-title">🎉 클리어!</div>
+    <div class="overlay-sub" id="win-message">말랑말랑 완벽 정리!</div>
+    <div class="overlay-reward">
+      <div class="reward-item"><span class="icon">🪙</span><span class="val" id="win-coins">+50</span></div>
+      <div class="reward-item"><span class="icon">⭐</span><span class="val" id="win-stars">+3</span></div>
+    </div>
+    <button class="btn btn-double" onclick="showAd('double')" style="margin-bottom:12px;">
+      🎬 광고 보고 2배 받기!
+    </button>
+    <br>
+    <button class="btn btn-next" onclick="nextLevel()">다음 레벨 →</button>
+  </div>
+</div>
+
+<!-- ===== FAIL OVERLAY ===== -->
+<div id="fail-overlay" class="overlay">
+  <div class="overlay-card">
+    <div class="fail-mochi"></div>
+    <div class="overlay-title">이동할 수 없어요...</div>
+    <div class="overlay-sub">모찌가 슬퍼하고 있어요</div>
+    <button class="btn btn-revive" onclick="showAd('revive')">
+      🎬 광고 보고 이어하기
+    </button>
+    <br>
+    <button class="btn btn-retry" onclick="retryLevel()">다시 도전</button>
+  </div>
+</div>
+
+<!-- ===== AD SIMULATION ===== -->
+<div id="ad-overlay" class="ad-overlay">
+  <div class="ad-text">📺 광고 시뮬레이션</div>
+  <div class="ad-timer" id="ad-timer">3</div>
+  <div class="ad-text" style="font-size:14px; opacity:0.6;">(실제 앱에서는 AdMob 광고가 표시됩니다)</div>
+  <button class="ad-skip" id="ad-skip" onclick="skipAd()">닫기</button>
+</div>
+
+<script>
+// ===== GAME STATE =====
+const STATE = {
+  coins: 0,
+  currentLevel: 1,
+  maxUnlocked: 1,
+  clearedLevels: new Set(),
+  collection: new Set(),
+  moves: 0,
+  selectedPlate: null,
+  plates: [],
+  history: [],
+  adCallback: null,
+  hintsUsed: 0,
+  totalLevels: 40,
+};
+
+// ===== MOCHI DATA =====
+const MOCHI_COLORS = [
+  { name: '딸기 모찌', class: 'color-0' },
+  { name: '귤 모찌', class: 'color-1' },
+  { name: '레몬 모찌', class: 'color-2' },
+  { name: '녹차 모찌', class: 'color-3' },
+  { name: '포도 모찌', class: 'color-4' },
+  { name: '블루베리 모찌', class: 'color-5' },
+  { name: '우유 모찌', class: 'color-6' },
+];
+
+const COLLECTION_ITEMS = [
+  ...MOCHI_COLORS.map((m, i) => ({ id: `basic_${i}`, name: m.name, colorClass: m.class, rarity: '일반' })),
+  { id: 'cherry_blossom', name: '벚꽃 모찌', colorClass: 'color-0', rarity: '레어' },
+  { id: 'matcha_premium', name: '고급 녹차', colorClass: 'color-3', rarity: '레어' },
+  { id: 'sunset', name: '노을 모찌', colorClass: 'color-1', rarity: '레어' },
+  { id: 'ocean', name: '바다 모찌', colorClass: 'color-5', rarity: '레어' },
+  { id: 'rainbow', name: '무지개 모찌', colorClass: 'color-4', rarity: '에픽' },
+  { id: 'golden', name: '황금 모찌', colorClass: 'color-2', rarity: '에픽' },
+  { id: 'crystal', name: '크리스탈 모찌', colorClass: 'color-5', rarity: '전설' },
+  { id: 'star', name: '별빛 모찌', colorClass: 'color-2', rarity: '전설' },
+];
+
+// ===== SOUND SYSTEM (Web Audio API) =====
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.15) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function sfxSelect() {
+  playTone(523, 0.12, 'sine', 0.12);
+  setTimeout(() => playTone(659, 0.12, 'sine', 0.1), 60);
+}
+
+function sfxPlace() {
+  playTone(392, 0.08, 'sine', 0.15);
+  playTone(196, 0.15, 'triangle', 0.1);
+}
+
+function sfxComplete() {
+  [523, 659, 784, 1047].forEach((f, i) => {
+    setTimeout(() => playTone(f, 0.2, 'sine', 0.12), i * 100);
+  });
+}
+
+function sfxWin() {
+  const notes = [523, 659, 784, 659, 784, 1047];
+  notes.forEach((f, i) => {
+    setTimeout(() => playTone(f, 0.25, 'sine', 0.15), i * 120);
+  });
+}
+
+function sfxError() {
+  playTone(200, 0.15, 'square', 0.06);
+  setTimeout(() => playTone(180, 0.2, 'square', 0.04), 100);
+}
+
+function sfxUndo() {
+  playTone(400, 0.1, 'sine', 0.08);
+  setTimeout(() => playTone(350, 0.1, 'sine', 0.06), 80);
+}
+
+function sfxCoin() {
+  playTone(1200, 0.08, 'sine', 0.1);
+  setTimeout(() => playTone(1600, 0.12, 'sine', 0.08), 80);
+}
+
+// ===== LEVEL GENERATION =====
+function generateLevel(levelNum) {
+  let numColors, plateCapacity, numPlates, emptyPlates;
+  plateCapacity = 4;
+
+  if (levelNum <= 5) {
+    numColors = 2;
+    emptyPlates = 2;
+  } else if (levelNum <= 12) {
+    numColors = 3;
+    emptyPlates = 2;
+  } else if (levelNum <= 20) {
+    numColors = 4;
+    emptyPlates = 2;
+  } else if (levelNum <= 30) {
+    numColors = 5;
+    emptyPlates = 1;
+  } else {
+    numColors = Math.min(6, 4 + Math.floor((levelNum - 25) / 8));
+    emptyPlates = 1;
+  }
+  numPlates = numColors + emptyPlates;
+
+  // create mochi array: plateCapacity of each color
+  let mochis = [];
+  for (let c = 0; c < numColors; c++) {
+    for (let i = 0; i < plateCapacity; i++) {
+      mochis.push(c);
+    }
+  }
+
+  // shuffle (Fisher-Yates)
+  for (let i = mochis.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [mochis[i], mochis[j]] = [mochis[j], mochis[i]];
+  }
+
+  // ensure the puzzle is not already solved and is solvable
+  // distribute into plates
+  let plates = [];
+  let idx = 0;
+  for (let p = 0; p < numColors; p++) {
+    let plate = [];
+    for (let i = 0; i < plateCapacity; i++) {
+      plate.push(mochis[idx++]);
+    }
+    plates.push(plate);
+  }
+  // add empty plates
+  for (let p = 0; p < emptyPlates; p++) {
+    plates.push([]);
+  }
+
+  // ensure not trivially solved (all same color on one plate)
+  let isSolved = plates.every(p => {
+    if (p.length === 0) return true;
+    return p.every(m => m === p[0]) && p.length === plateCapacity;
+  });
+  if (isSolved) {
+    // swap first two different-colored mochis between first two plates
+    if (plates[0].length && plates[1].length) {
+      [plates[0][0], plates[1][0]] = [plates[1][0], plates[0][0]];
+    }
+  }
+
+  return {
+    level: levelNum,
+    plates: plates,
+    capacity: plateCapacity,
+    numColors: numColors,
+  };
+}
+
+// ===== SCREEN MANAGEMENT =====
+function showScreen(screenId) {
+  initAudio();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+
+  if (screenId === 'level-screen') {
+    renderLevelSelect();
+  }
+}
+
+function showOverlay(id) {
+  document.getElementById(id).classList.add('active');
+}
+function hideOverlay(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+// ===== LEVEL SELECT =====
+function renderLevelSelect() {
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  document.getElementById('level-coins').textContent = STATE.coins;
+
+  for (let i = 1; i <= STATE.totalLevels; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn';
+
+    if (STATE.clearedLevels.has(i)) {
+      btn.classList.add('cleared');
+    } else if (i === STATE.maxUnlocked) {
+      btn.classList.add('current');
+    } else if (i > STATE.maxUnlocked) {
+      btn.classList.add('locked');
+    }
+
+    btn.textContent = i;
+
+    if (i <= STATE.maxUnlocked) {
+      btn.onclick = () => startLevel(i);
+    }
+
+    grid.appendChild(btn);
+  }
+}
+
+// ===== GAME LOGIC =====
+function startLevel(levelNum) {
+  STATE.currentLevel = levelNum;
+  STATE.moves = 0;
+  STATE.selectedPlate = null;
+  STATE.history = [];
+  STATE.hintsUsed = 0;
+
+  const levelData = generateLevel(levelNum);
+  STATE.plates = levelData.plates.map(p => [...p]);
+  STATE.plateCapacity = levelData.capacity;
+
+  document.getElementById('hud-level').textContent = `레벨 ${levelNum}`;
+  document.getElementById('hud-coins').textContent = STATE.coins;
+  document.getElementById('move-counter').textContent = `이동: 0`;
+
+  showScreen('game-screen');
+  renderPlates();
+}
+
+function renderPlates() {
+  const container = document.getElementById('plates-container');
+  container.innerHTML = '';
+
+  STATE.plates.forEach((plate, plateIdx) => {
+    const plateEl = document.createElement('div');
+    plateEl.className = 'plate';
+    if (STATE.selectedPlate === plateIdx) {
+      plateEl.classList.add('selected');
+    }
+    plateEl.onclick = () => onPlateClick(plateIdx);
+
+    const stack = document.createElement('div');
+    stack.className = 'plate-stack';
+
+    plate.forEach((colorIdx, mochiIdx) => {
+      const mochi = createMochiElement(colorIdx);
+      if (STATE.selectedPlate === plateIdx && mochiIdx === plate.length - 1) {
+        mochi.classList.add('selected');
+      }
+      stack.appendChild(mochi);
+    });
+
+    const base = document.createElement('div');
+    base.className = 'plate-base';
+
+    plateEl.appendChild(stack);
+    plateEl.appendChild(base);
+    container.appendChild(plateEl);
+  });
+}
+
+function createMochiElement(colorIdx) {
+  const mochi = document.createElement('div');
+  mochi.className = `mochi color-${colorIdx}`;
+
+  // Randomize animation offset so they don't all breathe in sync
+  mochi.style.animationDelay = `${Math.random() * 3}s`;
+
+  const eyes = document.createElement('div');
+  eyes.className = 'mochi-eyes';
+  eyes.textContent = '◕ ◕';
+
+  const mouth = document.createElement('div');
+  mouth.className = 'mochi-mouth';
+  mouth.textContent = 'ω';
+
+  const blushL = document.createElement('div');
+  blushL.className = 'mochi-blush left';
+  const blushR = document.createElement('div');
+  blushR.className = 'mochi-blush right';
+
+  mochi.appendChild(eyes);
+  mochi.appendChild(mouth);
+  mochi.appendChild(blushL);
+  mochi.appendChild(blushR);
+
+  return mochi;
+}
+
+function onPlateClick(plateIdx) {
+  initAudio();
+
+  if (STATE.selectedPlate === null) {
+    // Select: pick top mochi from this plate
+    if (STATE.plates[plateIdx].length === 0) return;
+    STATE.selectedPlate = plateIdx;
+    sfxSelect();
+    renderPlates();
+  } else if (STATE.selectedPlate === plateIdx) {
+    // Deselect
+    STATE.selectedPlate = null;
+    renderPlates();
+  } else {
+    // Try to move
+    const fromPlate = STATE.plates[STATE.selectedPlate];
+    const toPlate = STATE.plates[plateIdx];
+    const mochiColor = fromPlate[fromPlate.length - 1];
+
+    // Can place if: target is empty OR target top is same color AND not full
+    const canPlace = toPlate.length < STATE.plateCapacity &&
+      (toPlate.length === 0 || toPlate[toPlate.length - 1] === mochiColor);
+
+    if (canPlace) {
+      // Save history for undo
+      STATE.history.push({
+        from: STATE.selectedPlate,
+        to: plateIdx,
+        color: mochiColor,
+      });
+
+      fromPlate.pop();
+      toPlate.push(mochiColor);
+      STATE.moves++;
+      STATE.selectedPlate = null;
+
+      document.getElementById('move-counter').textContent = `이동: ${STATE.moves}`;
+
+      sfxPlace();
+      renderPlates();
+
+      // Animate landing
+      const plateEls = document.querySelectorAll('.plate');
+      const targetPlate = plateEls[plateIdx];
+      const mochiEls = targetPlate.querySelectorAll('.mochi');
+      const lastMochi = mochiEls[mochiEls.length - 1];
+      if (lastMochi) {
+        lastMochi.classList.remove('mochiIdle');
+        lastMochi.classList.add('landing');
+        setTimeout(() => lastMochi.classList.remove('landing'), 350);
+      }
+
+      // Check if plate is complete
+      if (toPlate.length === STATE.plateCapacity && toPlate.every(m => m === mochiColor)) {
+        setTimeout(() => completePlate(plateIdx), 400);
+      }
+
+      // Check win after a delay
+      setTimeout(checkWin, 600);
+    } else {
+      sfxError();
+      STATE.selectedPlate = null;
+      renderPlates();
+
+      // Shake the target plate
+      const plateEls = document.querySelectorAll('.plate');
+      const targetEl = plateEls[plateIdx];
+      targetEl.style.animation = 'none';
+      targetEl.offsetHeight; // reflow
+      targetEl.style.animation = 'shake 0.3s ease';
+    }
+  }
+}
+
+function completePlate(plateIdx) {
+  sfxComplete();
+
+  const plateEls = document.querySelectorAll('.plate');
+  const plateEl = plateEls[plateIdx];
+  const mochiEls = plateEl.querySelectorAll('.mochi');
+
+  // Get position for particles
+  const rect = plateEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  spawnParticles(cx, cy, 12);
+
+  mochiEls.forEach((m, i) => {
+    setTimeout(() => m.classList.add('completing'), i * 80);
+  });
+
+  // Add coins
+  STATE.coins += 10;
+  document.getElementById('hud-coins').textContent = STATE.coins;
+  sfxCoin();
+
+  // Add to collection
+  const color = STATE.plates[plateIdx][0];
+  if (color !== undefined) {
+    STATE.collection.add(`basic_${color}`);
+  }
+
+  // Random rare drop
+  if (Math.random() < 0.15) {
+    const rares = COLLECTION_ITEMS.filter(c => c.rarity !== '일반' && !STATE.collection.has(c.id));
+    if (rares.length > 0) {
+      const drop = rares[Math.floor(Math.random() * rares.length)];
+      STATE.collection.add(drop.id);
+    }
+  }
+}
+
+function spawnParticles(x, y, count) {
+  const emojis = ['✨', '💖', '⭐', '🌸', '💫', '🍡'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+    const dist = 60 + Math.random() * 80;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 40 + 'px');
+    p.style.animationDelay = Math.random() * 0.15 + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1200);
+  }
+}
+
+function checkWin() {
+  const allComplete = STATE.plates.every(plate => {
+    if (plate.length === 0) return true;
+    if (plate.length !== STATE.plateCapacity) return false;
+    return plate.every(m => m === plate[0]);
+  });
+
+  if (allComplete) {
+    setTimeout(() => {
+      sfxWin();
+
+      STATE.clearedLevels.add(STATE.currentLevel);
+      if (STATE.currentLevel >= STATE.maxUnlocked) {
+        STATE.maxUnlocked = Math.min(STATE.currentLevel + 1, STATE.totalLevels);
+      }
+
+      const reward = 30 + STATE.currentLevel * 5;
+      STATE.coins += reward;
+
+      document.getElementById('win-coins').textContent = `+${reward}`;
+      document.getElementById('win-stars').textContent = STATE.moves <= 10 ? '⭐⭐⭐' : STATE.moves <= 15 ? '⭐⭐' : '⭐';
+      document.getElementById('win-message').textContent =
+        STATE.moves <= 10 ? '완벽한 정리! 말랑말랑~' :
+        STATE.moves <= 15 ? '깔끔하게 정리했어요!' : '잘 정리했어요!';
+
+      showOverlay('win-overlay');
+      saveGame();
+    }, 800);
+  }
+
+  // Check if stuck (no valid moves)
+  if (!allComplete && !hasValidMoves()) {
+    setTimeout(() => {
+      showOverlay('fail-overlay');
+    }, 400);
+  }
+}
+
+function hasValidMoves() {
+  for (let i = 0; i < STATE.plates.length; i++) {
+    if (STATE.plates[i].length === 0) continue;
+    const topColor = STATE.plates[i][STATE.plates[i].length - 1];
+
+    for (let j = 0; j < STATE.plates.length; j++) {
+      if (i === j) continue;
+      if (STATE.plates[j].length >= STATE.plateCapacity) continue;
+      if (STATE.plates[j].length === 0 || STATE.plates[j][STATE.plates[j].length - 1] === topColor) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ===== UNDO =====
+function undoMove() {
+  if (STATE.history.length === 0) return;
+  const last = STATE.history.pop();
+  STATE.plates[last.to].pop();
+  STATE.plates[last.from].push(last.color);
+  STATE.moves--;
+  STATE.selectedPlate = null;
+  document.getElementById('move-counter').textContent = `이동: ${STATE.moves}`;
+  sfxUndo();
+  renderPlates();
+}
+
+// ===== HINT =====
+function useHint() {
+  if (STATE.hintsUsed >= 1) {
+    showAd('hint');
+    return;
+  }
+
+  STATE.hintsUsed++;
+  performHint();
+}
+
+function performHint() {
+  // Find a valid move and highlight it
+  for (let i = 0; i < STATE.plates.length; i++) {
+    if (STATE.plates[i].length === 0) continue;
+    const topColor = STATE.plates[i][STATE.plates[i].length - 1];
+
+    for (let j = 0; j < STATE.plates.length; j++) {
+      if (i === j) continue;
+      if (STATE.plates[j].length >= STATE.plateCapacity) continue;
+
+      // Prefer placing on same color, not empty
+      if (STATE.plates[j].length > 0 && STATE.plates[j][STATE.plates[j].length - 1] === topColor) {
+        highlightHint(i, j);
+        return;
+      }
+    }
+  }
+
+  // Fallback: any valid move including empty
+  for (let i = 0; i < STATE.plates.length; i++) {
+    if (STATE.plates[i].length === 0) continue;
+    for (let j = 0; j < STATE.plates.length; j++) {
+      if (i === j) continue;
+      if (STATE.plates[j].length < STATE.plateCapacity &&
+        (STATE.plates[j].length === 0 || STATE.plates[j][STATE.plates[j].length - 1] === STATE.plates[i][STATE.plates[i].length - 1])) {
+        highlightHint(i, j);
+        return;
+      }
+    }
+  }
+}
+
+function highlightHint(from, to) {
+  const plateEls = document.querySelectorAll('.plate');
+  plateEls[from].classList.add('hint-glow');
+  plateEls[to].classList.add('hint-glow');
+  setTimeout(() => {
+    plateEls[from].classList.remove('hint-glow');
+    plateEls[to].classList.remove('hint-glow');
+  }, 1500);
+}
+
+// ===== ADD EMPTY PLATE =====
+function addEmptyPlate() {
+  if (STATE.plates.length >= 10) {
+    sfxError();
+    return;
+  }
+  showAd('plate');
+}
+
+function performAddPlate() {
+  STATE.plates.push([]);
+  STATE.selectedPlate = null;
+  renderPlates();
+  sfxCoin();
+}
+
+// ===== AD SIMULATION =====
+function showAd(type) {
+  STATE.adCallback = type;
+  const overlay = document.getElementById('ad-overlay');
+  const timer = document.getElementById('ad-timer');
+  const skip = document.getElementById('ad-skip');
+
+  overlay.classList.add('active');
+  skip.classList.remove('visible');
+
+  let count = 3;
+  timer.textContent = count;
+
+  const interval = setInterval(() => {
+    count--;
+    timer.textContent = count;
+    if (count <= 0) {
+      clearInterval(interval);
+      skip.classList.add('visible');
+    }
+  }, 1000);
+}
+
+function skipAd() {
+  const overlay = document.getElementById('ad-overlay');
+  overlay.classList.remove('active');
+
+  sfxCoin();
+
+  switch (STATE.adCallback) {
+    case 'double':
+      const reward = 30 + STATE.currentLevel * 5;
+      STATE.coins += reward; // extra reward (already got base)
+      document.getElementById('win-coins').textContent = `+${reward * 2} (2배!)`;
+      break;
+    case 'revive':
+      hideOverlay('fail-overlay');
+      performAddPlate();
+      break;
+    case 'hint':
+      performHint();
+      break;
+    case 'plate':
+      performAddPlate();
+      break;
+  }
+
+  STATE.adCallback = null;
+  document.getElementById('hud-coins').textContent = STATE.coins;
+  saveGame();
+}
+
+// ===== NAVIGATION =====
+function nextLevel() {
+  hideOverlay('win-overlay');
+  if (STATE.currentLevel < STATE.totalLevels) {
+    startLevel(STATE.currentLevel + 1);
+  } else {
+    showScreen('level-screen');
+  }
+}
+
+function retryLevel() {
+  hideOverlay('fail-overlay');
+  startLevel(STATE.currentLevel);
+}
+
+function confirmQuit() {
+  STATE.selectedPlate = null;
+  showScreen('level-screen');
+}
+
+// ===== COLLECTION =====
+function renderCollection() {
+  const grid = document.querySelector('.collection-grid');
+  grid.innerHTML = '';
+
+  COLLECTION_ITEMS.forEach(item => {
+    const el = document.createElement('div');
+    const unlocked = STATE.collection.has(item.id);
+    el.className = `collection-item ${unlocked ? 'unlocked' : 'locked'}`;
+
+    const mochi = document.createElement('div');
+    mochi.className = `c-mochi ${item.colorClass}`;
+    if (unlocked) {
+      mochi.style.position = 'relative';
+      const eyes = document.createElement('div');
+      eyes.className = 'mochi-eyes';
+      eyes.textContent = '◕ ◕';
+      eyes.style.cssText = 'position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);font-size:8px;letter-spacing:6px;color:#5D4037;';
+      const mouth = document.createElement('div');
+      mouth.className = 'mochi-mouth';
+      mouth.textContent = 'ω';
+      mouth.style.cssText = 'position:absolute;top:55%;left:50%;transform:translate(-50%,-50%);font-size:8px;color:#5D4037;';
+      mochi.appendChild(eyes);
+      mochi.appendChild(mouth);
+    }
+
+    const name = document.createElement('div');
+    name.className = 'c-name';
+    name.textContent = unlocked ? item.name : '???';
+
+    el.appendChild(mochi);
+    el.appendChild(name);
+    grid.appendChild(el);
+  });
+
+  const progress = document.querySelector('.collection-progress');
+  if (!progress) {
+    const p = document.createElement('div');
+    p.className = 'collection-progress';
+    document.getElementById('collection-screen').appendChild(p);
+  }
+  const prog = document.querySelector('.collection-progress');
+  prog.innerHTML = `
+    수집: ${STATE.collection.size}/${COLLECTION_ITEMS.length}
+    <div class="progress-bar">
+      <div class="progress-fill" style="width:${(STATE.collection.size / COLLECTION_ITEMS.length) * 100}%"></div>
+    </div>
+  `;
+}
+
+// ===== SAVE/LOAD =====
+function saveGame() {
+  const data = {
+    coins: STATE.coins,
+    maxUnlocked: STATE.maxUnlocked,
+    clearedLevels: [...STATE.clearedLevels],
+    collection: [...STATE.collection],
+  };
+  localStorage.setItem('mallangSort', JSON.stringify(data));
+}
+
+function loadGame() {
+  try {
+    const data = JSON.parse(localStorage.getItem('mallangSort'));
+    if (data) {
+      STATE.coins = data.coins || 0;
+      STATE.maxUnlocked = data.maxUnlocked || 1;
+      STATE.clearedLevels = new Set(data.clearedLevels || []);
+      STATE.collection = new Set(data.collection || []);
+    }
+  } catch (e) { }
+}
+
+// ===== CSS for shake animation =====
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+`;
+document.head.appendChild(style);
+
+// ===== COLLECTION SCREEN STRUCTURE =====
+document.getElementById('collection-screen').innerHTML = `
+  <div class="collection-header">
+    <button class="btn btn-back" onclick="showScreen('title-screen')">←</button>
+    <div class="collection-title">🍡 모찌 도감</div>
+  </div>
+  <div class="collection-grid"></div>
+  <div class="collection-progress"></div>
+`;
+
+// ===== INIT =====
+loadGame();
+</script>
+</body>
+</html>
