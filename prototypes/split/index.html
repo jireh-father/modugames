@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>분열 (Split Shot)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;touch-action:none;font-family:'Segoe UI',sans-serif;user-select:none}
+canvas{display:block}
+#ui{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;pointer-events:none;z-index:10}
+#ui>div{background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;font-size:15px;color:#c5e1a5;font-weight:bold}
+#startScreen{position:fixed;inset:0;background:linear-gradient(180deg,#0a1a0a 0%,#1b5e20 50%,#0a1a0a 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#startScreen h1{font-size:52px;margin-bottom:8px;background:linear-gradient(90deg,#c5e1a5,#aed581,#8bc34a);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#startScreen p{color:#c5e1a5;margin-bottom:30px;font-size:16px;text-align:center;line-height:1.6}
+#startScreen button{background:linear-gradient(135deg,#2e7d32,#66bb6a);color:#fff;border:none;padding:16px 48px;border-radius:30px;font-size:20px;cursor:pointer;font-weight:bold;box-shadow:0 4px 20px rgba(46,125,50,0.5)}
+#levelComplete{position:fixed;inset:0;background:rgba(10,10,26,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#levelComplete h2{font-size:32px;margin-bottom:12px}
+#lcStars{font-size:48px;color:#ffd54f;margin-bottom:8px}
+#lcInfo{font-size:18px;color:#c5e1a5;margin-bottom:24px}
+#levelComplete button{background:linear-gradient(135deg,#2e7d32,#66bb6a);color:#fff;border:none;padding:14px 36px;border-radius:30px;font-size:18px;cursor:pointer;font-weight:bold;margin:6px}
+#skillInfo{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(46,125,50,0.4);padding:10px 24px;border-radius:20px;color:#dcedc8;font-size:14px;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>분열</h1>
+  <p>공 하나를 발사하면<br>벽에 튕길 때마다 2개로 분열!<br><br>분열된 공들로 모든 별을 맞추세요!</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="shotDisplay">발사: 0</div>
+  <div id="starsDisplay">별: 0/0</div>
+</div>
+<div id="skillInfo">드래그로 조준 → 바운스마다 분열!</div>
+<div id="levelComplete">
+  <h2 id="lcTitle">레벨 클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+
+const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+function playSound(f,d,t='sine',v=0.12){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d)}
+function playLaunch(){playSound(300,0.2,'sine',0.1);playSound(500,0.15,'sine',0.06)}
+function playSplit(gen){playSound(400+gen*150,0.15,'sine',0.1);playSound(600+gen*100,0.1,'sine',0.06)}
+function playStarHit(){playSound(600,0.3,'sine',0.15);setTimeout(()=>playSound(800,0.2,'sine',0.1),80)}
+function playBounce(){playSound(200+Math.random()*100,0.08,'sine',0.04)}
+
+const STAR_RADIUS=16,BALL_RADIUS=6;
+
+let balls=[],targets=[],walls=[],trails=[],particles=[],sparkles=[];
+let launchPos={x:0,y:0};
+let isDragging=false,aimPos=null;
+let shotCount=0,level=1,gameActive=false,ballsActive=false;
+const BALL_SPEED=8,MAX_GENERATION=3; // split up to 3 times
+
+const levelDefs=[
+  (w,h)=>({launch:{x:w*0.5,y:h*0.85},stars:[{x:w*0.3,y:h*0.3},{x:w*0.7,y:h*0.3},{x:w*0.5,y:h*0.55}],walls:[],par:1}),
+  (w,h)=>({launch:{x:w*0.2,y:h*0.85},stars:[{x:w*0.2,y:h*0.2},{x:w*0.5,y:h*0.4},{x:w*0.8,y:h*0.2},{x:w*0.8,y:h*0.6}],walls:[],par:1}),
+  (w,h)=>({launch:{x:w*0.5,y:h*0.9},stars:[{x:w*0.15,y:h*0.15},{x:w*0.85,y:h*0.15},{x:w*0.5,y:h*0.5},{x:w*0.15,y:h*0.7},{x:w*0.85,y:h*0.7}],
+    walls:[{x1:w*0.35,y1:h*0.3,x2:w*0.65,y2:h*0.3}],par:1}),
+  (w,h)=>({launch:{x:w*0.1,y:h*0.9},stars:[{x:w*0.3,y:h*0.2},{x:w*0.5,y:h*0.4},{x:w*0.7,y:h*0.2},{x:w*0.9,y:h*0.5},{x:w*0.5,y:h*0.7},{x:w*0.2,y:h*0.5}],
+    walls:[{x1:w*0.4,y1:h*0.15,x2:w*0.4,y2:h*0.55}],par:1}),
+  (w,h)=>({launch:{x:w*0.5,y:h*0.92},stars:[{x:w*0.1,y:h*0.1},{x:w*0.9,y:h*0.1},{x:w*0.1,y:h*0.5},{x:w*0.9,y:h*0.5},{x:w*0.3,y:h*0.3},{x:w*0.7,y:h*0.3},{x:w*0.5,y:h*0.65}],
+    walls:[{x1:w*0.25,y1:h*0.2,x2:w*0.25,y2:h*0.6},{x1:w*0.75,y1:h*0.2,x2:w*0.75,y2:h*0.6}],par:1}),
+  (w,h)=>({launch:{x:w*0.5,y:h*0.92},stars:[{x:w*0.15,y:h*0.15},{x:w*0.5,y:h*0.15},{x:w*0.85,y:h*0.15},{x:w*0.15,y:h*0.45},{x:w*0.5,y:h*0.45},{x:w*0.85,y:h*0.45},{x:w*0.3,y:h*0.7},{x:w*0.7,y:h*0.7}],
+    walls:[{x1:w*0.33,y1:h*0.25,x2:w*0.33,y2:h*0.55},{x1:w*0.67,y1:h*0.25,x2:w*0.67,y2:h*0.55},{x1:w*0.15,y1:h*0.6,x2:w*0.85,y2:h*0.6}],par:1}),
+];
+
+function initLevel(l){
+  const m=50,di=Math.min(l-1,levelDefs.length-1);
+  const def=levelDefs[di](W-m*2,H-m*2-50);
+  launchPos={x:def.launch.x+m,y:def.launch.y+m+50};
+  targets=def.stars.map(s=>({x:s.x+m,y:s.y+m+50,collected:false,pulse:Math.random()*Math.PI*2}));
+  walls=def.walls.map(w=>({x1:w.x1+m,y1:w.y1+m+50,x2:w.x2+m,y2:w.y2+m+50}));
+  balls=[];trails=[];particles=[];sparkles=[];
+  shotCount=0;ballsActive=false;aimPos=null;
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById('levelDisplay').textContent=`레벨 ${level}`;
+  document.getElementById('shotDisplay').textContent=`발사: ${shotCount}`;
+  const c=targets.filter(t=>t.collected).length;
+  document.getElementById('starsDisplay').textContent=`별: ${c}/${targets.length}`;
+}
+
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();if(!gameActive||ballsActive)return;
+  isDragging=true;aimPos={x:e.clientX,y:e.clientY};
+});
+canvas.addEventListener('pointermove',e=>{e.preventDefault();if(isDragging)aimPos={x:e.clientX,y:e.clientY}});
+canvas.addEventListener('pointerup',e=>{
+  e.preventDefault();
+  if(isDragging&&aimPos){
+    const dx=aimPos.x-launchPos.x,dy=aimPos.y-launchPos.y;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    if(len>20){
+      balls=[{x:launchPos.x,y:launchPos.y,vx:-(dx/len)*BALL_SPEED,vy:-(dy/len)*BALL_SPEED,
+        generation:0,alive:true,bounceCount:0,trail:[],hue:120}];
+      shotCount++;ballsActive=true;playLaunch();updateUI();
+    }
+  }
+  isDragging=false;aimPos=null;
+});
+
+function wallNormal(wall){
+  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,len=Math.sqrt(dx*dx+dy*dy);
+  return{nx:-dy/len,ny:dx/len};
+}
+
+function update(){
+  if(!gameActive)return;
+
+  // Update balls
+  let newBalls=[];
+  for(const ball of balls){
+    if(!ball.alive)continue;
+    for(let s=0;s<3;s++){
+      ball.x+=ball.vx/3;ball.y+=ball.vy/3;
+
+      // Trail
+      if(s===0){ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>30)ball.trail.shift()}
+
+      let bounced=false;
+      // Wall bounces = SPLIT!
+      if(ball.x-BALL_RADIUS<=0){ball.x=BALL_RADIUS;ball.vx=Math.abs(ball.vx);bounced=true}
+      if(ball.x+BALL_RADIUS>=W){ball.x=W-BALL_RADIUS;ball.vx=-Math.abs(ball.vx);bounced=true}
+      if(ball.y-BALL_RADIUS<=0){ball.y=BALL_RADIUS;ball.vy=Math.abs(ball.vy);bounced=true}
+      if(ball.y+BALL_RADIUS>=H){ball.y=H-BALL_RADIUS;ball.vy=-Math.abs(ball.vy);bounced=true}
+
+      // Custom walls
+      for(const wall of walls){
+        const wdx=wall.x2-wall.x1,wdy=wall.y2-wall.y1,wlen=Math.sqrt(wdx*wdx+wdy*wdy);
+        const t=Math.max(0,Math.min(1,((ball.x-wall.x1)*wdx+(ball.y-wall.y1)*wdy)/(wlen*wlen)));
+        const cx=wall.x1+t*wdx,cy=wall.y1+t*wdy;
+        const ddx=ball.x-cx,ddy=ball.y-cy,dist=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(dist<BALL_RADIUS+3){
+          const n=wallNormal(wall);
+          const dot=ball.vx*n.nx+ball.vy*n.ny;
+          if(dot<0){
+            ball.vx-=2*dot*n.nx;ball.vy-=2*dot*n.ny;
+            ball.x=cx+n.nx*(BALL_RADIUS+4);ball.y=cy+n.ny*(BALL_RADIUS+4);
+            bounced=true;
+          }
+        }
+      }
+
+      if(bounced){
+        ball.bounceCount++;
+        playBounce();
+
+        // SPLIT on bounce!
+        if(ball.generation<MAX_GENERATION){
+          // Create a split ball with perpendicular velocity
+          const speed=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
+          // Rotate velocity by ~45 degrees
+          const angle=Math.atan2(ball.vy,ball.vx);
+          const spreadAngle=Math.PI*0.35;
+          const newHue=(ball.hue+60)%360;
+
+          const splitBall={
+            x:ball.x,y:ball.y,
+            vx:Math.cos(angle+spreadAngle)*speed*0.85,
+            vy:Math.sin(angle+spreadAngle)*speed*0.85,
+            generation:ball.generation+1,alive:true,bounceCount:0,trail:[],hue:newHue
+          };
+          newBalls.push(splitBall);
+
+          // Adjust original ball angle slightly
+          ball.vx=Math.cos(angle-spreadAngle)*speed*0.85;
+          ball.vy=Math.sin(angle-spreadAngle)*speed*0.85;
+          ball.generation++;
+          ball.hue=(ball.hue+30)%360;
+
+          playSplit(ball.generation);
+
+          // Split particles
+          for(let p=0;p<8;p++){
+            const a=(Math.PI*2/8)*p,sp=2+Math.random()*2;
+            particles.push({x:ball.x,y:ball.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.6,
+              color:`hsla(${newHue},70%,60%,`,size:3+Math.random()*2});
+          }
+        }
+
+        // Max bounces per ball
+        if(ball.bounceCount>=5)ball.alive=false;
+      }
+
+      // Star collisions
+      for(const target of targets){
+        if(target.collected)continue;
+        const dx=ball.x-target.x,dy=ball.y-target.y;
+        if(Math.sqrt(dx*dx+dy*dy)<BALL_RADIUS+STAR_RADIUS){
+          target.collected=true;playStarHit();updateUI();
+          for(let p=0;p<16;p++){
+            const a=(Math.PI*2/16)*p,sp=3+Math.random()*4;
+            particles.push({x:target.x,y:target.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1.2,color:'rgba(255,217,61,',size:4+Math.random()*4});
+          }
+          sparkles.push({x:target.x,y:target.y-25,text:'+100',life:1.5});
+        }
+      }
+    }
+
+    // Ball speed decay
+    ball.vx*=0.998;ball.vy*=0.998;
+    const speed=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
+    if(speed<0.5)ball.alive=false;
+  }
+
+  // Add new split balls
+  for(const nb of newBalls)balls.push(nb);
+
+  // Check if all balls dead
+  const anyAlive=balls.some(b=>b.alive);
+  if(!anyAlive&&ballsActive){
+    ballsActive=false;
+    if(targets.every(t=>t.collected)){
+      setTimeout(()=>showComplete(),500);
+    }
+  }
+
+  // Update targets
+  for(const t of targets)t.pulse+=0.04;
+
+  // Update particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.97;p.vy*=0.97;p.life-=0.025;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=sparkles.length-1;i>=0;i--){sparkles[i].y-=1;sparkles[i].life-=0.03;if(sparkles[i].life<=0)sparkles.splice(i,1)}
+}
+
+function draw(){
+  ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='rgba(139,195,74,0.03)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  // Walls
+  ctx.strokeStyle='#aed581';ctx.lineWidth=4;ctx.lineCap='round';
+  ctx.shadowColor='#8bc34a';ctx.shadowBlur=10;
+  for(const w of walls){ctx.beginPath();ctx.moveTo(w.x1,w.y1);ctx.lineTo(w.x2,w.y2);ctx.stroke()}
+  ctx.shadowBlur=0;
+
+  // Border
+  ctx.strokeStyle='rgba(139,195,74,0.2)';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
+
+  // Stars
+  for(const t of targets){
+    if(t.collected)continue;
+    const pulse=1+Math.sin(t.pulse)*0.1,r=STAR_RADIUS*pulse;
+    const glow=ctx.createRadialGradient(t.x,t.y,0,t.x,t.y,r*3);
+    glow.addColorStop(0,'rgba(255,217,61,0.3)');glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(t.x,t.y,r*3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffd93d';ctx.shadowColor='#ffd93d';ctx.shadowBlur=15;
+    drawStar(t.x,t.y,r,r*0.4,5);ctx.shadowBlur=0;
+  }
+
+  // Aim
+  if(isDragging&&aimPos&&!ballsActive){
+    const dx=aimPos.x-launchPos.x,dy=aimPos.y-launchPos.y,len=Math.sqrt(dx*dx+dy*dy);
+    if(len>10){
+      ctx.strokeStyle='rgba(139,195,74,0.5)';ctx.lineWidth=2;ctx.setLineDash([6,6]);
+      ctx.beginPath();ctx.moveTo(launchPos.x,launchPos.y);ctx.lineTo(aimPos.x,aimPos.y);ctx.stroke();
+      ctx.setLineDash([]);
+      const dirX=-dx/len,dirY=-dy/len;
+      ctx.strokeStyle='rgba(139,195,74,0.3)';ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(launchPos.x,launchPos.y);ctx.lineTo(launchPos.x+dirX*120,launchPos.y+dirY*120);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Launch point
+  if(!ballsActive){
+    const lp=1+Math.sin(Date.now()*0.004)*0.15;
+    ctx.fillStyle='rgba(139,195,74,0.3)';ctx.beginPath();ctx.arc(launchPos.x,launchPos.y,20*lp,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8bc34a';ctx.beginPath();ctx.arc(launchPos.x,launchPos.y,BALL_RADIUS+2,0,Math.PI*2);ctx.fill();
+  }
+
+  // Ball trails
+  for(const ball of balls){
+    if(!ball.alive&&ball.trail.length===0)continue;
+    for(let i=0;i<ball.trail.length;i++){
+      const alpha=(i/ball.trail.length)*0.4;
+      const size=(i/ball.trail.length)*BALL_RADIUS;
+      ctx.fillStyle=`hsla(${ball.hue},70%,60%,${alpha})`;
+      ctx.beginPath();ctx.arc(ball.trail[i].x,ball.trail[i].y,size,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Balls
+  for(const ball of balls){
+    if(!ball.alive)continue;
+    const alpha=1-ball.generation*0.15;
+    const size=BALL_RADIUS-ball.generation*0.5;
+    ctx.shadowColor=`hsla(${ball.hue},70%,60%,0.8)`;ctx.shadowBlur=15;
+    ctx.fillStyle=`hsla(${ball.hue},70%,65%,${alpha})`;
+    ctx.beginPath();ctx.arc(ball.x,ball.y,Math.max(2,size),0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle=`rgba(255,255,255,${0.4*alpha})`;
+    ctx.beginPath();ctx.arc(ball.x-1,ball.y-1,Math.max(1,size*0.3),0,Math.PI*2);ctx.fill();
+  }
+
+  // Ball count
+  if(ballsActive){
+    const alive=balls.filter(b=>b.alive).length;
+    ctx.fillStyle='rgba(197,225,165,0.5)';ctx.font='14px sans-serif';ctx.textAlign='center';
+    ctx.fillText(`활성 공: ${alive}`,W/2,H-20);
+  }
+
+  // Particles
+  for(const p of particles){
+    ctx.fillStyle=`${p.color}${Math.min(1,p.life)})`;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill();
+  }
+  for(const s of sparkles){
+    ctx.fillStyle=`rgba(255,217,61,${Math.min(1,s.life)})`;ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText(s.text,s.x,s.y);
+  }
+
+  if(!ballsActive&&shotCount===0){ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('발사 지점을 드래그하여 조준하세요',W/2,H-30)}
+  if(!ballsActive&&balls.length>0&&!targets.every(t=>t.collected)){ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('다시 발사하세요!',W/2,H-30)}
+}
+
+function drawStar(cx,cy,outerR,innerR,points){
+  ctx.beginPath();
+  for(let i=0;i<points*2;i++){
+    const r=i%2===0?outerR:innerR;
+    const angle=(Math.PI/points)*i-Math.PI/2;
+    if(i===0)ctx.moveTo(cx+Math.cos(angle)*r,cy+Math.sin(angle)*r);
+    else ctx.lineTo(cx+Math.cos(angle)*r,cy+Math.sin(angle)*r);
+  }
+  ctx.closePath();ctx.fill();
+}
+
+function gameLoop(){update();draw();requestAnimationFrame(gameLoop)}
+
+function showComplete(){
+  gameActive=false;
+  const def=levelDefs[Math.min(level-1,levelDefs.length-1)](W,H);
+  let stars=1;if(shotCount<=def.par)stars=3;else if(shotCount<=def.par+1)stars=2;
+  document.getElementById('lcStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('lcTitle').textContent=`레벨 ${level} 클리어!`;
+  document.getElementById('lcInfo').textContent=`발사: ${shotCount}회 | 별: ${targets.length}개`;
+  document.getElementById('levelComplete').style.display='flex';
+  playSound(523,0.2,'sine',0.15);setTimeout(()=>playSound(659,0.2,'sine',0.15),150);setTimeout(()=>playSound(784,0.3,'sine',0.15),300);
+}
+function startGame(){document.getElementById('startScreen').style.display='none';document.getElementById('levelComplete').style.display='none';level=1;initLevel(level);gameActive=true}
+function nextLevel(){document.getElementById('levelComplete').style.display='none';level++;initLevel(level);gameActive=true}
+function retryLevel(){document.getElementById('levelComplete').style.display='none';initLevel(level);gameActive=true}
+gameLoop();
+</script>
+</body>
+</html>
