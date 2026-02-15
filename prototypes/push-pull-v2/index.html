@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>밀당 v2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080f;overflow:hidden;touch-action:none;font-family:'Segoe UI',sans-serif;user-select:none;color:#fff}
+canvas{display:block}
+
+/* ─── Top UI ─── */
+#topBar{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;pointer-events:none;z-index:10}
+#topBar>div{background:rgba(0,0,0,0.55);padding:7px 14px;border-radius:16px;font-size:13px;font-weight:bold;color:#b0bec5}
+#phase{position:fixed;top:48px;left:50%;transform:translateX(-50%);padding:5px 20px;border-radius:12px;font-size:14px;font-weight:bold;z-index:10;pointer-events:none;transition:all 0.3s}
+#phase.plan{background:rgba(30,136,229,0.3);color:#64b5f6;border:1px solid rgba(30,136,229,0.4)}
+#phase.exec{background:rgba(255,152,0,0.3);color:#ffcc80;border:1px solid rgba(255,152,0,0.4)}
+
+/* ─── Orb Status ─── */
+#orbStatus{position:fixed;top:80px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:none;z-index:10}
+.oc{padding:3px 10px;border-radius:10px;font-size:12px;font-weight:bold;color:#fff;opacity:0.8}
+.oc.done{opacity:0.35;text-decoration:line-through}
+
+/* ─── Bottom Controls ─── */
+#controls{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;z-index:20;background:linear-gradient(transparent,rgba(0,0,0,0.6) 30%)}
+.ctrl-btn{padding:10px 16px;border-radius:14px;font-size:13px;font-weight:bold;cursor:pointer;border:2px solid transparent;transition:all 0.15s;display:flex;align-items:center;gap:5px}
+.ctrl-btn:active{transform:scale(0.93)}
+.ctrl-btn.disabled{opacity:0.3;pointer-events:none}
+#btnPull{background:rgba(156,39,176,0.25);color:#ce93d8;border-color:rgba(156,39,176,0.4)}
+#btnPull.sel{background:rgba(156,39,176,0.5);box-shadow:0 0 16px rgba(156,39,176,0.4)}
+#btnPush{background:rgba(30,136,229,0.25);color:#64b5f6;border-color:rgba(30,136,229,0.4)}
+#btnPush.sel{background:rgba(30,136,229,0.5);box-shadow:0 0 16px rgba(30,136,229,0.4)}
+#btnUndo{background:rgba(255,255,255,0.08);color:#90a4ae;border-color:rgba(255,255,255,0.15)}
+#btnStart{background:linear-gradient(135deg,#e65100,#ff9800);color:#fff;border-color:#ff9800;font-size:15px;padding:12px 28px;box-shadow:0 0 20px rgba(255,152,0,0.4)}
+#btnStart.disabled{background:rgba(100,100,100,0.3);border-color:rgba(100,100,100,0.3);box-shadow:none}
+#slotsInfo{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);font-size:13px;color:#78909c;pointer-events:none;z-index:10;text-align:center}
+
+/* ─── Overlays ─── */
+.overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#startScreen{background:radial-gradient(ellipse at 30% 50%,#0d1b3e 0%,#08080f 60%,#1a0a2e 100%)}
+#startScreen h1{font-size:52px;margin-bottom:2px}
+#startScreen .ver{font-size:14px;color:#ff9800;margin-bottom:20px;letter-spacing:2px}
+#startScreen .rules{background:rgba(255,255,255,0.04);border-radius:16px;padding:18px 24px;margin-bottom:24px;max-width:340px;text-align:left;line-height:2;font-size:13px;color:#90a4ae}
+#startScreen .rules b{color:#cfd8dc}
+.overlay button{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;border:none;padding:14px 48px;border-radius:28px;font-size:18px;cursor:pointer;font-weight:bold;box-shadow:0 4px 20px rgba(26,35,126,0.5);border:1px solid rgba(255,255,255,0.1)}
+.overlay button:active{transform:scale(0.95)}
+.overlay button.retry{background:linear-gradient(135deg,#b71c1c,#e53935);box-shadow:0 4px 15px rgba(183,28,28,0.4)}
+.overlay button.next{background:linear-gradient(135deg,#1b5e20,#43a047);box-shadow:0 4px 15px rgba(27,94,32,0.4)}
+
+#gameOver{background:rgba(15,0,0,0.94)}
+#gameOver h2{font-size:38px;color:#ef5350;margin-bottom:6px}
+#gameOver .sub{color:#ef9a9a;margin-bottom:16px;font-size:15px}
+#gameOver .stats{color:#78909c;margin-bottom:22px;font-size:15px}
+
+#levelClear{background:rgba(5,15,5,0.94)}
+#levelClear h2{font-size:34px;margin-bottom:10px}
+#lcStars{font-size:48px;color:#ffd54f;margin-bottom:6px}
+#lcInfo{color:#a5d6a7;margin-bottom:6px;font-size:15px}
+#lcBonus{color:#ffcc80;margin-bottom:22px;font-size:14px}
+#levelClear .btns{display:flex;gap:10px}
+</style>
+</head>
+<body>
+
+<!-- Start -->
+<div class="overlay" id="startScreen" style="display:flex">
+  <h1>밀당</h1>
+  <div class="ver">V2 — STRATEGY MODE</div>
+  <div class="rules">
+    <b style="color:#ce93d8">끌기</b>와 <b style="color:#64b5f6">밀기</b> 스킬을 배치하세요<br>
+    배치 완료 후 <b style="color:#ff9800">▶ 시작</b>을 누르면 실행!<br>
+    같은 색 충돌 → <b>합체</b><br>
+    다른 색 충돌 → <b style="color:#ef5350">게임 오버</b><br>
+    남은 슬롯 → <b style="color:#ffcc80">다음 판에 이월!</b>
+  </div>
+  <button onclick="startGame()">시작하기</button>
+</div>
+
+<!-- Top -->
+<div id="topBar">
+  <div id="levelDisp">레벨 1</div>
+  <div id="scoreDisp">점수: 0</div>
+  <div id="slotDisp">슬롯: 0/0</div>
+</div>
+<div id="phase" class="plan">배치 단계</div>
+<div id="orbStatus"></div>
+
+<!-- Slot info -->
+<div id="slotsInfo"></div>
+
+<!-- Bottom -->
+<div id="controls">
+  <div id="btnPull" class="ctrl-btn sel" onclick="selectSkill('pull')">🕳️ 끌기</div>
+  <div id="btnPush" class="ctrl-btn" onclick="selectSkill('push')">🌊 밀기</div>
+  <div id="btnUndo" class="ctrl-btn" onclick="undoPlace()">↩ 되돌리기</div>
+  <div id="btnStart" class="ctrl-btn disabled" onclick="executeSkills()">▶ 시작</div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay" id="gameOver">
+  <h2>게임 오버</h2>
+  <div class="sub" id="goReason"></div>
+  <div class="stats" id="goStats"></div>
+  <button class="retry" onclick="retryLevel()">다시 도전</button>
+</div>
+
+<!-- Level Clear -->
+<div class="overlay" id="levelClear">
+  <h2 id="lcTitle">클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <div id="lcBonus"></div>
+  <div class="btns">
+    <button class="retry" onclick="retryLevel()">다시</button>
+    <button class="next" onclick="nextLevel()">다음 →</button>
+  </div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ══════════════════════ Audio ══════════════════════
+const AC = new (AudioContext || webkitAudioContext)();
+function snd(f,d,t='sine',v=.1){const o=AC.createOscillator(),g=AC.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}
+function sndPlace(){snd(500,.12);snd(700,.08,'sine',.06)}
+function sndRemove(){snd(300,.1,'sine',.06)}
+function sndExec(){snd(400,.2);snd(600,.15,'sine',.08);setTimeout(()=>snd(800,.15,'sine',.06),100)}
+function sndMerge(c){const b=400+c*80;snd(b,.5,'sine',.18);snd(b*1.5,.3,'sine',.08)}
+function sndDeath(){snd(250,.3,'sawtooth',.12);snd(150,.4,'sawtooth',.1);setTimeout(()=>snd(80,.5,'sawtooth',.08),150)}
+function sndWin(){snd(523,.2,'sine',.12);setTimeout(()=>snd(659,.2,'sine',.12),120);setTimeout(()=>snd(784,.25,'sine',.12),240);setTimeout(()=>snd(1047,.35,'sine',.1),380)}
+function sndFail(){snd(300,.3,'sawtooth',.1);snd(200,.4,'sawtooth',.08)}
+
+// ══════════════════════ Colors ══════════════════════
+const COLORS = [
+  {fill:'#ef5350',glow:'rgba(239,83,80,',name:'빨강'},
+  {fill:'#42a5f5',glow:'rgba(66,165,245,',name:'파랑'},
+  {fill:'#66bb6a',glow:'rgba(102,187,106,',name:'초록'},
+  {fill:'#ffa726',glow:'rgba(255,167,38,',name:'주황'},
+  {fill:'#ab47bc',glow:'rgba(171,71,188,',name:'보라'},
+  {fill:'#ffee58',glow:'rgba(255,238,88,',name:'노랑'},
+];
+
+// ══════════════════════ State ══════════════════════
+let orbs=[], emitters=[], particles=[], flashes=[], ripples=[];
+let phase='plan'; // 'plan' | 'exec' | 'done'
+let selectedSkill='pull';
+let level=1, score=0, totalScore=0;
+let bonusSlots=0; // carried over from previous levels
+let baseSlots=0, totalSlots=0, usedSlots=0;
+let execTimer=0, comboCount=0;
+let shakeT=0, shakeX=0, shakeY=0;
+let collisionPt=null;
+let ghostPos=null; // preview position for placing
+let simSpeed=1;
+let settled=false, settledTimer=0;
+
+const ORB_R=22, FRICTION=.98;
+const PULL_RADIUS=140, PULL_FORCE=2.8, PULL_DURATION=300; // frames
+const PUSH_RADIUS=280, PUSH_SPEED=5, PUSH_FORCE=3.5;
+
+// ══════════════════════ Levels ══════════════════════
+const LEVELS=[
+  {c:2,n:2,slots:3,par:2},  // 4 orbs
+  {c:2,n:3,slots:4,par:3},  // 6
+  {c:3,n:2,slots:4,par:3},  // 6
+  {c:2,n:4,slots:4,par:3},  // 8
+  {c:3,n:3,slots:5,par:4},  // 9
+  {c:4,n:2,slots:5,par:4},  // 8
+  {c:3,n:4,slots:5,par:4},  // 12
+  {c:4,n:3,slots:6,par:5},  // 12
+  {c:5,n:2,slots:5,par:4},  // 10
+  {c:5,n:3,slots:7,par:5},  // 15
+  {c:4,n:4,slots:7,par:5},  // 16
+  {c:6,n:3,slots:8,par:6},  // 18
+];
+
+function initLevel(lvl){
+  const cfg=LEVELS[Math.min(lvl-1,LEVELS.length-1)];
+  orbs=[];emitters=[];particles=[];flashes=[];ripples=[];
+  phase='plan';selectedSkill='pull';
+  comboCount=0;execTimer=0;score=0;
+  collisionPt=null;ghostPos=null;settled=false;settledTimer=0;simSpeed=1;
+
+  baseSlots=cfg.slots;
+  totalSlots=baseSlots+bonusSlots;
+  usedSlots=0;
+
+  // Place orbs grouped by color
+  const margin=80, playW=W-margin*2, playH=H-margin*2-140;
+  for(let c=0;c<cfg.c;c++){
+    const ang=(Math.PI*2/cfg.c)*c;
+    const cx=W/2+Math.cos(ang)*Math.min(playW,playH)*.22;
+    const cy=H/2+Math.sin(ang)*Math.min(playW,playH)*.18-10;
+    for(let i=0;i<cfg.n;i++){
+      let x,y,ok,att=0;
+      do{
+        x=cx+(Math.random()-.5)*130;y=cy+(Math.random()-.5)*110;
+        x=Math.max(margin,Math.min(W-margin,x));
+        y=Math.max(margin+90,Math.min(H-margin-80,y));
+        ok=true;
+        for(const o of orbs){const dx=x-o.x,dy=y-o.y;if(Math.sqrt(dx*dx+dy*dy)<ORB_R*3.2){ok=false;break;}}
+        att++;
+      }while(!ok&&att<200);
+      orbs.push({x,y,vx:0,vy:0,radius:ORB_R,color:c,mergeCount:0,pulse:Math.random()*Math.PI*2,danger:0});
+    }
+  }
+
+  updateAllUI();
+  selectSkill('pull');
+  document.getElementById('phase').className='plan';
+  document.getElementById('phase').textContent='배치 단계';
+  showControls(true);
+}
+
+// ══════════════════════ UI ══════════════════════
+function updateAllUI(){
+  document.getElementById('levelDisp').textContent=`레벨 ${level}`;
+  document.getElementById('scoreDisp').textContent=`점수: ${totalScore+score}`;
+  document.getElementById('slotDisp').textContent=`슬롯: ${usedSlots}/${totalSlots}`;
+  // Slot info
+  const info=document.getElementById('slotsInfo');
+  if(phase==='plan'){
+    const rem=totalSlots-usedSlots;
+    let txt=`남은 슬롯: ${rem}`;
+    if(bonusSlots>0) txt+=` (이월 +${bonusSlots})`;
+    info.textContent=txt;
+  } else info.textContent='';
+  // Orb status
+  const cfg=LEVELS[Math.min(level-1,LEVELS.length-1)];
+  let h='';
+  for(let c=0;c<cfg.c;c++){
+    const cnt=orbs.filter(o=>o.color===c).length;
+    const dn=cnt<=1;
+    h+=`<div class="oc${dn?' done':''}" style="background:${COLORS[c].fill}${dn?'44':'aa'}">${COLORS[c].name} ${cnt>1?'x'+cnt:'OK'}</div>`;
+  }
+  document.getElementById('orbStatus').innerHTML=h;
+  // Start button
+  const sb=document.getElementById('btnStart');
+  if(usedSlots>0&&phase==='plan'){sb.classList.remove('disabled')}else{sb.classList.add('disabled')}
+}
+
+function showControls(show){
+  document.getElementById('controls').style.display=show?'flex':'none';
+}
+
+function selectSkill(s){
+  if(phase!=='plan')return;
+  selectedSkill=s;
+  document.getElementById('btnPull').classList.toggle('sel',s==='pull');
+  document.getElementById('btnPush').classList.toggle('sel',s==='push');
+}
+
+// ══════════════════════ Placement ══════════════════════
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(phase!=='plan')return;
+  if(usedSlots>=totalSlots)return;
+  const x=e.clientX,y=e.clientY;
+  // Don't place on top of orbs
+  for(const o of orbs){
+    const dx=x-o.x,dy=y-o.y;
+    if(Math.sqrt(dx*dx+dy*dy)<o.radius+10)return;
+  }
+  // Don't place too close to other emitters
+  for(const em of emitters){
+    const dx=x-em.x,dy=y-em.y;
+    if(Math.sqrt(dx*dx+dy*dy)<30)return;
+  }
+  // Don't place in UI areas
+  if(y<90||y>H-70)return;
+
+  emitters.push({x,y,type:selectedSkill,age:0,active:false});
+  usedSlots++;
+  sndPlace();
+  updateAllUI();
+});
+
+canvas.addEventListener('pointermove',e=>{
+  if(phase==='plan')ghostPos={x:e.clientX,y:e.clientY};
+});
+
+function undoPlace(){
+  if(phase!=='plan'||emitters.length===0)return;
+  emitters.pop();
+  usedSlots--;
+  sndRemove();
+  updateAllUI();
+}
+
+// ══════════════════════ Execute ══════════════════════
+function executeSkills(){
+  if(phase!=='plan'||usedSlots===0)return;
+  phase='exec';
+  execTimer=0;
+  comboCount=0;
+  ghostPos=null;
+  document.getElementById('phase').className='exec';
+  document.getElementById('phase').textContent='실행 중...';
+  showControls(false);
+  sndExec();
+
+  // Activate all emitters
+  for(const em of emitters){
+    em.active=true;
+    em.age=0;
+    if(em.type==='push'){
+      // Create a ripple for push
+      ripples.push({x:em.x,y:em.y,radius:0,maxRadius:PUSH_RADIUS,alpha:1,force:PUSH_FORCE});
+    }
+  }
+}
+
+// ══════════════════════ Background ══════════════════════
+const bgStars=[];
+for(let i=0;i<70;i++)bgStars.push({x:Math.random()*2e3,y:Math.random()*2e3,s:Math.random()*1.8+.5,a:Math.random()*.35+.05,sp:Math.random()*.015});
+
+// ══════════════════════ Update ══════════════════════
+function update(){
+  if(phase!=='exec')return;
+  execTimer++;
+
+  // Pull emitters: sustained gravity
+  for(const em of emitters){
+    if(!em.active)continue;
+    em.age++;
+    if(em.type==='pull'){
+      if(em.age>PULL_DURATION){em.active=false;continue;}
+      const strength=PULL_FORCE*(1-em.age/PULL_DURATION);
+      for(const orb of orbs){
+        const dx=em.x-orb.x,dy=em.y-orb.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>5&&dist<PULL_RADIUS){
+          const f=strength*((PULL_RADIUS-dist)/PULL_RADIUS)/(dist*.2);
+          orb.vx+=dx/dist*f;
+          orb.vy+=dy/dist*f;
+        }
+      }
+      // Spiral particles
+      if(em.age%4===0){
+        const ang=em.age*.15,r=60+Math.random()*50;
+        particles.push({x:em.x+Math.cos(ang)*r,y:em.y+Math.sin(ang)*r,
+          vx:-Math.cos(ang)*r*.025,vy:-Math.sin(ang)*r*.025,
+          life:.7,color:'rgba(206,147,216,',size:2+Math.random()*2});
+      }
+    }
+  }
+
+  // Ripples (push waves)
+  for(let i=ripples.length-1;i>=0;i--){
+    const r=ripples[i];
+    r.radius+=PUSH_SPEED;
+    r.alpha=Math.max(0,1-r.radius/r.maxRadius);
+    for(const orb of orbs){
+      const dx=orb.x-r.x,dy=orb.y-r.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>0&&Math.abs(dist-r.radius)<26){
+        const intensity=1-Math.abs(dist-r.radius)/26;
+        const f=r.force*r.alpha*intensity;
+        orb.vx+=dx/dist*f;orb.vy+=dy/dist*f;
+      }
+    }
+    if(r.radius>=r.maxRadius)ripples.splice(i,1);
+  }
+
+  // Orb physics
+  for(const orb of orbs){
+    orb.x+=orb.vx;orb.y+=orb.vy;
+    orb.vx*=FRICTION;orb.vy*=FRICTION;
+    orb.pulse+=.03;orb.danger*=.94;
+    const m=12;
+    if(orb.x-orb.radius<m){orb.x=m+orb.radius;orb.vx=Math.abs(orb.vx)*.55;}
+    if(orb.x+orb.radius>W-m){orb.x=W-m-orb.radius;orb.vx=-Math.abs(orb.vx)*.55;}
+    if(orb.y-orb.radius<m+55){orb.y=m+55+orb.radius;orb.vy=Math.abs(orb.vy)*.55;}
+    if(orb.y+orb.radius>H-m-10){orb.y=H-m-10-orb.radius;orb.vy=-Math.abs(orb.vy)*.55;}
+  }
+
+  // ─── Collision ───
+  for(let i=0;i<orbs.length;i++){
+    for(let j=i+1;j<orbs.length;j++){
+      const a=orbs[i],b=orbs[j];
+      const dx=a.x-b.x,dy=a.y-b.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const minD=a.radius+b.radius;
+
+      if(a.color===b.color){
+        // Same → merge
+        if(dist<minD-3){
+          const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+          const nm=Math.max(a.mergeCount,b.mergeCount)+1;
+          comboCount++;
+          const pts=150*comboCount;score+=pts;
+
+          flashes.push({x:mx,y:my,radius:0,maxRadius:85,alpha:1,color:COLORS[a.color].glow});
+          // Safety push ripple
+          ripples.push({x:mx,y:my,radius:0,maxRadius:90+nm*20,alpha:.45,force:PUSH_FORCE*.35});
+
+          for(let p=0;p<14;p++){
+            const ang=(Math.PI*2/14)*p,sp=2+Math.random()*3;
+            particles.push({x:mx,y:my,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1.1,color:COLORS[a.color].glow,size:4+Math.random()*3});
+          }
+          particles.push({x:mx,y:my-22,vx:0,vy:-1.1,life:1.8,isText:true,text:`+${pts}`,color:'rgba(255,255,255,'});
+
+          const wasCount=orbs.filter(o=>o.color===a.color).length;
+          const newOrb={x:mx,y:my,vx:(a.vx+b.vx)*.25,vy:(a.vy+b.vy)*.25,
+            radius:ORB_R+nm*4,color:a.color,mergeCount:nm,pulse:0,danger:0};
+          orbs.splice(j,1);orbs.splice(i,1);orbs.push(newOrb);
+
+          sndMerge(comboCount);
+          if(wasCount===2){
+            particles.push({x:mx,y:my-42,vx:0,vy:-.7,life:2.2,isText:true,text:`${COLORS[newOrb.color].name} 완성!`,color:'rgba(255,215,0,'});
+            snd(880,.25,'sine',.1);
+          }
+          updateAllUI();
+          i=-1;break;
+        }
+      } else {
+        // Different color
+        const aDone=orbs.filter(o=>o.color===a.color).length<=1;
+        const bDone=orbs.filter(o=>o.color===b.color).length<=1;
+
+        if(dist<minD*.75){
+          if(!aDone||!bDone){
+            // ═══ GAME OVER ═══
+            phase='done';
+            collisionPt={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+            shakeT=25;sndDeath();
+            for(let p=0;p<28;p++){
+              const ang=Math.random()*Math.PI*2,sp=2+Math.random()*5;
+              const col=Math.random()>.5?COLORS[a.color].glow:COLORS[b.color].glow;
+              particles.push({x:collisionPt.x,y:collisionPt.y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:1.4,color:col,size:3+Math.random()*5});
+            }
+            setTimeout(()=>{
+              document.getElementById('goReason').textContent=`${COLORS[a.color].name}과 ${COLORS[b.color].name}이 충돌!`;
+              document.getElementById('goStats').textContent=`레벨 ${level} | 슬롯 ${usedSlots}개 사용`;
+              document.getElementById('gameOver').style.display='flex';
+            },700);
+            return;
+          } else {
+            // Both done → bounce
+            const overlap=minD-dist;
+            const nx=dx/dist,ny=dy/dist;
+            a.x+=nx*overlap*.5;a.y+=ny*overlap*.5;
+            b.x-=nx*overlap*.5;b.y-=ny*overlap*.5;
+            const rv=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+            if(rv>0){a.vx-=rv*nx*.5;a.vy-=rv*ny*.5;b.vx+=rv*nx*.5;b.vy+=rv*ny*.5;}
+          }
+        }
+        // Danger proximity
+        if(dist<100&&(!aDone||!bDone)){
+          const d=Math.max(0,1-(dist-minD)/(100-minD));
+          a.danger=Math.max(a.danger,d);b.danger=Math.max(b.danger,d);
+        }
+        // Soft repel between incomplete different colors
+        if(dist<minD*1.1&&dist>0&&(!aDone||!bDone)){
+          const push=(minD*1.1-dist)*.12;
+          a.vx+=dx/dist*push;a.vy+=dy/dist*push;
+          b.vx-=dx/dist*push;b.vy-=dy/dist*push;
+        }
+      }
+    }
+  }
+
+  // Win check
+  const cfg=LEVELS[Math.min(level-1,LEVELS.length-1)];
+  let allDone=true;
+  for(let c=0;c<cfg.c;c++){if(orbs.filter(o=>o.color===c).length>1){allDone=false;break;}}
+  if(allDone){
+    phase='done';
+    setTimeout(()=>showClear(),500);
+    return;
+  }
+
+  // Settled check (all orbs nearly stopped, all emitters done)
+  const allEmittersDone=emitters.every(em=>!em.active);
+  const allOrbsStill=orbs.every(o=>Math.abs(o.vx)<.3&&Math.abs(o.vy)<.3);
+  if(allEmittersDone&&ripples.length===0&&allOrbsStill){
+    settledTimer++;
+    if(settledTimer>90){
+      // Failed to clear
+      phase='done';
+      sndFail();
+      setTimeout(()=>{
+        document.getElementById('goReason').textContent='구슬이 멈췄지만 다 합쳐지지 않았어요';
+        document.getElementById('goStats').textContent=`레벨 ${level} | 슬롯 ${usedSlots}개 사용`;
+        document.getElementById('gameOver').style.display='flex';
+      },500);
+    }
+  } else settledTimer=0;
+
+  // Shake
+  if(shakeT>0){shakeT--;shakeX=(Math.random()-.5)*shakeT*1.5;shakeY=(Math.random()-.5)*shakeT*1.5;}
+  else{shakeX=shakeY=0;}
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life-=.018;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=flashes.length-1;i>=0;i--){
+    flashes[i].radius+=3.5;flashes[i].alpha-=.035;
+    if(flashes[i].alpha<=0)flashes.splice(i,1);
+  }
+}
+
+// ══════════════════════ Draw ══════════════════════
+function draw(){
+  ctx.save();
+  ctx.translate(shakeX,shakeY);
+
+  // BG
+  const bg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.7);
+  bg.addColorStop(0,'#0e0e1a');bg.addColorStop(1,'#08080f');
+  ctx.fillStyle=bg;ctx.fillRect(-20,-20,W+40,H+40);
+
+  // Stars
+  const t=Date.now()*.001;
+  for(const s of bgStars){
+    const tw=.5+Math.sin(t*s.sp*10+s.x)*.5;
+    ctx.fillStyle=`rgba(170,170,210,${s.a*tw})`;
+    ctx.beginPath();ctx.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);ctx.fill();
+  }
+
+  // ─── Emitters ───
+  for(const em of emitters){
+    const isPull=em.type==='pull';
+    const baseColor=isPull?[156,39,176]:[30,136,229];
+    let alpha=1;
+    if(phase==='exec'&&em.active){
+      alpha=isPull?1-em.age/PULL_DURATION:Math.max(0,1-em.age/60);
+    }
+    if(phase==='exec'&&!em.active)alpha=.2;
+
+    // Range circle
+    const range=isPull?PULL_RADIUS:PUSH_RADIUS;
+    ctx.strokeStyle=`rgba(${baseColor},${.12*alpha})`;
+    ctx.lineWidth=1;ctx.setLineDash([6,6]);
+    ctx.beginPath();ctx.arc(em.x,em.y,range,0,Math.PI*2);ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Icon glow
+    const glow=ctx.createRadialGradient(em.x,em.y,0,em.x,em.y,22);
+    glow.addColorStop(0,`rgba(${baseColor},${.5*alpha})`);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(em.x,em.y,22,0,Math.PI*2);ctx.fill();
+
+    // Icon
+    ctx.fillStyle=`rgba(${baseColor},${.8*alpha})`;
+    ctx.beginPath();ctx.arc(em.x,em.y,10,0,Math.PI*2);ctx.fill();
+
+    // Animated rings for active pull
+    if(phase==='exec'&&em.active&&isPull){
+      for(let r=0;r<3;r++){
+        const ring=((em.age*2+r*45)%130);
+        const radius=PULL_RADIUS-ring*(PULL_RADIUS/130);
+        if(radius<8)continue;
+        ctx.strokeStyle=`rgba(206,147,216,${.12*(radius/PULL_RADIUS)*alpha})`;
+        ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.arc(em.x,em.y,radius,0,Math.PI*2);ctx.stroke();
+      }
+    }
+
+    // Label
+    ctx.fillStyle=`rgba(255,255,255,${.5*alpha})`;
+    ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(isPull?'끌기':'밀기',em.x,em.y+22);
+  }
+
+  // Ghost preview
+  if(phase==='plan'&&ghostPos&&usedSlots<totalSlots){
+    const gx=ghostPos.x,gy=ghostPos.y;
+    if(gy>90&&gy<H-70){
+      const isPull=selectedSkill==='pull';
+      const bc=isPull?'156,39,176':'30,136,229';
+      const range=isPull?PULL_RADIUS:PUSH_RADIUS;
+      ctx.strokeStyle=`rgba(${bc},.08)`;ctx.lineWidth=1;ctx.setLineDash([4,6]);
+      ctx.beginPath();ctx.arc(gx,gy,range,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle=`rgba(${bc},.15)`;
+      ctx.beginPath();ctx.arc(gx,gy,10,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Ripples
+  for(const r of ripples){
+    ctx.strokeStyle=`rgba(100,181,246,${r.alpha*.55})`;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);ctx.stroke();
+    if(r.radius>8){
+      ctx.strokeStyle=`rgba(100,181,246,${r.alpha*.2})`;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(r.x,r.y,r.radius-7,0,Math.PI*2);ctx.stroke();
+    }
+  }
+
+  // Flashes
+  for(const f of flashes){
+    const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.radius);
+    g.addColorStop(0,f.color+`${f.alpha*.45})`);g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.radius,0,Math.PI*2);ctx.fill();
+  }
+
+  // ─── Orbs ───
+  for(const orb of orbs){
+    const c=COLORS[orb.color];
+    const complete=orbs.filter(o=>o.color===orb.color).length<=1;
+    const pulse=1+Math.sin(orb.pulse)*.04;
+    const r=orb.radius*pulse;
+
+    // Danger glow
+    if(orb.danger>.08){
+      const dg=ctx.createRadialGradient(orb.x,orb.y,r,orb.x,orb.y,r*2.2);
+      dg.addColorStop(0,`rgba(255,40,40,${orb.danger*.35})`);dg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=dg;ctx.beginPath();ctx.arc(orb.x,orb.y,r*2.2,0,Math.PI*2);ctx.fill();
+    }
+
+    // Glow
+    const glow=ctx.createRadialGradient(orb.x,orb.y,r*.5,orb.x,orb.y,r*2.3);
+    glow.addColorStop(0,c.glow+'.32)');glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(orb.x,orb.y,r*2.3,0,Math.PI*2);ctx.fill();
+
+    // Body
+    const bg2=ctx.createRadialGradient(orb.x-r*.3,orb.y-r*.3,r*.1,orb.x,orb.y,r);
+    bg2.addColorStop(0,'#fff');bg2.addColorStop(.3,c.fill);bg2.addColorStop(1,c.fill);
+    ctx.fillStyle=bg2;ctx.beginPath();ctx.arc(orb.x,orb.y,r,0,Math.PI*2);ctx.fill();
+
+    // Gold ring if complete
+    if(complete){
+      ctx.strokeStyle=`rgba(255,215,0,${.35+Math.sin(orb.pulse*2)*.15})`;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(orb.x,orb.y,r+4,0,Math.PI*2);ctx.stroke();
+    }
+
+    // Highlight
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.beginPath();ctx.arc(orb.x-r*.25,orb.y-r*.25,r*.32,0,Math.PI*2);ctx.fill();
+
+    // Merge count
+    if(orb.mergeCount>0){
+      ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`bold ${11+orb.mergeCount*2}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(`x${orb.mergeCount+1}`,orb.x,orb.y);
+    }
+  }
+
+  // Collision explosion
+  if(collisionPt){
+    const flash=Math.sin(Date.now()*.01)*.5+.5;
+    const eg=ctx.createRadialGradient(collisionPt.x,collisionPt.y,0,collisionPt.x,collisionPt.y,70);
+    eg.addColorStop(0,`rgba(255,40,40,${.35*flash})`);eg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=eg;ctx.beginPath();ctx.arc(collisionPt.x,collisionPt.y,70,0,Math.PI*2);ctx.fill();
+  }
+
+  // Particles
+  for(const p of particles){
+    if(p.isText){
+      ctx.fillStyle=`${p.color}${Math.min(1,p.life)})`;
+      ctx.font=`bold ${p.text.includes('완성')?20:17}px sans-serif`;ctx.textAlign='center';
+      ctx.fillText(p.text,p.x,p.y);
+    } else {
+      ctx.fillStyle=`${p.color}${Math.min(1,p.life)})`;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.size*Math.min(1,p.life),0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Combo
+  if(comboCount>1){
+    ctx.fillStyle=`rgba(255,215,0,${Math.min(1,comboCount*.28)})`;
+    ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+    ctx.fillText(`${comboCount}x COMBO!`,W/2,H/2-55);
+  }
+
+  ctx.restore();
+}
+
+function gameLoop(){update();draw();requestAnimationFrame(gameLoop);}
+
+// ══════════════════════ Screens ══════════════════════
+function showClear(){
+  const cfg=LEVELS[Math.min(level-1,LEVELS.length-1)];
+  const par=cfg.par;
+  let stars=1;
+  if(usedSlots<=par)stars=3;
+  else if(usedSlots<=par+1)stars=2;
+
+  const unused=totalSlots-usedSlots;
+  const bonus=unused*200;
+  score+=bonus;
+
+  document.getElementById('lcStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('lcTitle').textContent=`레벨 ${level} 클리어!`;
+  document.getElementById('lcInfo').textContent=`슬롯 ${usedSlots}개 사용 (기준: ${par}개) | 점수: ${score}`;
+  document.getElementById('lcBonus').textContent=unused>0?`🎁 미사용 ${unused}슬롯 → 다음 판에 이월!`:'슬롯을 전부 사용했어요';
+  document.getElementById('levelClear').style.display='flex';
+
+  totalScore+=score;
+  bonusSlots=unused; // carry over
+  sndWin();
+}
+
+function startGame(){
+  document.getElementById('startScreen').style.display='none';
+  hideOverlays();
+  level=1;totalScore=0;bonusSlots=0;
+  initLevel(level);
+}
+
+function nextLevel(){
+  hideOverlays();
+  level++;
+  initLevel(level);
+}
+
+function retryLevel(){
+  hideOverlays();
+  collisionPt=null;
+  // Don't reset bonusSlots on retry — keep what was earned before this level
+  initLevel(level);
+}
+
+function hideOverlays(){
+  document.getElementById('gameOver').style.display='none';
+  document.getElementById('levelClear').style.display='none';
+}
+
+gameLoop();
+</script>
+</body>
+</html>
