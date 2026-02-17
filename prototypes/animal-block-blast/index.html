@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>애니멀 블록 블라스트</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fef3e2;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none;font-family:-apple-system,'Segoe UI',sans-serif}
+canvas{max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+c.width=W;c.height=H;
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+// ===== CONSTANTS =====
+const GRID=8,CELL=52,PAD=2;
+const BOARD_X=(W-GRID*CELL)/2,BOARD_Y=160;
+const PIECE_AREA_Y=BOARD_Y+GRID*CELL+30;
+
+// ===== CUTE ANIMALS (colors + emoji-style drawing) =====
+const ANIMALS=[
+  {name:'토끼',bg:'#ffb3ba',face:'#fff',ear:'#ffc0cb',eyes:'#333',mouth:'#e55'},  // pink bunny
+  {name:'병아리',bg:'#ffffba',face:'#fff8dc',ear:'#ffa500',eyes:'#333',mouth:'#f80'},// yellow chick
+  {name:'개구리',bg:'#baffc9',face:'#e0ffe0',ear:'#2e8b57',eyes:'#333',mouth:'#2a6'},// green frog
+  {name:'고양이',bg:'#bae1ff',face:'#e8f4ff',ear:'#6495ed',eyes:'#333',mouth:'#48f'},// blue cat
+  {name:'곰돌이',bg:'#e8c9ff',face:'#f0e0ff',ear:'#9370db',eyes:'#333',mouth:'#86f'},// purple bear
+];
+
+function drawAnimal(x,y,size,type,alpha){
+  let a=ANIMALS[type];
+  let s=size-PAD*2;
+  let cx=x+PAD+s/2,cy=y+PAD+s/2;
+  let r=s/2;
+
+  ctx.globalAlpha=alpha||1;
+
+  // Body (rounded square)
+  ctx.fillStyle=a.bg;
+  roundRect(x+PAD,y+PAD,s,s,r*0.3);
+
+  // Face circle
+  ctx.fillStyle=a.face;
+  ctx.beginPath();ctx.arc(cx,cy+r*0.05,r*0.55,0,Math.PI*2);ctx.fill();
+
+  // Type-specific features
+  if(type===0){// Bunny ears
+    ctx.fillStyle=a.ear;
+    ctx.beginPath();ctx.ellipse(cx-r*0.25,cy-r*0.55,r*0.12,r*0.35,-.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+r*0.25,cy-r*0.55,r*0.12,r*0.35,.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fbb';
+    ctx.beginPath();ctx.ellipse(cx-r*0.25,cy-r*0.52,r*0.06,r*0.2,-.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx+r*0.25,cy-r*0.52,r*0.06,r*0.2,.2,0,Math.PI*2);ctx.fill();
+  }else if(type===1){// Chick beak + tuft
+    ctx.fillStyle=a.ear;
+    ctx.beginPath();ctx.moveTo(cx,cy+r*0.15);ctx.lineTo(cx-r*0.15,cy+r*0.3);ctx.lineTo(cx+r*0.15,cy+r*0.3);ctx.closePath();ctx.fill();
+    // Tuft
+    ctx.fillStyle='#ffa500';
+    ctx.beginPath();ctx.ellipse(cx,cy-r*0.5,r*0.1,r*0.18,0,0,Math.PI*2);ctx.fill();
+  }else if(type===2){// Frog big eyes
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(cx-r*0.25,cy-r*0.25,r*0.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.25,cy-r*0.25,r*0.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=a.eyes;
+    ctx.beginPath();ctx.arc(cx-r*0.25,cy-r*0.22,r*0.09,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.25,cy-r*0.22,r*0.09,0,Math.PI*2);ctx.fill();
+    // Smile
+    ctx.strokeStyle=a.mouth;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(cx,cy+r*0.1,r*0.2,0.1,Math.PI-0.1);ctx.stroke();
+    ctx.globalAlpha=1;
+    return;
+  }else if(type===3){// Cat ears
+    ctx.fillStyle=a.ear;
+    ctx.beginPath();ctx.moveTo(cx-r*0.4,cy-r*0.25);ctx.lineTo(cx-r*0.55,cy-r*0.65);ctx.lineTo(cx-r*0.1,cy-r*0.35);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx+r*0.4,cy-r*0.25);ctx.lineTo(cx+r*0.55,cy-r*0.65);ctx.lineTo(cx+r*0.1,cy-r*0.35);ctx.closePath();ctx.fill();
+    // Inner ears
+    ctx.fillStyle='#ffc0cb';
+    ctx.beginPath();ctx.moveTo(cx-r*0.35,cy-r*0.28);ctx.lineTo(cx-r*0.48,cy-r*0.55);ctx.lineTo(cx-r*0.15,cy-r*0.35);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx+r*0.35,cy-r*0.28);ctx.lineTo(cx+r*0.48,cy-r*0.55);ctx.lineTo(cx+r*0.15,cy-r*0.35);ctx.closePath();ctx.fill();
+    // Whiskers
+    ctx.strokeStyle='#aaa';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx-r*0.55,cy+r*0.05);ctx.lineTo(cx-r*0.2,cy+r*0.1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-r*0.55,cy+r*0.15);ctx.lineTo(cx-r*0.2,cy+r*0.15);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+r*0.55,cy+r*0.05);ctx.lineTo(cx+r*0.2,cy+r*0.1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+r*0.55,cy+r*0.15);ctx.lineTo(cx+r*0.2,cy+r*0.15);ctx.stroke();
+  }else if(type===4){// Bear ears
+    ctx.fillStyle=a.ear;
+    ctx.beginPath();ctx.arc(cx-r*0.38,cy-r*0.4,r*0.18,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.38,cy-r*0.4,r*0.18,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=a.face;
+    ctx.beginPath();ctx.arc(cx-r*0.38,cy-r*0.4,r*0.1,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.38,cy-r*0.4,r*0.1,0,Math.PI*2);ctx.fill();
+    // Snout
+    ctx.fillStyle='#f0d0ff';
+    ctx.beginPath();ctx.ellipse(cx,cy+r*0.15,r*0.2,r*0.15,0,0,Math.PI*2);ctx.fill();
+  }
+
+  // Default eyes (not frog)
+  if(type!==2){
+    ctx.fillStyle=a.eyes;
+    let ey=cy-r*0.08;
+    ctx.beginPath();ctx.arc(cx-r*0.18,ey,r*0.07,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.18,ey,r*0.07,0,Math.PI*2);ctx.fill();
+    // Eye shine
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(cx-r*0.15,ey-r*0.03,r*0.03,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+r*0.21,ey-r*0.03,r*0.03,0,Math.PI*2);ctx.fill();
+    // Mouth
+    ctx.strokeStyle=a.mouth;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(cx,cy+r*0.2,r*0.12,0.1,Math.PI-0.1);ctx.stroke();
+  }
+
+  // Cheek blush
+  ctx.fillStyle='rgba(255,150,150,0.3)';
+  ctx.beginPath();ctx.ellipse(cx-r*0.35,cy+r*0.12,r*0.1,r*0.07,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(cx+r*0.35,cy+r*0.12,r*0.1,r*0.07,0,0,Math.PI*2);ctx.fill();
+
+  ctx.globalAlpha=1;
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();ctx.fill();
+}
+
+// ===== BLOCK PIECE SHAPES =====
+// Each shape is array of [row,col] offsets
+const SHAPES=[
+  // 1-cell
+  [[0,0]],
+  // 2-cells
+  [[0,0],[0,1]],  // horizontal 2
+  [[0,0],[1,0]],  // vertical 2
+  // 3-cells
+  [[0,0],[0,1],[0,2]],  // horizontal 3
+  [[0,0],[1,0],[2,0]],  // vertical 3
+  [[0,0],[0,1],[1,0]],  // L top-left
+  [[0,0],[0,1],[1,1]],  // L top-right
+  [[0,0],[1,0],[1,1]],  // L bottom-right
+  [[0,1],[1,0],[1,1]],  // L bottom-left
+  // 4-cells
+  [[0,0],[0,1],[0,2],[0,3]],  // horizontal 4
+  [[0,0],[1,0],[2,0],[3,0]],  // vertical 4
+  [[0,0],[0,1],[1,0],[1,1]],  // 2x2 square
+  [[0,0],[0,1],[0,2],[1,0]],  // L-4
+  [[0,0],[0,1],[0,2],[1,2]],  // J-4
+  [[0,0],[1,0],[1,1],[1,2]],  // L-4 inv
+  [[0,0],[0,1],[0,2],[1,1]],  // T-4
+  // 5-cells
+  [[0,0],[0,1],[0,2],[0,3],[0,4]],  // horizontal 5
+  [[0,0],[1,0],[2,0],[3,0],[4,0]],  // vertical 5
+  [[0,0],[0,1],[0,2],[1,0],[2,0]],  // big L
+  [[0,0],[0,1],[0,2],[1,2],[2,2]],  // big J
+  [[0,0],[1,0],[2,0],[2,1],[2,2]],  // big L inv
+  [[0,2],[1,2],[2,0],[2,1],[2,2]],  // big J inv
+  // 9-cells (3x3)
+  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],  // 3x3 square
+];
+
+// ===== GAME STATE =====
+let board=[]; // 8x8 grid, -1 = empty, 0-4 = animal type
+let pieces=[]; // current 3 pieces
+let score=0,bestScore=0,combo=0;
+let state='menu'; // menu, playing, gameover
+let dragging=null; // {pieceIdx, offsetX, offsetY, x, y}
+let clearAnim=[]; // [{r,c,timer}]
+let shakeTimer=0;
+let particles=[];
+
+function initBoard(){
+  board=[];
+  for(let r=0;r<GRID;r++){board[r]=[];for(let c=0;c<GRID;c++)board[r][c]=-1}
+}
+
+function newPieces(){
+  pieces=[];
+  for(let i=0;i<3;i++){
+    let shapeIdx=Math.floor(Math.random()*SHAPES.length);
+    let animal=Math.floor(Math.random()*5);
+    pieces.push({shape:SHAPES[shapeIdx],animal,used:false});
+  }
+}
+
+function initGame(){
+  initBoard();score=0;combo=0;
+  newPieces();state='playing';
+  loadBest();
+}
+
+function loadBest(){try{bestScore=parseInt(localStorage.getItem('animal-bb-best'))||0}catch(e){}}
+function saveBest(){try{if(score>bestScore){bestScore=score;localStorage.setItem('animal-bb-best',bestScore)}}catch(e){}}
+
+// ===== PIECE PLACEMENT =====
+function canPlace(shape,br,bc){
+  for(let [r,c] of shape){
+    let gr=br+r,gc=bc+c;
+    if(gr<0||gr>=GRID||gc<0||gc>=GRID)return false;
+    if(board[gr][gc]!==-1)return false;
+  }
+  return true;
+}
+
+function placePiece(pieceIdx,br,bc){
+  let p=pieces[pieceIdx];
+  if(!canPlace(p.shape,br,bc))return false;
+
+  // Place blocks
+  let blockCount=0;
+  for(let [r,cc] of p.shape){
+    board[br+r][bc+cc]=p.animal;
+    blockCount++;
+  }
+  p.used=true;
+  score+=blockCount;
+
+  // Check and clear lines
+  let rowsToClear=[],colsToClear=[];
+  for(let r=0;r<GRID;r++){
+    let full=true;
+    for(let cc=0;cc<GRID;cc++)if(board[r][cc]===-1){full=false;break}
+    if(full)rowsToClear.push(r);
+  }
+  for(let cc=0;cc<GRID;cc++){
+    let full=true;
+    for(let r=0;r<GRID;r++)if(board[r][cc]===-1){full=false;break}
+    if(full)colsToClear.push(cc);
+  }
+
+  let linesCleared=rowsToClear.length+colsToClear.length;
+  if(linesCleared>0){
+    combo++;
+    // Score: 10 * n^2 * combo multiplier
+    let lineScore=10*linesCleared*linesCleared;
+    let comboMult=Math.min(combo,10);
+    score+=lineScore*comboMult;
+
+    // Spawn clear animation & particles
+    let cellsToClear=new Set();
+    for(let r of rowsToClear)for(let cc=0;cc<GRID;cc++)cellsToClear.add(r*GRID+cc);
+    for(let cc of colsToClear)for(let r=0;r<GRID;r++)cellsToClear.add(r*GRID+cc);
+
+    for(let key of cellsToClear){
+      let r=Math.floor(key/GRID),cc=key%GRID;
+      let px=BOARD_X+cc*CELL+CELL/2,py=BOARD_Y+r*CELL+CELL/2;
+      // Star particles
+      for(let i=0;i<3;i++){
+        let a=Math.random()*Math.PI*2,sp=Math.random()*120+60;
+        particles.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.6,
+          color:ANIMALS[board[r][cc]>=0?board[r][cc]:0].bg,r:Math.random()*4+2,type:'star'});
+      }
+      clearAnim.push({r,c:cc,timer:0.3});
+      board[r][cc]=-1;
+    }
+
+    // Combo text particle
+    if(combo>1){
+      particles.push({x:W/2,y:BOARD_Y-20,vx:0,vy:-30,life:1.2,
+        color:'#f80',r:0,type:'text',text:combo+'x COMBO!',size:combo>3?28:22});
+    }
+  }else{
+    combo=0;
+  }
+
+  // Check if all 3 pieces used → get new pieces
+  if(pieces.every(p=>p.used))newPieces();
+
+  // Check game over
+  if(isGameOver()){
+    saveBest();
+    state='gameover';
+  }
+
+  return true;
+}
+
+function isGameOver(){
+  for(let p of pieces){
+    if(p.used)continue;
+    for(let r=0;r<GRID;r++){
+      for(let cc=0;cc<GRID;cc++){
+        if(canPlace(p.shape,r,cc))return false;
+      }
+    }
+  }
+  return true;
+}
+
+// ===== INPUT =====
+function gcp(e){
+  let r=c.getBoundingClientRect();
+  let t=e.touches?e.touches[0]:e;
+  return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H};
+}
+
+function getPieceAt(px,py){
+  let spacing=W/3;
+  for(let i=0;i<3;i++){
+    if(pieces[i].used)continue;
+    let shape=pieces[i].shape;
+    // Calculate piece bounds
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+    let pw=(maxC-minC+1)*30,ph=(maxR-minR+1)*30;
+    let pcx=spacing*i+spacing/2,pcy=PIECE_AREA_Y+70;
+    let px0=pcx-pw/2,py0=pcy-ph/2;
+    if(px>=px0-15&&px<=px0+pw+15&&py>=py0-15&&py<=py0+ph+15){
+      return{idx:i,offX:px-pcx,offY:py-pcy};
+    }
+  }
+  return null;
+}
+
+function getBoardCell(px,py){
+  let bc=Math.floor((px-BOARD_X)/CELL);
+  let br=Math.floor((py-BOARD_Y)/CELL);
+  if(bc>=0&&bc<GRID&&br>=0&&br<GRID)return{r:br,c:bc};
+  return null;
+}
+
+c.addEventListener('touchstart',e=>{e.preventDefault();onDown(gcp(e))});
+c.addEventListener('touchmove',e=>{e.preventDefault();onMove(gcp(e))});
+c.addEventListener('touchend',e=>{e.preventDefault();onUp(gcp(e))});
+c.addEventListener('mousedown',e=>{onDown(gcp(e))});
+c.addEventListener('mousemove',e=>{if(dragging)onMove(gcp(e))});
+c.addEventListener('mouseup',e=>{onUp(gcp(e))});
+
+function onDown(p){
+  if(state==='menu'){initGame();return}
+  if(state==='gameover'){state='menu';return}
+  if(state!=='playing')return;
+
+  let hit=getPieceAt(p.x,p.y);
+  if(hit){
+    dragging={pieceIdx:hit.idx,x:p.x,y:p.y,offX:hit.offX,offY:hit.offY};
+  }
+}
+
+function onMove(p){
+  if(dragging)dragging={...dragging,x:p.x,y:p.y};
+}
+
+function onUp(p){
+  if(!dragging)return;
+  let piece=pieces[dragging.pieceIdx];
+  // Find board cell under center of piece
+  let shape=piece.shape;
+  let minR=99,maxR=-99,minC=99,maxC=-99;
+  for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+  let pw=(maxC-minC+1),ph=(maxR-minR+1);
+
+  // Use drag position with offset to find target cell
+  let cx=dragging.x,cy=dragging.y-60; // offset up so finger doesn't cover
+  let targetC=Math.round((cx-BOARD_X)/CELL-pw/2);
+  let targetR=Math.round((cy-BOARD_Y)/CELL-ph/2);
+
+  if(canPlace(shape,targetR,targetC)){
+    placePiece(dragging.pieceIdx,targetR,targetC);
+  }else{
+    shakeTimer=0.2;
+  }
+  dragging=null;
+}
+
+// ===== GAME LOOP =====
+let lastTime=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+
+  // Clear animations
+  clearAnim=clearAnim.filter(a=>{a.timer-=dt;return a.timer>0});
+
+  // Particles
+  for(let p of particles){
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+    if(p.type==='star')p.vy+=150*dt;
+  }
+  particles=particles.filter(p=>p.life>0);
+
+  if(shakeTimer>0)shakeTimer-=dt;
+
+  draw();
+}
+
+function draw(){
+  // Background
+  ctx.fillStyle='#fef3e2';ctx.fillRect(0,0,W,H);
+
+  // Decorative top pattern
+  ctx.fillStyle='#ffe4c4';
+  for(let i=0;i<W;i+=40){
+    ctx.beginPath();ctx.arc(i,0,20,0,Math.PI);ctx.fill();
+  }
+
+  if(state==='menu'){
+    drawMenu();return;
+  }
+  if(state==='gameover'){
+    drawGame();drawGameOver();return;
+  }
+
+  drawGame();
+}
+
+function drawMenu(){
+  // Title
+  ctx.fillStyle='#ff6b6b';ctx.font='bold 42px sans-serif';ctx.textAlign='center';
+  ctx.fillText('애니멀 블록',W/2,250);
+  ctx.fillStyle='#4ecdc4';ctx.font='bold 42px sans-serif';
+  ctx.fillText('블라스트!',W/2,310);
+
+  // Draw sample animals
+  let animalSize=70;
+  for(let i=0;i<5;i++){
+    let ax=W/2+(i-2)*80-animalSize/2;
+    drawAnimal(ax,380,animalSize,i,1);
+  }
+
+  // Start button
+  ctx.fillStyle='#ff6b6b';
+  roundRect(W/2-100,500,200,65,15);
+  ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';ctx.textAlign='center';
+  ctx.fillText('시작하기',W/2,543);
+
+  // Best score
+  ctx.fillStyle='#999';ctx.font='18px sans-serif';
+  ctx.fillText('최고점수: '+bestScore,W/2,620);
+
+  // Instructions
+  ctx.fillStyle='#aaa';ctx.font='14px sans-serif';
+  ctx.fillText('블록을 드래그하여 8x8 보드에 배치하세요',W/2,700);
+  ctx.fillText('가로 또는 세로 줄을 채우면 클리어!',W/2,725);
+}
+
+function drawGame(){
+  let sx=0,sy=0;
+  if(shakeTimer>0){sx=(Math.random()-0.5)*6;sy=(Math.random()-0.5)*6}
+  ctx.save();ctx.translate(sx,sy);
+
+  // Score area
+  ctx.fillStyle='#ff6b6b';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+  ctx.fillText('SCORE',30,40);
+  ctx.fillStyle='#333';ctx.font='bold 32px sans-serif';
+  ctx.fillText(score.toLocaleString(),30,78);
+
+  ctx.fillStyle='#4ecdc4';ctx.font='bold 16px sans-serif';ctx.textAlign='right';
+  ctx.fillText('BEST',W-30,40);
+  ctx.fillStyle='#333';ctx.font='bold 32px sans-serif';
+  ctx.fillText(bestScore.toLocaleString(),W-30,78);
+
+  // Combo indicator
+  if(combo>0){
+    ctx.fillStyle='#f80';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText(combo+'x COMBO',W/2,78);
+  }
+
+  // Board background
+  ctx.fillStyle='#f5e6d3';
+  roundRect(BOARD_X-6,BOARD_Y-6,GRID*CELL+12,GRID*CELL+12,10);
+
+  // Board grid
+  for(let r=0;r<GRID;r++){
+    for(let cc=0;cc<GRID;cc++){
+      let x=BOARD_X+cc*CELL,y=BOARD_Y+r*CELL;
+
+      // Empty cell
+      ctx.fillStyle=(r+cc)%2===0?'#fcecd5':'#f8e2c4';
+      roundRect(x+1,y+1,CELL-2,CELL-2,4);
+
+      // Placed animal
+      if(board[r][cc]>=0){
+        // Check if being cleared
+        let clearing=clearAnim.find(a=>a.r===r&&a.c===cc);
+        if(clearing){
+          let scale=clearing.timer/0.3;
+          let cs=CELL*scale;
+          drawAnimal(x+(CELL-cs)/2,y+(CELL-cs)/2,cs,board[r][cc],scale);
+        }else{
+          drawAnimal(x,y,CELL,board[r][cc],1);
+        }
+      }
+    }
+  }
+
+  // Ghost preview while dragging
+  if(dragging){
+    let piece=pieces[dragging.pieceIdx];
+    let shape=piece.shape;
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+    let pw=(maxC-minC+1),ph=(maxR-minR+1);
+
+    let cx=dragging.x,cy=dragging.y-60;
+    let targetC=Math.round((cx-BOARD_X)/CELL-pw/2);
+    let targetR=Math.round((cy-BOARD_Y)/CELL-ph/2);
+
+    let valid=canPlace(shape,targetR,targetC);
+
+    // Draw ghost on board
+    if(targetR>=-(ph)&&targetR<GRID+ph&&targetC>=-(pw)&&targetC<GRID+pw){
+      for(let [r,cc] of shape){
+        let gr=targetR+r,gc=targetC+cc;
+        if(gr>=0&&gr<GRID&&gc>=0&&gc<GRID){
+          let gx=BOARD_X+gc*CELL,gy=BOARD_Y+gr*CELL;
+          if(valid){
+            drawAnimal(gx,gy,CELL,piece.animal,0.4);
+          }else{
+            ctx.fillStyle='rgba(255,0,0,0.2)';
+            roundRect(gx+2,gy+2,CELL-4,CELL-4,4);
+          }
+        }
+      }
+    }
+
+    // Draw piece following finger
+    for(let [r,cc] of shape){
+      let px=dragging.x+(cc-minC-(maxC-minC)/2)*CELL-CELL/2;
+      let py=dragging.y-80+(r-minR-(maxR-minR)/2)*CELL-CELL/2;
+      drawAnimal(px,py,CELL,piece.animal,0.8);
+    }
+  }
+
+  // Draw available pieces
+  ctx.fillStyle='#f5e6d3';
+  roundRect(15,PIECE_AREA_Y-5,W-30,H-PIECE_AREA_Y-5,10);
+
+  let spacing=W/3;
+  for(let i=0;i<3;i++){
+    if(!pieces[i]||pieces[i].used)continue;
+    if(dragging&&dragging.pieceIdx===i)continue;
+    let shape=pieces[i].shape;
+    let animal=pieces[i].animal;
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+    let pw=(maxC-minC+1),ph=(maxR-minR+1);
+    let sz=30; // small cell size for preview
+    let pcx=spacing*i+spacing/2,pcy=PIECE_AREA_Y+70;
+    let ox=pcx-pw*sz/2,oy=pcy-ph*sz/2;
+
+    // Check if this piece can be placed anywhere
+    let placeable=false;
+    for(let r=0;r<GRID&&!placeable;r++)
+      for(let cc=0;cc<GRID&&!placeable;cc++)
+        if(canPlace(shape,r,cc))placeable=true;
+
+    for(let [r,cc] of shape){
+      drawAnimal(ox+cc*sz,oy+r*sz,sz,animal,placeable?1:0.3);
+    }
+  }
+
+  // Highlight lines about to complete
+  for(let r=0;r<GRID;r++){
+    let filled=0;
+    for(let cc=0;cc<GRID;cc++)if(board[r][cc]>=0)filled++;
+    if(filled===GRID-1){
+      ctx.strokeStyle='rgba(255,200,0,0.4)';ctx.lineWidth=2;
+      ctx.strokeRect(BOARD_X,BOARD_Y+r*CELL,GRID*CELL,CELL);
+    }
+  }
+  for(let cc=0;cc<GRID;cc++){
+    let filled=0;
+    for(let r=0;r<GRID;r++)if(board[r][cc]>=0)filled++;
+    if(filled===GRID-1){
+      ctx.strokeStyle='rgba(255,200,0,0.4)';ctx.lineWidth=2;
+      ctx.strokeRect(BOARD_X+cc*CELL,BOARD_Y,CELL,GRID*CELL);
+    }
+  }
+
+  // Particles
+  for(let p of particles){
+    ctx.globalAlpha=Math.max(0,p.life);
+    if(p.type==='star'){
+      ctx.fillStyle=p.color;
+      ctx.beginPath();
+      drawStar(p.x,p.y,p.r,p.r*0.5,5);
+      ctx.fill();
+    }else if(p.type==='text'){
+      ctx.fillStyle=p.color;ctx.font='bold '+p.size+'px sans-serif';ctx.textAlign='center';
+      ctx.fillText(p.text,p.x,p.y);
+    }
+  }
+  ctx.globalAlpha=1;
+
+  ctx.restore();
+}
+
+function drawStar(cx,cy,outerR,innerR,points){
+  ctx.beginPath();
+  for(let i=0;i<points*2;i++){
+    let r=i%2===0?outerR:innerR;
+    let a=i*Math.PI/points-Math.PI/2;
+    if(i===0)ctx.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+    else ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+  }
+  ctx.closePath();
+}
+
+function drawGameOver(){
+  ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(0,0,W,H);
+
+  // Panel
+  ctx.fillStyle='#fff';
+  roundRect(W/2-160,H/2-160,320,320,20);
+
+  // Sad animal
+  drawAnimal(W/2-35,H/2-140,70,Math.floor(Math.random()*0.001+2),1);
+
+  ctx.fillStyle='#ff6b6b';ctx.font='bold 32px sans-serif';ctx.textAlign='center';
+  ctx.fillText('게임 오버',W/2,H/2-45);
+
+  ctx.fillStyle='#333';ctx.font='24px sans-serif';
+  ctx.fillText('점수: '+score.toLocaleString(),W/2,H/2);
+
+  if(score>=bestScore&&score>0){
+    ctx.fillStyle='#f80';ctx.font='bold 18px sans-serif';
+    ctx.fillText('🏆 새로운 최고점수!',W/2,H/2+35);
+  }
+
+  ctx.fillStyle='#4ecdc4';
+  roundRect(W/2-80,H/2+60,160,50,12);
+  ctx.fillStyle='#fff';ctx.font='bold 22px sans-serif';
+  ctx.fillText('다시하기',W/2,H/2+93);
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>
