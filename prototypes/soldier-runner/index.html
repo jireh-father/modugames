@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>솔저 러너</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none}
+canvas{background:#555;max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c" width="540" height="960"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+// Constants
+const ROAD_L=70,ROAD_R=470,ROAD_W=ROAD_R-ROAD_L;
+const PLAYER_Y=750;
+const SCROLL_SPD=150;
+
+// Weapons
+const WEAPONS=[
+  {name:'권총',color:'#ff0',dmg:5,rate:0.4,bullets:1,spread:0},
+  {name:'샷건',color:'#f80',dmg:3,rate:0.6,bullets:5,spread:0.4},
+  {name:'기관총',color:'#0f0',dmg:3,rate:0.1,bullets:1,spread:0.05},
+  {name:'스나이퍼',color:'#0ff',dmg:30,rate:1.2,bullets:1,spread:0},
+  {name:'로켓',color:'#f44',dmg:20,rate:1.0,bullets:1,spread:0,aoe:50}
+];
+
+// Enemy types
+const ENEMY_TYPES=[
+  {name:'보병',color:'#f44',hp:15,spd:40,r:10,coins:1},
+  {name:'돌격병',color:'#f80',hp:10,spd:80,r:9,coins:2},
+  {name:'방패병',color:'#888',hp:40,spd:30,r:13,coins:3},
+  {name:'궁수',color:'#a0f',hp:12,spd:35,r:10,coins:2,shoots:true}
+];
+
+// Stages
+const STAGES=[];
+for(let i=0;i<10;i++){
+  let segs=[];
+  let gateCount=3+i;
+  let enemyWaves=2+i;
+  for(let g=0;g<gateCount;g++){
+    segs.push({type:'gate',y:-(g+1)*600});
+  }
+  for(let e=0;e<enemyWaves;e++){
+    let count=3+i+e*2;
+    let types=[];
+    for(let j=0;j<count;j++){
+      types.push(Math.min(3,Math.floor(Math.random()*Math.min(4,1+i/2))));
+    }
+    segs.push({type:'enemies',y:-(gateCount+e+1)*600,enemies:types});
+  }
+  // Boss at end
+  segs.push({type:'boss',y:-(gateCount+enemyWaves+1)*600,
+    bossHp:200+i*150,bossName:'보스 '+(i+1)});
+  STAGES.push({segs,reward:50+i*30});
+}
+
+let state='menu'; // menu, stage_select, weapon_select, playing, victory, defeat
+let playerX=W/2,soldiers=10,maxSoldiers=10;
+let scrollY=0,shootTimer=0,selectedWeapon=0,currentStage=0;
+let bullets=[],enemies=[],eBullets=[],gates=[],particles=[],floatTexts=[];
+let boss=null,coins=0,unlockedStages=1;
+let weaponLevels=[1,0,0,0,0];
+
+// Save/Load
+function save(){try{localStorage.setItem('soldier-runner',JSON.stringify({coins,unlockedStages,weaponLevels,selectedWeapon}))}catch(e){}}
+function load(){try{let d=JSON.parse(localStorage.getItem('soldier-runner'));if(d){coins=d.coins;unlockedStages=d.unlockedStages;weaponLevels=d.weaponLevels;selectedWeapon=d.selectedWeapon}}catch(e){}}
+load();
+
+function initStage(idx){
+  currentStage=idx;
+  let stage=STAGES[idx];
+  playerX=W/2;soldiers=10;maxSoldiers=10;scrollY=0;shootTimer=0;
+  bullets=[];enemies=[];eBullets=[];gates=[];particles=[];floatTexts=[];boss=null;
+
+  // Create gates
+  for(let seg of stage.segs){
+    if(seg.type==='gate'){
+      let ops=['+','-','×','÷'];
+      let op1=ops[Math.floor(Math.random()*4)];
+      let op2=ops[Math.floor(Math.random()*4)];
+      let v1=Math.floor(Math.random()*5)+1;
+      let v2=Math.floor(Math.random()*5)+1;
+      // Make sure at least one is good
+      gates.push({y:seg.y,leftOp:op1,leftVal:v1,rightOp:op2,rightVal:v2,passed:false});
+    }
+    if(seg.type==='enemies'){
+      for(let i=0;i<seg.enemies.length;i++){
+        let ti=seg.enemies[i];
+        let et=ENEMY_TYPES[ti];
+        let ex=ROAD_L+30+Math.random()*(ROAD_W-60);
+        let ey=seg.y-i*40;
+        let hpMul=1+idx*0.3;
+        enemies.push({x:ex,y:ey,hp:et.hp*hpMul,maxHp:et.hp*hpMul,spd:et.spd,r:et.r,
+          color:et.color,coins:et.coins,shoots:et.shoots||false,shootTimer:2,alive:true,flash:0});
+      }
+    }
+    if(seg.type==='boss'){
+      boss={x:W/2,y:seg.y,hp:seg.bossHp,maxHp:seg.bossHp,name:seg.bossName,
+        r:30,moveDir:1,moveSpd:80,shootTimer:1,flash:0,alive:true,entered:false};
+    }
+  }
+  state='playing';
+}
+
+function applyGate(op,val){
+  let prev=soldiers;
+  if(op==='+')soldiers+=val;
+  else if(op==='-')soldiers=Math.max(1,soldiers-val);
+  else if(op==='×')soldiers=Math.min(50,soldiers*val);
+  else if(op==='÷')soldiers=Math.max(1,Math.floor(soldiers/val));
+  let diff=soldiers-prev;
+  let text=(diff>=0?'+':'')+diff;
+  floatTexts.push({x:playerX,y:PLAYER_Y-40,text,color:diff>=0?'#0f0':'#f44',life:1});
+}
+
+function spawnParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    let a=Math.random()*Math.PI*2,s=Math.random()*100+40;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.5,color,r:3});
+  }
+}
+
+// Input
+let touchX=null;
+function gcp(e){let r=c.getBoundingClientRect();let t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H}}
+
+c.addEventListener('touchstart',e=>{e.preventDefault();handleDown(gcp(e))});
+c.addEventListener('touchmove',e=>{e.preventDefault();let p=gcp(e);touchX=p.x});
+c.addEventListener('touchend',e=>{e.preventDefault();touchX=null});
+c.addEventListener('mousedown',e=>handleDown(gcp(e)));
+c.addEventListener('mousemove',e=>{if(touchX!==null){let p=gcp(e);touchX=p.x}});
+c.addEventListener('mouseup',()=>touchX=null);
+
+function handleDown(p){
+  if(state==='menu'){state='stage_select';return}
+  if(state==='victory'||state==='defeat'){state='stage_select';return}
+  if(state==='stage_select'){
+    // Grid of stages
+    for(let i=0;i<10;i++){
+      let col=i%5,row=Math.floor(i/5);
+      let sx=40+col*95,sy=300+row*120;
+      if(p.x>sx&&p.x<sx+80&&p.y>sy&&p.y<sy+90){
+        if(i<unlockedStages){currentStage=i;state='weapon_select'}
+        return;
+      }
+    }
+    return;
+  }
+  if(state==='weapon_select'){
+    for(let i=0;i<5;i++){
+      let wy=250+i*110;
+      if(p.y>wy&&p.y<wy+90&&p.x>40&&p.x<500){
+        if(weaponLevels[i]>0){selectedWeapon=i;initStage(currentStage)}
+        else if(coins>=100*(i+1)){
+          // Unlock
+          coins-=100*(i+1);weaponLevels[i]=1;save();
+        }
+        return;
+      }
+    }
+    return;
+  }
+  touchX=p.x;
+}
+
+let keys={};
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+// Game loop
+let lastTime=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+
+  if(state==='playing'){
+    // Scroll
+    scrollY+=SCROLL_SPD*dt;
+
+    // Player movement
+    if(keys['a']||keys['arrowleft'])playerX-=200*dt;
+    if(keys['d']||keys['arrowright'])playerX+=200*dt;
+    if(touchX!==null)playerX+=(touchX-playerX)*5*dt;
+    playerX=Math.max(ROAD_L+20,Math.min(ROAD_R-20,playerX));
+
+    // Shooting
+    let w=WEAPONS[selectedWeapon];
+    let lvl=weaponLevels[selectedWeapon];
+    shootTimer-=dt;
+    if(shootTimer<=0&&soldiers>0){
+      shootTimer=w.rate/(1+lvl*0.2);
+      for(let b=0;b<w.bullets;b++){
+        let angle=-Math.PI/2+(b-(w.bullets-1)/2)*w.spread+(Math.random()-0.5)*w.spread*0.3;
+        bullets.push({x:playerX+(Math.random()-0.5)*20,y:PLAYER_Y-20,
+          vx:Math.cos(angle)*400,vy:Math.sin(angle)*400,
+          dmg:w.dmg*(1+lvl*0.3),r:3,life:2,color:w.color,aoe:w.aoe||0});
+      }
+    }
+
+    // Bullets
+    for(let b of bullets){
+      b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+      // Hit enemies
+      for(let e of enemies){
+        if(!e.alive)continue;
+        if(Math.hypot(b.x-e.x,b.y-(e.y+scrollY))<e.r+b.r){
+          e.hp-=b.dmg;e.flash=0.1;b.life=0;
+          if(b.aoe>0){
+            for(let e2 of enemies){
+              if(e2!==e&&e2.alive&&Math.hypot(e2.x-b.x,(e2.y+scrollY)-b.y)<b.aoe)
+                {e2.hp-=b.dmg*0.5;e2.flash=0.1}
+            }
+            spawnParticles(b.x,b.y,b.color,5);
+          }
+          if(e.hp<=0){e.alive=false;coins+=e.coins;spawnParticles(e.x,e.y+scrollY,e.color,4)}
+          break;
+        }
+      }
+      // Hit boss
+      if(boss&&boss.alive&&boss.entered){
+        if(Math.hypot(b.x-boss.x,b.y-(boss.y+scrollY))<boss.r+b.r){
+          boss.hp-=b.dmg;boss.flash=0.1;b.life=0;
+          spawnParticles(b.x,b.y,b.color,2);
+          if(boss.hp<=0){
+            boss.alive=false;
+            spawnParticles(boss.x,boss.y+scrollY,boss.color||'#f00',20);
+            coins+=STAGES[currentStage].reward;
+            if(currentStage+1>=unlockedStages&&currentStage<9)unlockedStages=currentStage+2;
+            save();
+            state='victory';
+          }
+        }
+      }
+    }
+    bullets=bullets.filter(b=>b.life>0);
+
+    // Gates
+    for(let g of gates){
+      let screenY=g.y+scrollY;
+      if(!g.passed&&screenY>PLAYER_Y-30&&screenY<PLAYER_Y+30){
+        g.passed=true;
+        let mid=(ROAD_L+ROAD_R)/2;
+        if(playerX<mid){applyGate(g.leftOp,g.leftVal)}
+        else{applyGate(g.rightOp,g.rightVal)}
+      }
+    }
+
+    // Enemies
+    for(let e of enemies){
+      if(!e.alive)continue;
+      let screenY=e.y+scrollY;
+      e.flash=Math.max(0,e.flash-dt);
+      // Move toward player if on screen
+      if(screenY>-50&&screenY<H+50){
+        e.y+=e.spd*dt; // Move down relative
+        // Shoot
+        if(e.shoots){
+          e.shootTimer-=dt;
+          if(e.shootTimer<=0){
+            e.shootTimer=2;
+            let a=Math.atan2(PLAYER_Y-screenY,playerX-e.x);
+            eBullets.push({x:e.x,y:screenY,vx:Math.cos(a)*150,vy:Math.sin(a)*150,r:4,life:3,color:'#f0f'});
+          }
+        }
+        // Reached player line
+        if(screenY>PLAYER_Y){
+          e.alive=false;soldiers=Math.max(0,soldiers-1);
+          floatTexts.push({x:e.x,y:PLAYER_Y-20,text:'-1',color:'#f44',life:1});
+          if(soldiers<=0)state='defeat';
+        }
+      }
+    }
+
+    // Enemy bullets
+    for(let b of eBullets){
+      b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+      if(Math.hypot(b.x-playerX,b.y-PLAYER_Y)<30){
+        b.life=0;soldiers=Math.max(0,soldiers-1);
+        spawnParticles(playerX,PLAYER_Y,'#f00',3);
+        if(soldiers<=0)state='defeat';
+      }
+    }
+    eBullets=eBullets.filter(b=>b.life>0);
+
+    // Boss behavior
+    if(boss&&boss.alive){
+      let bossScreenY=boss.y+scrollY;
+      if(bossScreenY>150&&!boss.entered)boss.entered=true;
+      if(boss.entered){
+        boss.x+=boss.moveDir*boss.moveSpd*dt;
+        if(boss.x<ROAD_L+40)boss.moveDir=1;
+        if(boss.x>ROAD_R-40)boss.moveDir=-1;
+        boss.shootTimer-=dt;
+        if(boss.shootTimer<=0){
+          boss.shootTimer=0.8;
+          for(let i=-2;i<=2;i++){
+            let a=Math.PI/2+i*0.3;
+            eBullets.push({x:boss.x,y:bossScreenY,vx:Math.cos(a)*120,vy:Math.sin(a)*120,r:5,life:3,color:'#fa0'});
+          }
+        }
+        boss.flash=Math.max(0,boss.flash-dt);
+      }
+    }
+
+    // Particles
+    for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}
+    particles=particles.filter(p=>p.life>0);
+
+    // Float texts
+    for(let f of floatTexts){f.y-=40*dt;f.life-=dt}
+    floatTexts=floatTexts.filter(f=>f.life>0);
+  }
+
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#555';ctx.fillRect(0,0,W,H);
+
+  if(state==='menu'){
+    ctx.fillStyle='#fff';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('솔저 러너',W/2,300);
+    ctx.font='24px sans-serif';ctx.fillText('🎖️ 병사 수집 런 게임',W/2,360);
+    ctx.fillStyle='#4a8';ctx.fillRect(170,450,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';ctx.fillText('시작',W/2,490);
+    ctx.fillStyle='#ff0';ctx.font='16px sans-serif';ctx.fillText('💰 '+coins,W/2,560);
+    return;
+  }
+
+  if(state==='stage_select'){
+    ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff';ctx.font='bold 32px sans-serif';ctx.textAlign='center';
+    ctx.fillText('스테이지 선택',W/2,100);
+    ctx.fillStyle='#ff0';ctx.font='18px sans-serif';ctx.fillText('💰 '+coins,W/2,140);
+    for(let i=0;i<10;i++){
+      let col=i%5,row=Math.floor(i/5);
+      let sx=40+col*95,sy=200+row*140;
+      let unlocked=i<unlockedStages;
+      ctx.fillStyle=unlocked?'#2a4a6a':'#333';
+      ctx.fillRect(sx,sy,80,100);
+      ctx.strokeStyle=unlocked?'#4af':'#555';ctx.lineWidth=2;ctx.strokeRect(sx,sy,80,100);
+      ctx.fillStyle=unlocked?'#fff':'#666';ctx.font='bold 24px sans-serif';ctx.textAlign='center';
+      ctx.fillText(unlocked?(i+1):'🔒',sx+40,sy+45);
+      if(unlocked){
+        ctx.fillStyle='#ff0';ctx.font='12px sans-serif';
+        ctx.fillText('보상:'+STAGES[i].reward,sx+40,sy+75);
+        ctx.fillStyle='#aaa';
+        ctx.fillText('적:'+(STAGES[i].segs.length-1),sx+40,sy+90);
+      }
+    }
+    return;
+  }
+
+  if(state==='weapon_select'){
+    ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff';ctx.font='bold 32px sans-serif';ctx.textAlign='center';
+    ctx.fillText('무기 선택',W/2,100);
+    ctx.fillStyle='#ff0';ctx.font='18px sans-serif';ctx.fillText('💰 '+coins,W/2,140);
+    ctx.font='14px sans-serif';ctx.fillStyle='#aaa';ctx.fillText('스테이지 '+(currentStage+1),W/2,180);
+    for(let i=0;i<5;i++){
+      let w=WEAPONS[i],wy=220+i*120;
+      let owned=weaponLevels[i]>0;
+      ctx.fillStyle=owned?(selectedWeapon===i?'#2a4a2a':'#2a2a3a'):'#1a1a2a';
+      ctx.fillRect(40,wy,460,100);
+      ctx.strokeStyle=owned?w.color:'#555';ctx.lineWidth=2;ctx.strokeRect(40,wy,460,100);
+      ctx.fillStyle=w.color;ctx.font='bold 22px sans-serif';ctx.textAlign='left';
+      ctx.fillText(w.name,70,wy+35);
+      ctx.fillStyle='#aaa';ctx.font='14px sans-serif';
+      ctx.fillText('DMG:'+w.dmg+' RATE:'+(1/w.rate).toFixed(1)+'/s'+(w.aoe?' AOE':''),70,wy+60);
+      if(owned){
+        ctx.fillStyle='#0f0';ctx.fillText('Lv.'+weaponLevels[i]+' [선택하려면 터치]',70,wy+80);
+      }else{
+        let cost=100*(i+1);
+        ctx.fillStyle=coins>=cost?'#ff0':'#666';
+        ctx.fillText('해금: 💰'+cost,70,wy+80);
+      }
+    }
+    return;
+  }
+
+  if(state==='victory'){
+    ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ffd700';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('승리!',W/2,300);
+    ctx.fillStyle='#fff';ctx.font='24px sans-serif';
+    ctx.fillText('스테이지 '+(currentStage+1)+' 클리어!',W/2,370);
+    ctx.fillText('보상: 💰'+STAGES[currentStage].reward,W/2,420);
+    ctx.fillStyle='#4a8';ctx.fillRect(170,500,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('계속',W/2,538);
+    return;
+  }
+
+  if(state==='defeat'){
+    ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#f44';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('패배...',W/2,300);
+    ctx.fillStyle='#fff';ctx.font='24px sans-serif';
+    ctx.fillText('스테이지 '+(currentStage+1),W/2,370);
+    ctx.fillStyle='#c44';ctx.fillRect(170,450,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('다시하기',W/2,488);
+    return;
+  }
+
+  // === PLAYING ===
+  // Road
+  ctx.fillStyle='#444';ctx.fillRect(ROAD_L,0,ROAD_W,H);
+  // Road lines
+  ctx.strokeStyle='#ff0';ctx.lineWidth=2;ctx.setLineDash([20,20]);
+  let lineOffset=(scrollY*2)%40;
+  ctx.beginPath();
+  for(let y=-40+lineOffset;y<H;y+=40){ctx.moveTo(W/2,y);ctx.lineTo(W/2,y+20)}
+  ctx.stroke();ctx.setLineDash([]);
+  // Road edges
+  ctx.fillStyle='#222';ctx.fillRect(ROAD_L-5,0,5,H);ctx.fillRect(ROAD_R,0,5,H);
+
+  // Gates
+  for(let g of gates){
+    let sy=g.y+scrollY;
+    if(sy<-60||sy>H+60)continue;
+    let mid=(ROAD_L+ROAD_R)/2;
+    // Left gate
+    ctx.fillStyle=g.passed?'#333':'#264';
+    ctx.fillRect(ROAD_L,sy-25,mid-ROAD_L-5,50);
+    ctx.strokeStyle='#0f0';ctx.lineWidth=2;ctx.strokeRect(ROAD_L,sy-25,mid-ROAD_L-5,50);
+    ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText(g.leftOp+g.leftVal,(ROAD_L+mid-5)/2,sy+7);
+    // Right gate
+    ctx.fillStyle=g.passed?'#333':'#426';
+    ctx.fillRect(mid+5,sy-25,ROAD_R-mid-5,50);
+    ctx.strokeStyle='#48f';ctx.lineWidth=2;ctx.strokeRect(mid+5,sy-25,ROAD_R-mid-5,50);
+    ctx.fillStyle='#fff';
+    ctx.fillText(g.rightOp+g.rightVal,(mid+5+ROAD_R)/2,sy+7);
+  }
+
+  // Enemies
+  for(let e of enemies){
+    if(!e.alive)continue;
+    let sy=e.y+scrollY;
+    if(sy<-30||sy>H+30)continue;
+    ctx.fillStyle=e.flash>0?'#fff':e.color;
+    ctx.beginPath();ctx.arc(e.x,sy,e.r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#300';ctx.fillRect(e.x-e.r,sy-e.r-6,e.r*2,3);
+    ctx.fillStyle='#f00';ctx.fillRect(e.x-e.r,sy-e.r-6,e.r*2*(e.hp/e.maxHp),3);
+  }
+
+  // Boss
+  if(boss&&boss.alive){
+    let sy=boss.y+scrollY;
+    if(sy>-60&&sy<H+60){
+      ctx.fillStyle=boss.flash>0?'#fff':'#c00';
+      ctx.beginPath();ctx.arc(boss.x,sy,boss.r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#800';ctx.beginPath();ctx.arc(boss.x,sy,boss.r*0.6,0,Math.PI*2);ctx.fill();
+      // HP bar
+      ctx.fillStyle='#300';ctx.fillRect(100,20,W-200,18);
+      ctx.fillStyle='#f00';ctx.fillRect(100,20,(W-200)*(boss.hp/boss.maxHp),18);
+      ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+      ctx.fillText(boss.name+' '+Math.ceil(boss.hp)+'/'+boss.maxHp,W/2,34);
+    }
+  }
+
+  // Bullets
+  for(let b of bullets){ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill()}
+  for(let b of eBullets){ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill()}
+
+  // Player soldiers
+  let cols=Math.min(soldiers,5);
+  let rows=Math.ceil(soldiers/cols);
+  for(let i=0;i<soldiers;i++){
+    let col=i%cols,row=Math.floor(i/cols);
+    let sx=playerX+(col-(cols-1)/2)*18;
+    let sy=PLAYER_Y+row*16;
+    ctx.fillStyle='#4af';
+    ctx.beginPath();ctx.arc(sx,sy,7,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#28d';
+    ctx.fillRect(sx-2,sy-10,4,8);
+  }
+
+  // Particles
+  for(let p of particles){ctx.globalAlpha=p.life*2;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}
+  ctx.globalAlpha=1;
+
+  // Float texts
+  for(let f of floatTexts){
+    ctx.globalAlpha=f.life;ctx.fillStyle=f.color;ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText(f.text,f.x,f.y);
+  }
+  ctx.globalAlpha=1;
+
+  // HUD
+  ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(0,H-50,W,50);
+  ctx.fillStyle='#4af';ctx.font='bold 18px sans-serif';ctx.textAlign='left';
+  ctx.fillText('🎖️ '+soldiers,20,H-20);
+  ctx.fillStyle='#ff0';ctx.textAlign='center';
+  ctx.fillText('💰 '+coins,W/2,H-20);
+  ctx.fillStyle='#fff';ctx.textAlign='right';
+  ctx.fillText(WEAPONS[selectedWeapon].name,W-20,H-20);
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>
