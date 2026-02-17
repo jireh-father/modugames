@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>머지 배틀</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none}
+canvas{background:#1a1a2e;max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c" width="540" height="960"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+const COLS=5,ROWS=4,CELL=80,GRID_X=(W-COLS*CELL)/2,GRID_Y=530,BTN_Y=858;
+const BATTLE_Y=50,BATTLE_H=460;
+const TIERS=[
+  {name:'전사',color:'#8b4513',atk:5,hp:30,spd:1.0},
+  {name:'기사',color:'#c0c0c0',atk:12,hp:60,spd:0.9},
+  {name:'마법사',color:'#4169e1',atk:25,hp:40,spd:0.8},
+  {name:'궁수',color:'#228b22',atk:20,hp:35,spd:0.6},
+  {name:'닌자',color:'#800080',atk:35,hp:50,spd:0.5},
+  {name:'드래곤',color:'#ff4500',atk:60,hp:100,spd:1.2},
+  {name:'신',color:'#ffd700',atk:100,hp:200,spd:0.7}
+];
+const ENEMY_WAVES=[]; // generated
+for(let w=1;w<=20;w++){
+  let enemies=[];
+  let count=3+Math.floor(w*1.5);
+  for(let i=0;i<count;i++){
+    let tier=Math.min(6,Math.floor(w/4));
+    let hpMul=1+w*0.3;
+    enemies.push({tier,hp:TIERS[tier].hp*hpMul,maxHp:TIERS[tier].hp*hpMul,atk:TIERS[tier].atk*(1+w*0.2),x:W+50+i*60,y:BATTLE_Y+80+Math.random()*(BATTLE_H-160)});
+  }
+  ENEMY_WAVES.push(enemies);
+}
+
+let state='menu',gold=100,wave=0,grid=[],battleUnits=[],battleEnemies=[],battleBullets=[];
+let dragging=null,dragX=0,dragY=0;
+
+function initGame(){
+  gold=100;wave=0;
+  grid=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)grid.push(null);
+  battleUnits=[];battleEnemies=[];battleBullets=[];
+}
+
+function gridIdx(col,row){return row*COLS+col}
+function summonUnit(){
+  if(gold<50)return;
+  let empty=[];
+  for(let i=0;i<grid.length;i++)if(!grid[i])empty.push(i);
+  if(empty.length===0)return;
+  gold-=50;
+  let idx=empty[Math.floor(Math.random()*empty.length)];
+  grid[idx]={tier:0,hp:TIERS[0].hp,atk:TIERS[0].atk};
+}
+
+function startBattle(){
+  if(wave>=20)return;
+  battleUnits=[];battleEnemies=[];battleBullets=[];
+  // Place units from grid
+  let placed=0;
+  for(let i=0;i<grid.length;i++){
+    if(grid[i]){
+      let col=i%COLS,row=Math.floor(i/COLS);
+      let t=TIERS[grid[i].tier];
+      battleUnits.push({tier:grid[i].tier,x:60+placed*50,y:BATTLE_Y+100+row*80,
+        hp:t.hp,maxHp:t.hp,atk:t.atk*(1+grid[i].tier*0.5),spd:t.spd,
+        color:t.color,shootTimer:0,alive:true});
+      placed++;
+    }
+  }
+  // Spawn enemies
+  let waveData=ENEMY_WAVES[wave];
+  for(let e of waveData){
+    battleEnemies.push({...e,alive:true,spd:30+wave*2,shootTimer:0,color:TIERS[e.tier].color});
+  }
+  state='battle';
+}
+
+function getCanvasPos(e){
+  let r=c.getBoundingClientRect();
+  let t=e.touches?e.touches[0]||e.changedTouches[0]:e;
+  return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H};
+}
+
+function getGridCell(px,py){
+  let col=Math.floor((px-GRID_X)/CELL),row=Math.floor((py-GRID_Y)/CELL);
+  if(col>=0&&col<COLS&&row>=0&&row<ROWS)return{col,row,idx:gridIdx(col,row)};
+  return null;
+}
+
+// Input
+c.addEventListener('mousedown',e=>{let p=getCanvasPos(e);handleDown(p)});
+c.addEventListener('mousemove',e=>{let p=getCanvasPos(e);handleMove(p)});
+c.addEventListener('mouseup',e=>{let p=getCanvasPos(e);handleUp(p)});
+c.addEventListener('touchstart',e=>{e.preventDefault();handleDown(getCanvasPos(e))});
+c.addEventListener('touchmove',e=>{e.preventDefault();handleMove(getCanvasPos(e))});
+c.addEventListener('touchend',e=>{e.preventDefault();handleUp(getCanvasPos(e))});
+
+function handleDown(p){
+  if(state==='menu'){initGame();state='prep';return}
+  if(state==='gameover'||state==='victory'){state='menu';return}
+  if(state==='prep'){
+    // Check buttons
+    if(p.y>BTN_Y&&p.y<BTN_Y+50){
+      if(p.x>30&&p.x<230){summonUnit();return}
+      if(p.x>280&&p.x<480){startBattle();return}
+    }
+    // Start drag
+    let cell=getGridCell(p.x,p.y);
+    if(cell&&grid[cell.idx]){
+      dragging={idx:cell.idx,unit:grid[cell.idx]};
+      dragX=p.x;dragY=p.y;
+    }
+  }
+}
+
+function handleMove(p){if(dragging){dragX=p.x;dragY=p.y}}
+
+function handleUp(p){
+  if(!dragging)return;
+  let cell=getGridCell(p.x,p.y);
+  if(cell&&cell.idx!==dragging.idx){
+    let target=grid[cell.idx];
+    if(target&&target.tier===dragging.unit.tier&&target.tier<6){
+      // Merge!
+      let newTier=target.tier+1;
+      grid[cell.idx]={tier:newTier,hp:TIERS[newTier].hp,atk:TIERS[newTier].atk};
+      grid[dragging.idx]=null;
+    }else if(!target){
+      // Move
+      grid[cell.idx]=dragging.unit;
+      grid[dragging.idx]=null;
+    }
+  }
+  dragging=null;
+}
+
+// Update
+let lastTime=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+
+  if(state==='battle'){
+    // Units shoot
+    for(let u of battleUnits){
+      if(!u.alive)continue;
+      u.shootTimer-=dt;
+      if(u.shootTimer<=0){
+        u.shootTimer=u.spd;
+        let nearest=null,nd=Infinity;
+        for(let e of battleEnemies){if(!e.alive)continue;let d=Math.hypot(e.x-u.x,e.y-u.y);if(d<nd){nd=d;nearest=e}}
+        if(nearest){
+          let a=Math.atan2(nearest.y-u.y,nearest.x-u.x);
+          battleBullets.push({x:u.x,y:u.y,vx:Math.cos(a)*250,vy:Math.sin(a)*250,dmg:u.atk,color:u.color,life:2,friendly:true,r:4});
+        }
+      }
+    }
+    // Enemies move and shoot
+    for(let e of battleEnemies){
+      if(!e.alive)continue;
+      e.x-=e.spd*dt;
+      e.shootTimer-=dt;
+      if(e.shootTimer<=0){
+        e.shootTimer=1.5;
+        let nearest=null,nd=Infinity;
+        for(let u of battleUnits){if(!u.alive)continue;let d=Math.hypot(u.x-e.x,u.y-e.y);if(d<nd){nd=d;nearest=u}}
+        if(nearest){
+          let a=Math.atan2(nearest.y-e.y,nearest.x-e.x);
+          battleBullets.push({x:e.x,y:e.y,vx:Math.cos(a)*150,vy:Math.sin(a)*150,dmg:e.atk,color:'#f44',life:2,friendly:false,r:3});
+        }
+      }
+    }
+    // Bullets
+    for(let b of battleBullets){
+      b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+      if(b.friendly){
+        for(let e of battleEnemies){
+          if(!e.alive)continue;
+          if(Math.hypot(b.x-e.x,b.y-e.y)<20){e.hp-=b.dmg;b.life=0;if(e.hp<=0){e.alive=false;gold+=10+wave*3}break}
+        }
+      }else{
+        for(let u of battleUnits){
+          if(!u.alive)continue;
+          if(Math.hypot(b.x-u.x,b.y-u.y)<20){u.hp-=b.dmg;b.life=0;if(u.hp<=0)u.alive=false;break}
+        }
+      }
+    }
+    battleBullets=battleBullets.filter(b=>b.life>0);
+    // Check win/lose
+    let enemiesAlive=battleEnemies.filter(e=>e.alive).length;
+    let unitsAlive=battleUnits.filter(u=>u.alive).length;
+    if(enemiesAlive===0){
+      wave++;
+      if(wave>=20){state='victory'}
+      else{state='prep';gold+=50+wave*10}
+    }else if(unitsAlive===0&&battleBullets.filter(b=>b.friendly).length===0){
+      // Check if any enemies still coming
+      if(battleEnemies.some(e=>e.alive&&e.x<0)){state='gameover'}
+      else if(unitsAlive===0){state='gameover'}
+    }
+  }
+
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);
+
+  if(state==='menu'){
+    ctx.fillStyle='#fff';ctx.font='bold 48px sans-serif';ctx.textAlign='center';
+    ctx.fillText('머지 배틀',W/2,300);
+    ctx.font='24px sans-serif';ctx.fillText('🔗 유닛 합성 & 웨이브 전투',W/2,360);
+    ctx.fillStyle='#48f';ctx.fillRect(170,450,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';ctx.fillText('시작',W/2,490);
+    return;
+  }
+
+  if(state==='gameover'){
+    ctx.fillStyle='#fff';ctx.font='bold 40px sans-serif';ctx.textAlign='center';
+    ctx.fillText('패배...',W/2,350);
+    ctx.font='24px sans-serif';ctx.fillText('도달 웨이브: '+wave,W/2,420);
+    ctx.fillStyle='#48f';ctx.fillRect(170,480,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('다시하기',W/2,518);
+    return;
+  }
+
+  if(state==='victory'){
+    ctx.fillStyle='#ffd700';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('승리!',W/2,350);
+    ctx.font='24px sans-serif';ctx.fillStyle='#fff';ctx.fillText('모든 웨이브 클리어!',W/2,420);
+    ctx.fillStyle='#48f';ctx.fillRect(170,480,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('다시하기',W/2,518);
+    return;
+  }
+
+  // Battle area
+  ctx.fillStyle='#0a0a1e';ctx.fillRect(0,BATTLE_Y,W,BATTLE_H);
+  ctx.strokeStyle='#333';ctx.strokeRect(0,BATTLE_Y,W,BATTLE_H);
+
+  if(state==='battle'){
+    // Draw battle units
+    for(let u of battleUnits){
+      if(!u.alive)continue;
+      ctx.fillStyle=u.color;
+      ctx.beginPath();ctx.arc(u.x,u.y,15,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText(TIERS[u.tier].name,u.x,u.y+4);
+      // HP bar
+      ctx.fillStyle='#300';ctx.fillRect(u.x-12,u.y-22,24,4);
+      ctx.fillStyle='#0f0';ctx.fillRect(u.x-12,u.y-22,24*(u.hp/u.maxHp),4);
+    }
+    // Draw battle enemies
+    for(let e of battleEnemies){
+      if(!e.alive)continue;
+      ctx.fillStyle=e.color;
+      ctx.fillRect(e.x-12,e.y-12,24,24);
+      ctx.fillStyle='#300';ctx.fillRect(e.x-12,e.y-18,24,4);
+      ctx.fillStyle='#f00';ctx.fillRect(e.x-12,e.y-18,24*(e.hp/e.maxHp),4);
+    }
+    // Bullets
+    for(let b of battleBullets){
+      ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+    }
+  }else{
+    ctx.fillStyle='#555';ctx.font='20px sans-serif';ctx.textAlign='center';
+    ctx.fillText('⚔️ 전투 영역',W/2,BATTLE_Y+BATTLE_H/2);
+  }
+
+  // HUD
+  ctx.fillStyle='#fff';ctx.font='bold 18px sans-serif';ctx.textAlign='left';
+  ctx.fillText('💰 '+gold+'G',20,30);
+  ctx.textAlign='right';ctx.fillText('Wave '+(wave+1)+'/20',W-20,30);
+
+  // Grid area label
+  ctx.fillStyle='#888';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('유닛 배치 (드래그로 합성)',W/2,GRID_Y-10);
+
+  // Grid
+  for(let r=0;r<ROWS;r++){
+    for(let cl=0;cl<COLS;cl++){
+      let x=GRID_X+cl*CELL,y=GRID_Y+r*CELL;
+      let idx=gridIdx(cl,r);
+      ctx.fillStyle='#1e2a3a';ctx.fillRect(x+2,y+2,CELL-4,CELL-4);
+      ctx.strokeStyle='#3a4a5a';ctx.strokeRect(x+2,y+2,CELL-4,CELL-4);
+      let u=grid[idx];
+      if(u&&(!dragging||dragging.idx!==idx)){
+        let t=TIERS[u.tier];
+        ctx.fillStyle=t.color;
+        ctx.beginPath();ctx.arc(x+CELL/2,y+CELL/2-5,CELL/3,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+        ctx.fillText(t.name,x+CELL/2,y+CELL/2+5);
+        ctx.fillStyle='#ff0';ctx.font='10px sans-serif';
+        ctx.fillText('T'+(u.tier+1),x+CELL/2,y+CELL/2+20);
+      }
+    }
+  }
+
+  // Dragging unit
+  if(dragging){
+    let t=TIERS[dragging.unit.tier];
+    ctx.globalAlpha=0.7;
+    ctx.fillStyle=t.color;
+    ctx.beginPath();ctx.arc(dragX,dragY,CELL/3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+    ctx.fillText(t.name,dragX,dragY+5);
+    ctx.globalAlpha=1;
+  }
+
+  // Buttons (only in prep)
+  if(state==='prep'){
+    // Summon button
+    ctx.fillStyle=gold>=50?'#2a6':'#444';
+    ctx.fillRect(30,BTN_Y,200,50);
+    ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText('소환 (50G)',130,BTN_Y+33);
+
+    // Battle button
+    ctx.fillStyle='#c44';
+    ctx.fillRect(280,BTN_Y,200,50);
+    ctx.fillStyle='#fff';ctx.fillText('전투!',380,BTN_Y+33);
+  }
+
+  // Tier legend
+  ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillStyle='#888';
+  ctx.fillText('같은 티어 합성 → 상위 티어',GRID_X,GRID_Y+ROWS*CELL+20);
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>

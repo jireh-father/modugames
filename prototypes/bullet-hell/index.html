@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>총알 지옥</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none}
+canvas{background:#0a0a1e;max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c" width="540" height="960"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+const WEAPONS=[
+  {name:'직진탄',color:'#ff0',dmg:12,rate:0.12,spread:0,count:1,spd:500,homing:false},
+  {name:'확산탄',color:'#0f0',dmg:8,rate:0.2,spread:0.3,count:3,spd:400,homing:false},
+  {name:'유도탄',color:'#08f',dmg:15,rate:0.4,spread:0,count:1,spd:250,homing:true}
+];
+const BOSSES=[
+  {name:'스타더스트',hp:500,color:'#ff69b4',size:30,patterns:['spiral'],rate:2},
+  {name:'비의 신',hp:800,color:'#4169e1',size:35,patterns:['rain','aimed'],rate:1.8},
+  {name:'태풍',hp:1200,color:'#00bcd4',size:38,patterns:['flower','wave'],rate:1.5},
+  {name:'어둠의 왕',hp:1800,color:'#6a0dad',size:42,patterns:['cross','spiral','aimed'],rate:1.2},
+  {name:'최종보스',hp:2500,color:'#f00',size:48,patterns:['spiral','rain','flower','wave','cross','aimed'],rate:1.0}
+];
+
+let state='menu',player,boss,pBullets=[],eBullets=[],particles=[],stars=[];
+let weapon=0,bossIdx=0,score=0,lives=3;
+
+// Stars background
+for(let i=0;i<80;i++)stars.push({x:Math.random()*W,y:Math.random()*H,s:Math.random()*2+0.5,spd:Math.random()*30+10});
+
+function initPlayer(){
+  player={x:W/2,y:H-100,r:8,spd:300,invuln:0,shootTimer:0};
+}
+
+function spawnBoss(){
+  let b=BOSSES[bossIdx];
+  boss={x:W/2,y:-60,targetY:100,hp:b.hp,maxHp:b.hp,color:b.color,size:b.size,
+    patterns:b.patterns,rate:b.rate,timer:2,patIdx:0,moveDir:1,moveSpd:60,
+    flash:0,entering:true,name:b.name,angle:0};
+}
+
+function startGame(){
+  initPlayer();
+  pBullets=[];eBullets=[];particles=[];
+  bossIdx=0;score=0;lives=3;
+  spawnBoss();
+  state='playing';
+}
+
+function spawnP(x,y,color,n){
+  for(let i=0;i<n;i++){
+    let a=Math.random()*Math.PI*2,s=Math.random()*150+50;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.6,color,r:Math.random()*3+1});
+  }
+}
+
+// Bullet patterns
+function firePattern(pattern){
+  if(!boss)return;
+  let bx=boss.x,by=boss.y;
+  if(pattern==='spiral'){
+    for(let i=0;i<12;i++){
+      let a=boss.angle+i*(Math.PI*2/12);
+      eBullets.push({x:bx,y:by,vx:Math.cos(a)*120,vy:Math.sin(a)*120,r:4,color:'#f44',life:5});
+    }
+    boss.angle+=0.3;
+  }else if(pattern==='rain'){
+    for(let i=0;i<8;i++){
+      eBullets.push({x:Math.random()*W,y:-10,vx:(Math.random()-0.5)*30,vy:Math.random()*100+100,r:4,color:'#f80',life:5});
+    }
+  }else if(pattern==='aimed'){
+    let a=Math.atan2(player.y-by,player.x-bx);
+    for(let i=-1;i<=1;i++){
+      eBullets.push({x:bx,y:by,vx:Math.cos(a+i*0.15)*180,vy:Math.sin(a+i*0.15)*180,r:5,color:'#f0f',life:4});
+    }
+  }else if(pattern==='flower'){
+    for(let i=0;i<16;i++){
+      let a=boss.angle+i*(Math.PI*2/16);
+      let spd=80+Math.sin(i*Math.PI/4)*40;
+      eBullets.push({x:bx,y:by,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:4,color:'#ff0',life:5});
+    }
+    boss.angle+=0.2;
+  }else if(pattern==='wave'){
+    for(let i=0;i<6;i++){
+      let a=-Math.PI/2+Math.sin(boss.angle+i*0.5)*0.8;
+      eBullets.push({x:bx-60+i*24,y:by,vx:Math.cos(a)*100,vy:Math.sin(a)*100+80,r:4,color:'#0ff',life:5});
+    }
+    boss.angle+=0.4;
+  }else if(pattern==='cross'){
+    for(let d=0;d<4;d++){
+      let a=d*Math.PI/2+boss.angle;
+      for(let j=1;j<=3;j++){
+        eBullets.push({x:bx,y:by,vx:Math.cos(a)*60*j,vy:Math.sin(a)*60*j,r:4,color:'#fa0',life:4});
+      }
+    }
+    boss.angle+=0.15;
+  }
+}
+
+function onBossDefeat(){
+  spawnP(boss.x,boss.y,boss.color,30);
+  score+=boss.maxHp;
+  boss=null;
+  bossIdx++;
+  if(bossIdx>=5){state='victory'}
+  else{state='boss_defeated'}
+}
+
+// Input
+let touchX=null,touchY=null,touchActive=false;
+let keys={};
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+function gcp(e){let r=c.getBoundingClientRect();let t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H}}
+
+c.addEventListener('touchstart',e=>{
+  e.preventDefault();let p=gcp(e);
+  if(state==='menu'){state='weapon_select';return}
+  if(state==='weapon_select'){
+    for(let i=0;i<3;i++){if(p.y>350+i*100&&p.y<430+i*100){weapon=i;startGame();return}}
+    return;
+  }
+  if(state==='boss_defeated'){spawnBoss();state='playing';return}
+  if(state==='gameover'||state==='victory'){state='menu';return}
+  touchActive=true;touchX=p.x;touchY=p.y;
+});
+c.addEventListener('touchmove',e=>{e.preventDefault();if(touchActive){let p=gcp(e);touchX=p.x;touchY=p.y}});
+c.addEventListener('touchend',e=>{e.preventDefault();touchActive=false});
+
+c.addEventListener('mousedown',e=>{
+  let p=gcp(e);
+  if(state==='menu'){state='weapon_select';return}
+  if(state==='weapon_select'){
+    for(let i=0;i<3;i++){if(p.y>350+i*100&&p.y<430+i*100){weapon=i;startGame();return}}
+    return;
+  }
+  if(state==='boss_defeated'){spawnBoss();state='playing';return}
+  if(state==='gameover'||state==='victory'){state='menu';return}
+  touchActive=true;touchX=p.x;touchY=p.y;
+});
+c.addEventListener('mousemove',e=>{if(touchActive){let p=gcp(e);touchX=p.x;touchY=p.y}});
+c.addEventListener('mouseup',()=>touchActive=false);
+
+let lastTime=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+
+  // Stars
+  for(let s of stars){s.y+=s.spd*dt;if(s.y>H){s.y=0;s.x=Math.random()*W}}
+
+  if(state!=='playing'){draw();return}
+
+  // Player movement
+  let mx=0,my=0;
+  if(keys['a']||keys['arrowleft'])mx=-1;
+  if(keys['d']||keys['arrowright'])mx=1;
+  if(keys['w']||keys['arrowup'])my=-1;
+  if(keys['s']||keys['arrowdown'])my=1;
+  if(touchActive){
+    let dx=touchX-player.x,dy=touchY-player.y-40;
+    let d=Math.hypot(dx,dy);
+    if(d>5){mx=dx/d;my=dy/d}
+  }
+  let ml=Math.hypot(mx,my);if(ml>0){mx/=ml;my/=ml}
+  player.x+=mx*player.spd*dt;
+  player.y+=my*player.spd*dt;
+  player.x=Math.max(player.r,Math.min(W-player.r,player.x));
+  player.y=Math.max(player.r,Math.min(H-player.r,player.y));
+  if(player.invuln>0)player.invuln-=dt;
+
+  // Player shoot
+  let w=WEAPONS[weapon];
+  player.shootTimer-=dt;
+  if(player.shootTimer<=0){
+    player.shootTimer=w.rate;
+    for(let i=0;i<w.count;i++){
+      let angle=-Math.PI/2+(i-(w.count-1)/2)*w.spread;
+      pBullets.push({x:player.x,y:player.y,vx:Math.cos(angle)*w.spd,vy:Math.sin(angle)*w.spd,
+        dmg:w.dmg,r:4,life:2,color:w.color,homing:w.homing});
+    }
+  }
+
+  // Player bullets
+  for(let b of pBullets){
+    if(b.homing&&boss){
+      let a=Math.atan2(boss.y-b.y,boss.x-b.x);
+      b.vx+=(Math.cos(a)*500-b.vx)*3*dt;
+      b.vy+=(Math.sin(a)*500-b.vy)*3*dt;
+    }
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+    if(!boss)continue;
+    if(Math.hypot(b.x-boss.x,b.y-boss.y)<boss.size+b.r){
+      boss.hp-=b.dmg;boss.flash=0.08;b.life=0;
+      spawnP(b.x,b.y,b.color,2);
+      if(boss.hp<=0){onBossDefeat();break}
+    }
+  }
+  pBullets=pBullets.filter(b=>b.life>0);
+
+  // Boss
+  if(boss){
+    if(boss.entering){
+      boss.y+=(boss.targetY-boss.y)*2*dt;
+      if(Math.abs(boss.y-boss.targetY)<2){boss.entering=false;boss.y=boss.targetY}
+    }else{
+      boss.x+=boss.moveDir*boss.moveSpd*dt;
+      if(boss.x<80)boss.moveDir=1;
+      if(boss.x>W-80)boss.moveDir=-1;
+      boss.timer-=dt;
+      if(boss.timer<=0){
+        boss.timer=boss.rate;
+        let p=boss.patterns[boss.patIdx%boss.patterns.length];
+        firePattern(p);
+        boss.patIdx++;
+      }
+    }
+    if(boss.flash>0)boss.flash-=dt;
+  }
+
+  // Enemy bullets
+  for(let b of eBullets){
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+    if(player.invuln<=0&&Math.hypot(b.x-player.x,b.y-player.y)<player.r+b.r){
+      lives--;player.invuln=2;b.life=0;
+      spawnP(player.x,player.y,'#f00',8);
+      if(lives<=0){state='gameover'}
+    }
+  }
+  eBullets=eBullets.filter(b=>b.life>0&&b.x>-20&&b.x<W+20&&b.y>-20&&b.y<H+20);
+
+  // Particles
+  for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}
+  particles=particles.filter(p=>p.life>0);
+
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#0a0a1e';ctx.fillRect(0,0,W,H);
+
+  // Stars
+  ctx.fillStyle='#fff';
+  for(let s of stars){ctx.globalAlpha=s.s/2.5;ctx.fillRect(s.x,s.y,s.s,s.s)}
+  ctx.globalAlpha=1;
+
+  if(state==='menu'){
+    ctx.fillStyle='#f44';ctx.font='bold 48px sans-serif';ctx.textAlign='center';
+    ctx.fillText('총알 지옥',W/2,300);
+    ctx.fillStyle='#fff';ctx.font='24px sans-serif';ctx.fillText('💥 보스 러쉬 탄막 슈팅',W/2,360);
+    ctx.fillStyle='#c44';ctx.fillRect(170,450,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';ctx.fillText('시작',W/2,490);
+    return;
+  }
+
+  if(state==='weapon_select'){
+    ctx.fillStyle='#fff';ctx.font='bold 36px sans-serif';ctx.textAlign='center';
+    ctx.fillText('무기 선택',W/2,300);
+    for(let i=0;i<3;i++){
+      let w=WEAPONS[i];
+      ctx.fillStyle='#1a2a3a';ctx.fillRect(80,350+i*100,380,80);
+      ctx.strokeStyle=w.color;ctx.lineWidth=2;ctx.strokeRect(80,350+i*100,380,80);
+      ctx.fillStyle=w.color;ctx.font='bold 24px sans-serif';
+      ctx.fillText(w.name,W/2,390+i*100);
+      ctx.fillStyle='#aaa';ctx.font='14px sans-serif';
+      ctx.fillText('DMG:'+w.dmg+' SPD:'+(1/w.rate).toFixed(0)+'/s',W/2,415+i*100);
+    }
+    return;
+  }
+
+  if(state==='boss_defeated'){
+    ctx.fillStyle='#ff0';ctx.font='bold 40px sans-serif';ctx.textAlign='center';
+    ctx.fillText('보스 처치!',W/2,400);
+    ctx.fillStyle='#fff';ctx.font='20px sans-serif';
+    ctx.fillText('터치하여 다음 보스로',W/2,460);
+    return;
+  }
+
+  if(state==='gameover'){
+    ctx.fillStyle='#f44';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('게임 오버',W/2,350);
+    ctx.fillStyle='#fff';ctx.font='24px sans-serif';
+    ctx.fillText('Score: '+score,W/2,420);
+    ctx.fillStyle='#c44';ctx.fillRect(170,470,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('다시하기',W/2,508);
+    return;
+  }
+
+  if(state==='victory'){
+    ctx.fillStyle='#ffd700';ctx.font='bold 44px sans-serif';ctx.textAlign='center';
+    ctx.fillText('축하합니다!',W/2,350);
+    ctx.fillStyle='#fff';ctx.font='24px sans-serif';
+    ctx.fillText('모든 보스 처치! Score: '+score,W/2,420);
+    ctx.fillStyle='#4a8';ctx.fillRect(170,470,200,60);
+    ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';ctx.fillText('다시하기',W/2,508);
+    return;
+  }
+
+  // Boss
+  if(boss){
+    // HP bar
+    ctx.fillStyle='#300';ctx.fillRect(20,15,W-40,20);
+    ctx.fillStyle='#f00';ctx.fillRect(20,15,(W-40)*(boss.hp/boss.maxHp),20);
+    ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillText(boss.name+' ('+Math.ceil(boss.hp)+'/'+boss.maxHp+')',W/2,31);
+
+    ctx.fillStyle=boss.flash>0?'#fff':boss.color;
+    ctx.beginPath();
+    // Draw boss as polygon
+    let sides=5+bossIdx;
+    for(let i=0;i<sides;i++){
+      let a=i*Math.PI*2/sides-Math.PI/2;
+      let px=boss.x+Math.cos(a)*boss.size,py=boss.y+Math.sin(a)*boss.size;
+      if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+    }
+    ctx.closePath();ctx.fill();
+    // Inner glow
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.beginPath();ctx.arc(boss.x,boss.y,boss.size*0.4,0,Math.PI*2);ctx.fill();
+  }
+
+  // Enemy bullets
+  for(let b of eBullets){ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill()}
+
+  // Player bullets
+  for(let b of pBullets){ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill()}
+
+  // Player
+  if(player.invuln<=0||Math.floor(player.invuln*8)%2===0){
+    ctx.fillStyle='#0ff';
+    ctx.beginPath();
+    ctx.moveTo(player.x,player.y-player.r);
+    ctx.lineTo(player.x-player.r,player.y+player.r);
+    ctx.lineTo(player.x+player.r,player.y+player.r);
+    ctx.closePath();ctx.fill();
+  }
+
+  // Particles
+  for(let p of particles){ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}
+  ctx.globalAlpha=1;
+
+  // HUD bottom
+  ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='left';
+  // Lives as ship icons
+  for(let i=0;i<lives;i++){
+    ctx.fillStyle='#0ff';
+    ctx.beginPath();ctx.moveTo(20+i*20,H-20);ctx.lineTo(15+i*20,H-10);ctx.lineTo(25+i*20,H-10);ctx.closePath();ctx.fill();
+  }
+  ctx.textAlign='right';ctx.fillStyle='#fff';ctx.font='16px sans-serif';
+  ctx.fillText('Score '+score,W-20,H-15);
+  ctx.fillText(WEAPONS[weapon].name,W-20,H-35);
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>
