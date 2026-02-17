@@ -17,7 +17,7 @@ function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s
 resize();addEventListener('resize',resize);
 
 // ===== CONSTANTS =====
-const GRID=8,CELL=52,PAD=2;
+const GRID=7,CELL=56,PAD=2;
 const BOARD_X=(W-GRID*CELL)/2,BOARD_Y=160;
 const PIECE_AREA_Y=BOARD_Y+GRID*CELL+30;
 
@@ -154,8 +154,6 @@ const SHAPES=[
   [[0,0],[1,0],[1,1],[1,2]],  // L-4 inv
   [[0,0],[0,1],[0,2],[1,1]],  // T-4
   // 5-cells
-  [[0,0],[0,1],[0,2],[0,3],[0,4]],  // horizontal 5
-  [[0,0],[1,0],[2,0],[3,0],[4,0]],  // vertical 5
   [[0,0],[0,1],[0,2],[1,0],[2,0]],  // big L
   [[0,0],[0,1],[0,2],[1,2],[2,2]],  // big J
   [[0,0],[1,0],[2,0],[2,1],[2,2]],  // big L inv
