@@ -304,13 +304,13 @@ function getPieceAt(px,py){
   for(let i=0;i<3;i++){
     if(pieces[i].used)continue;
     let shape=pieces[i].shape;
-    // Calculate piece bounds
     let minR=99,maxR=-99,minC=99,maxC=-99;
     for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
     let pw=(maxC-minC+1)*30,ph=(maxR-minR+1)*30;
     let pcx=spacing*i+spacing/2,pcy=PIECE_AREA_Y+70;
-    let px0=pcx-pw/2,py0=pcy-ph/2;
-    if(px>=px0-15&&px<=px0+pw+15&&py>=py0-15&&py<=py0+ph+15){
+    // Wide hit area for easy picking
+    let hitW=Math.max(pw+40,80),hitH=Math.max(ph+40,80);
+    if(px>=pcx-hitW/2&&px<=pcx+hitW/2&&py>=pcy-hitH/2&&py<=pcy+hitH/2){
       return{idx:i,offX:px-pcx,offY:py-pcy};
     }
   }
@@ -355,10 +355,11 @@ function onUp(p){
   for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
   let pw=(maxC-minC+1),ph=(maxR-minR+1);
 
-  // Use drag position with offset to find target cell
-  let cx=dragging.x,cy=dragging.y-60; // offset up so finger doesn't cover
-  let targetC=Math.round((cx-BOARD_X)/CELL-pw/2);
-  let targetR=Math.round((cy-BOARD_Y)/CELL-ph/2);
+  // Use drag position to find target cell
+  // On touch: offset up 60px so finger doesn't cover; on mouse: no offset
+  let cx=dragging.x,cy=dragging.y-40;
+  let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
+  let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
 
   if(canPlace(shape,targetR,targetC)){
     placePiece(dragging.pieceIdx,targetR,targetC);
@@ -497,9 +498,9 @@ function drawGame(){
     for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
     let pw=(maxC-minC+1),ph=(maxR-minR+1);
 
-    let cx=dragging.x,cy=dragging.y-60;
-    let targetC=Math.round((cx-BOARD_X)/CELL-pw/2);
-    let targetR=Math.round((cy-BOARD_Y)/CELL-ph/2);
+    let cx=dragging.x,cy=dragging.y-40;
+    let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
+    let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
 
     let valid=canPlace(shape,targetR,targetC);
 
