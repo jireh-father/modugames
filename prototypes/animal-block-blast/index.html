@@ -187,9 +187,38 @@ function newPieces(){
 }
 
 function initGame(){
-  initBoard();score=0;combo=0;
-  newPieces();state='playing';
-  loadBest();
+  initBoard();fillHalfBoard();score=0;combo=0;
+  newPieces();
+  let tries=0;
+  while(isGameOver()&&tries<20){newPieces();tries++}
+  if(isGameOver()){initBoard();fillHalfBoard();newPieces()}
+  state='playing';loadBest();
+}
+
+function fillHalfBoard(){
+  let total=GRID*GRID;
+  let toFill=Math.floor(total/2);
+  let cells=[];
+  for(let r=0;r<GRID;r++)for(let cc=0;cc<GRID;cc++)cells.push([r,cc]);
+  for(let i=cells.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]]}
+  for(let i=0;i<toFill;i++){
+    let[r,cc]=cells[i];
+    board[r][cc]=Math.floor(Math.random()*5);
+  }
+  let cleared=true;
+  while(cleared){
+    cleared=false;
+    let rowsToClear=[],colsToClear=[];
+    for(let r=0;r<GRID;r++){let full=true;for(let cc=0;cc<GRID;cc++)if(board[r][cc]===-1){full=false;break}if(full)rowsToClear.push(r)}
+    for(let cc=0;cc<GRID;cc++){let full=true;for(let r=0;r<GRID;r++)if(board[r][cc]===-1){full=false;break}if(full)colsToClear.push(cc)}
+    if(rowsToClear.length+colsToClear.length>0){
+      cleared=true;
+      let toClear=new Set();
+      for(let r of rowsToClear)for(let cc=0;cc<GRID;cc++)toClear.add(r*GRID+cc);
+      for(let cc of colsToClear)for(let r=0;r<GRID;r++)toClear.add(r*GRID+cc);
+      for(let key of toClear){board[Math.floor(key/GRID)][key%GRID]=-1}
+    }
+  }
 }
 
 function loadBest(){try{bestScore=parseInt(localStorage.getItem('animal-bb-best'))||0}catch(e){}}
@@ -347,14 +376,14 @@ function onMove(p){
 function onUp(){
   if(!dragging)return;
   let piece=pieces[dragging.pieceIdx];
-  // Find board cell under center of piece
   let shape=piece.shape;
-
-  // Use drag position to find target cell
-  let cx=dragging.x,cy=dragging.y-40;
-  let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
-  let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
-
+  let minR=99,maxR=-99,minC=99,maxC=-99;
+  for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+  let fw=(maxC-minC+1),fh=(maxR-minR+1);
+  let floatX=dragging.x-fw*CELL/2;
+  let floatY=dragging.y-80-fh*CELL/2;
+  let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+  let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
   if(canPlace(shape,targetR,targetC)){
     placePiece(dragging.pieceIdx,targetR,targetC);
   }else{
@@ -430,7 +459,7 @@ function drawMenu(){
 
   // Instructions
   ctx.fillStyle='#aaa';ctx.font='14px sans-serif';
-  ctx.fillText('블록을 드래그하여 8x8 보드에 배치하세요',W/2,700);
+  ctx.fillText('블록을 드래그하여 7×7 보드에 배치하세요',W/2,700);
   ctx.fillText('가로 또는 세로 줄을 채우면 클리어!',W/2,725);
 }
 
@@ -492,14 +521,16 @@ function drawGame(){
     for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
     let pw=(maxC-minC+1),ph=(maxR-minR+1);
 
-    let cx=dragging.x,cy=dragging.y-40;
-    let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
-    let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
+    let fw=(maxC-minC+1),fh=(maxR-minR+1);
+    let floatX=dragging.x-fw*CELL/2;
+    let floatY=dragging.y-80-fh*CELL/2;
+    let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+    let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
 
     let valid=canPlace(shape,targetR,targetC);
 
     // Draw ghost on board
-    if(targetR>=-(ph)&&targetR<GRID+ph&&targetC>=-(pw)&&targetC<GRID+pw){
+    if(targetR>=-(fh)&&targetR<GRID+fh&&targetC>=-(fw)&&targetC<GRID+fw){
       for(let [r,cc] of shape){
         let gr=targetR+r,gc=targetC+cc;
         if(gr>=0&&gr<GRID&&gc>=0&&gc<GRID){
@@ -516,8 +547,8 @@ function drawGame(){
 
     // Draw piece following finger
     for(let [r,cc] of shape){
-      let px=dragging.x+(cc-minC-(maxC-minC)/2)*CELL-CELL/2;
-      let py=dragging.y-80+(r-minR-(maxR-minR)/2)*CELL-CELL/2;
+      let px=floatX+(cc-minC)*CELL;
+      let py=floatY+(r-minR)*CELL;
       drawAnimal(px,py,CELL,piece.animal,0.8);
     }
   }
