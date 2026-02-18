@@ -293,7 +293,7 @@ function isGameOver(){
 // ===== INPUT =====
 function gcp(e){
   let r=c.getBoundingClientRect();
-  let t=e.touches?e.touches[0]:e;
+  let t=e.changedTouches?e.changedTouches[0]:e.touches?e.touches[0]:e;
   return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H};
 }
 
@@ -324,10 +324,10 @@ function getBoardCell(px,py){
 
 c.addEventListener('touchstart',e=>{e.preventDefault();onDown(gcp(e))});
 c.addEventListener('touchmove',e=>{e.preventDefault();onMove(gcp(e))});
-c.addEventListener('touchend',e=>{e.preventDefault();onUp(gcp(e))});
+c.addEventListener('touchend',e=>{e.preventDefault();onUp()});
 c.addEventListener('mousedown',e=>{onDown(gcp(e))});
 c.addEventListener('mousemove',e=>{if(dragging)onMove(gcp(e))});
-c.addEventListener('mouseup',e=>{onUp(gcp(e))});
+c.addEventListener('mouseup',e=>{onUp()});
 
 function onDown(p){
   if(state==='menu'){initGame();return}
@@ -344,17 +344,13 @@ function onMove(p){
   if(dragging)dragging={...dragging,x:p.x,y:p.y};
 }
 
-function onUp(p){
+function onUp(){
   if(!dragging)return;
   let piece=pieces[dragging.pieceIdx];
   // Find board cell under center of piece
   let shape=piece.shape;
-  let minR=99,maxR=-99,minC=99,maxC=-99;
-  for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
-  let pw=(maxC-minC+1),ph=(maxR-minR+1);
 
   // Use drag position to find target cell
-  // On touch: offset up 60px so finger doesn't cover; on mouse: no offset
   let cx=dragging.x,cy=dragging.y-40;
   let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
   let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
