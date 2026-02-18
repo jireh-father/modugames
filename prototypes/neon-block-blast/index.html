@@ -120,7 +120,41 @@ let screenFlash=0,screenFlashColor='#fff';
 
 function initBoard(){board=[];for(let r=0;r<GRID;r++){board[r]=[];for(let c=0;c<GRID;c++)board[r][c]=-1}}
 function newPieces(){pieces=[];for(let i=0;i<3;i++){pieces.push({shape:SHAPES[Math.floor(Math.random()*SHAPES.length)],animal:Math.floor(Math.random()*5),used:false})}}
-function initGame(){initBoard();score=0;combo=0;newPieces();state='playing';loadBest()}
+function initGame(){initBoard();fillHalfBoard();score=0;combo=0;newPieces();
+  // Ensure pieces can be placed, regenerate if needed
+  let tries=0;
+  while(isGameOver()&&tries<20){newPieces();tries++}
+  if(isGameOver()){initBoard();fillHalfBoard();newPieces()}
+  state='playing';loadBest()}
+
+function fillHalfBoard(){
+  let total=GRID*GRID;
+  let toFill=Math.floor(total/2);
+  let cells=[];
+  for(let r=0;r<GRID;r++)for(let cc=0;cc<GRID;cc++)cells.push([r,cc]);
+  // Shuffle
+  for(let i=cells.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]]}
+  // Fill random cells
+  for(let i=0;i<toFill;i++){
+    let[r,cc]=cells[i];
+    board[r][cc]=Math.floor(Math.random()*5);
+  }
+  // Clear any complete lines
+  let cleared=true;
+  while(cleared){
+    cleared=false;
+    let rowsToClear=[],colsToClear=[];
+    for(let r=0;r<GRID;r++){let full=true;for(let cc=0;cc<GRID;cc++)if(board[r][cc]===-1){full=false;break}if(full)rowsToClear.push(r)}
+    for(let cc=0;cc<GRID;cc++){let full=true;for(let r=0;r<GRID;r++)if(board[r][cc]===-1){full=false;break}if(full)colsToClear.push(cc)}
+    if(rowsToClear.length+colsToClear.length>0){
+      cleared=true;
+      let toClear=new Set();
+      for(let r of rowsToClear)for(let cc=0;cc<GRID;cc++)toClear.add(r*GRID+cc);
+      for(let cc of colsToClear)for(let r=0;r<GRID;r++)toClear.add(r*GRID+cc);
+      for(let key of toClear){board[Math.floor(key/GRID)][key%GRID]=-1}
+    }
+  }
+}
 function loadBest(){try{bestScore=parseInt(localStorage.getItem('neon-bb-best'))||0}catch(e){}}
 function saveBest(){try{if(score>bestScore){bestScore=score;localStorage.setItem('neon-bb-best',bestScore)}}catch(e){}}
 
@@ -237,9 +271,13 @@ function onUp(){
   if(!dragging)return;
   let piece=pieces[dragging.pieceIdx];
   let shape=piece.shape;
-  let cx=dragging.x,cy=dragging.y-40;
-  let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
-  let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
+  let minR=99,maxR=-99,minC=99,maxC=-99;
+  for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+  let fw=(maxC-minC+1),fh=(maxR-minR+1);
+  let floatX=dragging.x-fw*CELL/2;
+  let floatY=dragging.y-80-fh*CELL/2;
+  let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+  let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
   if(canPlace(shape,targetR,targetC))placePiece(dragging.pieceIdx,targetR,targetC);
   else shakeTimer=0.2;
   dragging=null;
@@ -394,12 +432,15 @@ function drawGame(){
     let minR=99,maxR=-99,minC=99,maxC=-99;
     for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
 
-    let cx=dragging.x,cy=dragging.y-40;
-    let targetC=Math.round((cx-BOARD_X-CELL/2)/CELL);
-    let targetR=Math.round((cy-BOARD_Y-CELL/2)/CELL);
+    // Floating piece center = where the shape's top-left cell visually sits
+    let fw=(maxC-minC+1),fh=(maxR-minR+1);
+    let floatX=dragging.x-fw*CELL/2;
+    let floatY=dragging.y-80-fh*CELL/2;
+    let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+    let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
     let valid=canPlace(shape,targetR,targetC);
 
-    if(targetR>=-(maxR-minR+1)&&targetR<GRID+(maxR-minR+1)&&targetC>=-(maxC-minC+1)&&targetC<GRID+(maxC-minC+1)){
+    if(targetR>=-(fh)&&targetR<GRID+fh&&targetC>=-(fw)&&targetC<GRID+fw){
       for(let [r,cc] of shape){
         let gr=targetR+r,gc=targetC+cc;
         if(gr>=0&&gr<GRID&&gc>=0&&gc<GRID){
@@ -414,8 +455,8 @@ function drawGame(){
     }
     // Floating piece
     for(let [r,cc] of shape){
-      let px=dragging.x+(cc-minC-(maxC-minC)/2)*CELL-CELL/2;
-      let py=dragging.y-80+(r-minR-(maxR-minR)/2)*CELL-CELL/2;
+      let px=floatX+(cc-minC)*CELL;
+      let py=floatY+(r-minR)*CELL;
       drawBrick(px,py,CELL,piece.animal,0.85);
     }
   }
