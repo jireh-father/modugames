@@ -6,6 +6,7 @@ export const RANGE_BOTTOM = Math.floor(H * 0.7); // 672
 export const CONTROLS_TOP = RANGE_BOTTOM;
 export const CONTROLS_BOTTOM = H;
 export const SLOT_H = 40; // 무기 슬롯 높이
+export const JOYSTICK_W = 110; // 조이스틱 영역 너비
 
 // ── 게임 상태 ──
 export const state = {

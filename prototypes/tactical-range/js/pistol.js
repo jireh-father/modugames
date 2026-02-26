@@ -1,5 +1,5 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js';
 import { registerZone } from './input.js';
 import { fireProjectile } from './projectiles.js';
 import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js';
@@ -7,7 +7,8 @@ import { spawnParticles } from './particles.js';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
-const COL_W = W / 3;
+const WEAPON_W = W - JOYSTICK_W; // 조이스틱 제외 무기 영역
+const COL_W = WEAPON_W / 3;
 
 // 드래그 상태
 let slideDragY = 0;
@@ -19,12 +20,12 @@ let magDragging = false;
 let bulletDrag = null; // {fromX, fromY, x, y}
 
 // 총알통 영역
-const AMMO_BOX = { x: 10, y: CTRL_Y + CTRL_H - 60, w: 60, h: 50 };
+const AMMO_BOX = { x: JOYSTICK_W + 10, y: CTRL_Y + CTRL_H - 60, w: 60, h: 50 };
 
 export function initPistol() {
   // 슬라이드 영역 (가운데)
   registerZone(
-    { x: COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
+    { x: JOYSTICK_W + COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'pistol') return false;
@@ -53,7 +54,7 @@ export function initPistol() {
 
   // 방아쇠 영역 (오른쪽)
   registerZone(
-    { x: COL_W * 2, y: CTRL_Y, w: COL_W, h: CTRL_H },
+    { x: JOYSTICK_W + COL_W * 2, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'pistol') return false;
@@ -79,13 +80,8 @@ export function initPistol() {
           playGunshot();
           spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
 
-          // 자동 약실 장전: 탄창에서 한 발 올림
-          if (p.magazineBullets > 0) {
-            p.magazineBullets--;
-            p.chambered = true;
-          } else {
-            p.slideBack = true;
-          }
+          // 수동 장전: 슬라이드를 직접 당겨야 다음 탄 장전
+          p.slideBack = true;
         }
         triggerDragX = 0;
       },
@@ -95,7 +91,7 @@ export function initPistol() {
 
   // 탄창 영역 (왼쪽) - 분리/삽입/탄환 넣기
   registerZone(
-    { x: 0, y: CTRL_Y, w: COL_W, h: CTRL_H },
+    { x: JOYSTICK_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'pistol') return false;
@@ -174,26 +170,29 @@ export function drawPistol(ctx) {
 
   // ── 왼쪽 영역: 탄창 + 총알통 ──
   // 영역 구분선
+  const ox = JOYSTICK_W; // 조이스틱 오프셋
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(COL_W, CTRL_Y);
-  ctx.lineTo(COL_W, CONTROLS_BOTTOM);
-  ctx.moveTo(COL_W * 2, CTRL_Y);
-  ctx.lineTo(COL_W * 2, CONTROLS_BOTTOM);
+  ctx.moveTo(ox, CTRL_Y);
+  ctx.lineTo(ox, CONTROLS_BOTTOM);
+  ctx.moveTo(ox + COL_W, CTRL_Y);
+  ctx.lineTo(ox + COL_W, CONTROLS_BOTTOM);
+  ctx.moveTo(ox + COL_W * 2, CTRL_Y);
+  ctx.lineTo(ox + COL_W * 2, CONTROLS_BOTTOM);
   ctx.stroke();
 
   // 레이블
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('탄창', COL_W / 2, CTRL_Y + 14);
-  ctx.fillText('슬라이드', COL_W * 1.5, CTRL_Y + 14);
-  ctx.fillText('방아쇠', COL_W * 2.5, CTRL_Y + 14);
+  ctx.fillText('탄창', ox + COL_W / 2, CTRL_Y + 14);
+  ctx.fillText('슬라이드', ox + COL_W * 1.5, CTRL_Y + 14);
+  ctx.fillText('방아쇠', ox + COL_W * 2.5, CTRL_Y + 14);
 
   if (p.magazineOut) {
     // 분리된 탄창
-    const magX = 50 + (magDragging ? magDragX : 0);
+    const magX = ox + 50 + (magDragging ? magDragX : 0);
     const magY = baseY + 30;
     drawMagazine(ctx, magX, magY, p.magazineBullets, p.magazineMax);
 
@@ -228,21 +227,21 @@ export function drawPistol(ctx) {
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.font = '9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('← 분리됨 / →삽입', COL_W / 2, CONTROLS_BOTTOM - 8);
+    ctx.fillText('← 분리됨 / →삽입', ox + COL_W / 2, CONTROLS_BOTTOM - 8);
   } else {
     // 장착된 탄창 (왼쪽 드래그 힌트)
-    const magX = 50 + (magDragging ? Math.min(0, magDragX) : 0);
+    const magX = ox + 50 + (magDragging ? Math.min(0, magDragX) : 0);
     drawMagazine(ctx, magX, baseY + 50, p.magazineBullets, p.magazineMax);
 
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.font = '9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('←드래그: 탄창 분리', COL_W / 2, CONTROLS_BOTTOM - 8);
+    ctx.fillText('←드래그: 탄창 분리', ox + COL_W / 2, CONTROLS_BOTTOM - 8);
   }
 
   // ── 가운데: 슬라이드 ──
   const slideOff = slideDragging ? slideDragY : 0;
-  const slideX = COL_W + COL_W / 2;
+  const slideX = ox + COL_W + COL_W / 2;
   const slideY = baseY + 50 + slideOff;
 
   // 총 몸체
@@ -286,7 +285,7 @@ export function drawPistol(ctx) {
   ctx.fillText(p.chambered ? '장전됨' : '↓드래그: 장전', slideX, CONTROLS_BOTTOM - 8);
 
   // ── 오른쪽: 방아쇠 ──
-  const trigX = COL_W * 2 + COL_W / 2;
+  const trigX = ox + COL_W * 2 + COL_W / 2;
   const trigY = baseY + 80;
   const trigOff = triggerDragging ? -triggerDragX : 0;
 

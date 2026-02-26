@@ -1,5 +1,5 @@
 // ── 활 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js';
 import { registerZone } from './input.js';
 import { fireProjectile } from './projectiles.js';
 import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js';
@@ -7,8 +7,9 @@ import { spawnParticles } from './particles.js';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
-const QUIVER_W = W * 0.25;
-const BOW_W = W - QUIVER_W;
+const WEAPON_W = W - JOYSTICK_W; // 조이스틱 제외 무기 영역
+const QUIVER_W = WEAPON_W * 0.25;
+const BOW_W = WEAPON_W - QUIVER_W;
 
 // 드래그 상태
 let arrowDrag = null; // {x, y} 화살 드래그 중
@@ -16,9 +17,9 @@ let stringDragY = 0;
 let stringDragging = false;
 
 export function initBow() {
-  // 화살통 영역 (왼쪽 25%)
+  // 화살통 영역 (조이스틱 우측 25%)
   registerZone(
-    { x: 0, y: CTRL_Y, w: QUIVER_W, h: CTRL_H },
+    { x: JOYSTICK_W, y: CTRL_Y, w: QUIVER_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'bow') return false;
@@ -38,7 +39,7 @@ export function initBow() {
         if (!arrowDrag || state.currentWeapon !== 'bow') { arrowDrag = null; return; }
         const b = state.bow;
         // 활 중앙 영역에 드롭했는지 체크
-        const bowCenterX = QUIVER_W + BOW_W * 0.4;
+        const bowCenterX = JOYSTICK_W + QUIVER_W + BOW_W * 0.4;
         const bowCenterY = CTRL_Y + CTRL_H / 2;
         const dist = Math.hypot(x - bowCenterX, y - bowCenterY);
         if (dist < 60) {
@@ -55,7 +56,7 @@ export function initBow() {
 
   // 활+시위 영역 (오른쪽 75%)
   registerZone(
-    { x: QUIVER_W, y: CTRL_Y, w: BOW_W, h: CTRL_H },
+    { x: JOYSTICK_W + QUIVER_W, y: CTRL_Y, w: BOW_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'bow') return false;
@@ -82,7 +83,7 @@ export function initBow() {
           const isSpecial = b._specialNocked || false;
           fireProjectile('arrow', state.aimX, state.aimY, isSpecial, b.drawPower);
           playBowRelease();
-          const bowCX = QUIVER_W + BOW_W * 0.4;
+          const bowCX = JOYSTICK_W + QUIVER_W + BOW_W * 0.4;
           spawnParticles(bowCX, CTRL_Y + CTRL_H / 2, 'bowString');
           b.arrowNocked = false;
           b._specialNocked = false;
@@ -103,22 +104,26 @@ export function drawBow(ctx) {
 
   ctx.save();
 
+  const ox = JOYSTICK_W; // 조이스틱 오프셋
+
   // 영역 구분선
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(QUIVER_W, CTRL_Y);
-  ctx.lineTo(QUIVER_W, CONTROLS_BOTTOM);
+  ctx.moveTo(ox, CTRL_Y);
+  ctx.lineTo(ox, CONTROLS_BOTTOM);
+  ctx.moveTo(ox + QUIVER_W, CTRL_Y);
+  ctx.lineTo(ox + QUIVER_W, CONTROLS_BOTTOM);
   ctx.stroke();
 
   // ── 왼쪽: 화살통 ──
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('화살통', QUIVER_W / 2, CTRL_Y + 14);
+  ctx.fillText('화살통', ox + QUIVER_W / 2, CTRL_Y + 14);
 
   // 화살통 몸체
-  const qx = QUIVER_W / 2 - 20;
+  const qx = ox + QUIVER_W / 2 - 20;
   const qy = baseY + 20;
   ctx.fillStyle = '#5a3a1a';
   ctx.fillRect(qx, qy, 40, 160);
@@ -151,14 +156,14 @@ export function drawBow(ctx) {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(`${b.arrows}`, QUIVER_W / 2 - 10, CONTROLS_BOTTOM - 10);
+  ctx.fillText(`${b.arrows}`, ox + QUIVER_W / 2 - 10, CONTROLS_BOTTOM - 10);
   if (b.specialArrows > 0) {
     ctx.fillStyle = '#ff6600';
-    ctx.fillText(`+${b.specialArrows}`, QUIVER_W / 2 + 15, CONTROLS_BOTTOM - 10);
+    ctx.fillText(`+${b.specialArrows}`, ox + QUIVER_W / 2 + 15, CONTROLS_BOTTOM - 10);
   }
 
   // ── 오른쪽: 활 ──
-  const bowCX = QUIVER_W + BOW_W * 0.4;
+  const bowCX = ox + QUIVER_W + BOW_W * 0.4;
   const bowCY = CTRL_Y + CTRL_H / 2;
   const bowH = CTRL_H * 0.8;
 
@@ -215,7 +220,7 @@ export function drawBow(ctx) {
 
   // 파워 게이지
   if (b.drawing && b.drawPower > 0) {
-    const gaugeX = QUIVER_W + BOW_W - 30;
+    const gaugeX = ox + QUIVER_W + BOW_W - 30;
     const gaugeH = CTRL_H * 0.7;
     const gaugeY = CTRL_Y + (CTRL_H - gaugeH) / 2;
 

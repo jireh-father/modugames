@@ -1,7 +1,6 @@
 // ── Tactical Range - 메인 게임 루프 ──
 import { W, H, state, isGameOver } from './game.js';
-import { pointer } from './input.js';
-import { updateAiming } from './aiming.js';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js';
 import { drawRange, drawCrosshair } from './renderer.js';
 import { initPistol, drawPistol } from './pistol.js';
 import { initBow, drawBow } from './bow.js';
@@ -33,6 +32,7 @@ addEventListener('resize', resize);
 // ── 입력 초기화 ──
 initScreenHandlers();
 initHUD();
+initJoystick();
 initPistol();
 initBow();
 initItems();
@@ -59,10 +59,8 @@ function update(dt, realDt) {
   state.time += dt;
   state.difficulty = Math.min(state.time / 180, 1);
 
-  // 에이밍: 사격장 영역 드래그 시
-  if (pointer.down && pointer.y < 672 && pointer.y > 48) {
-    updateAiming(pointer.dx, pointer.dy);
-  }
+  // 조이스틱 기반 조준
+  updateJoystick(dt);
 
   // 슬로모션 타이머
   if (state.slowMo) {
@@ -174,6 +172,9 @@ function draw() {
 
   // 무기 슬롯
   drawWeaponSlots(ctx);
+
+  // 조이스틱
+  drawJoystick(ctx);
 
   // 무기별 조작 UI
   drawPistol(ctx);
