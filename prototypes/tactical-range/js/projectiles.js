@@ -1,6 +1,31 @@
 // ── 발사체 시스템 (탄환 + 화살) ──
-import { state } from './game.js';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js';
 import { worldToScreen } from './renderer.js';
+
+const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
+const VP_X = W / 2;
+const VP_Y = RANGE_TOP + RANGE_H * 0.15;
+const CROSSHAIR_SX = W / 2;
+const CROSSHAIR_SY = (RANGE_TOP + RANGE_BOTTOM) / 2;
+
+/**
+ * 깊이 z에서 십자선 화면 좌표에 대응하는 월드 (x, y) 계산
+ * worldToScreen의 역함수: 화면 중앙(십자선)에 해당하는 월드 좌표
+ */
+function crosshairWorldAt(z, aimX, aimY) {
+  const p = 1 - z * 0.85;
+  // sx = VP_X + (x * W/2) * p - aimX * 220 * p = CROSSHAIR_SX
+  // → x = (CROSSHAIR_SX - VP_X + aimX * 220 * p) / (W/2 * p)
+  // VP_X = W/2, CROSSHAIR_SX = W/2 이므로:
+  // x = aimX * 220 / (W/2) = aimX * 0.815 (깊이 무관)
+  const wx = aimX * 220 / (W / 2);
+
+  // sy = VP_Y + RANGE_H*0.7*(1-z) + y*RANGE_H*0.3*p - aimY*150*p = CROSSHAIR_SY
+  // → y = (CROSSHAIR_SY - VP_Y - RANGE_H*0.7*(1-z) + aimY*150*p) / (RANGE_H*0.3*p)
+  const wy = (CROSSHAIR_SY - VP_Y - RANGE_H * 0.7 * (1 - z) + aimY * 150 * p) / (RANGE_H * 0.3 * p);
+
+  return { x: wx, y: wy };
+}
 
 /**
  * 발사체 생성
@@ -11,22 +36,25 @@ import { worldToScreen } from './renderer.js';
  * @param {number} power - 화살 파워 (0~1, 총알은 무시)
  */
 export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
+  const start = crosshairWorldAt(0, aimX, aimY);
+
   const proj = {
     type,
     special,
-    // 3D 월드 좌표 (시작: 카메라 앞)
-    x: 0,      // 좌우 (에이밍에 따라)
-    y: 0,      // 상하
-    z: 0,      // 깊이 (0=가까움, 1=멀리)
-    // 속도
-    vx: aimX * 0.3,
-    vy: aimY * 0.2,
-    vz: type === 'bullet' ? 3.0 : 1.5 + power * 1.5, // 총알은 빠르고, 화살은 파워에 따라
-    // 중력 (화살만)
+    // 발사 시점의 조준 방향 기록 (깊이별 위치 계산용)
+    firedAimX: aimX,
+    firedAimY: aimY,
+    x: start.x,
+    y: start.y,
+    z: 0,
+    vz: type === 'bullet' ? 3.0 : 1.5 + power * 1.5,
+    // 화살 중력으로 인한 y 편차
+    gravityOffset: 0,
     gravity: type === 'arrow' ? 0.3 : 0,
+    gravityVel: 0,
     power,
     alive: true,
-    trail: [], // 잔상 (화살용)
+    trail: [],
     time: 0,
   };
 
@@ -44,13 +72,18 @@ export function updateProjectiles(dt) {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
     p.time += dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
     p.z += p.vz * dt;
 
-    // 중력 (화살 포물선)
+    // 현재 깊이에서 십자선 레이 위치 계산
+    const ray = crosshairWorldAt(p.z, p.firedAimX, p.firedAimY);
+    p.x = ray.x;
+    p.y = ray.y;
+
+    // 화살 중력 편차 (레이 위치 기준으로 아래로 처짐)
     if (p.gravity) {
-      p.vy += p.gravity * dt;
+      p.gravityVel += p.gravity * dt;
+      p.gravityOffset += p.gravityVel * dt;
+      p.y += p.gravityOffset;
     }
 
     // 잔상 기록 (화살)
@@ -60,7 +93,7 @@ export function updateProjectiles(dt) {
     }
 
     // 범위 벗어남 → 빗나감
-    if (p.z > 1.2 || p.z < -0.1 || Math.abs(p.x) > 2 || Math.abs(p.y) > 2) {
+    if (p.z > 1.2 || p.z < -0.1 || Math.abs(p.x) > 2 || Math.abs(p.y) > 3) {
       p.alive = false;
       missedThisFrame++;
     }
@@ -91,7 +124,9 @@ export function drawProjectiles(ctx, aimX, aimY) {
         ctx.strokeStyle = p.special ? 'rgba(255,204,0,0.5)' : 'rgba(255,165,0,0.3)';
         ctx.lineWidth = 2 * scr.scale;
         ctx.beginPath();
-        const back = worldToScreen(p.x - p.vx * 0.05, p.y - p.vy * 0.05, p.z - p.vz * 0.05, aimX, aimY);
+        const prevZ = p.z - p.vz * 0.05;
+        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
+        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
         ctx.moveTo(back.sx, back.sy);
         ctx.lineTo(scr.sx, scr.sy);
         ctx.stroke();
@@ -116,7 +151,7 @@ export function drawProjectiles(ctx, aimX, aimY) {
 
       // 화살 본체
       const len = 15 * scr.scale;
-      const angle = Math.atan2(p.vy, p.vz);
+      const angle = Math.atan2(p.gravityVel, p.vz);
       ctx.strokeStyle = p.special ? '#ff6600' : '#c0a060';
       ctx.lineWidth = 2 * scr.scale;
       ctx.beginPath();
