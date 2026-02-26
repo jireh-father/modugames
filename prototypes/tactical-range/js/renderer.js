@@ -16,8 +16,8 @@ const VP_Y = RANGE_TOP + RANGE_H * 0.15; // 소실점 Y (상단 근처)
  */
 export function worldToScreen(x, y, z, aimX = 0, aimY = 0) {
   const perspective = 1 - z * 0.85; // z=0 → 1.0, z=1 → 0.15
-  const aimOffX = aimX * 80;
-  const aimOffY = aimY * 40;
+  const aimOffX = aimX * 220;
+  const aimOffY = aimY * 150;
 
   const baseX = VP_X + (x * W * 0.5) * perspective - aimOffX * perspective;
   const baseY = VP_Y + (RANGE_H * 0.7) * (1 - z) + (y * RANGE_H * 0.3) * perspective - aimOffY * perspective;
@@ -44,8 +44,8 @@ export function drawRange(ctx, aimX, aimY) {
   ctx.fillRect(0, RANGE_TOP, W, rangeH);
 
   // 소실점 기준 원근 레인
-  const aimOffX = aimX * 80;
-  const aimOffY = aimY * 40;
+  const aimOffX = aimX * 220;
+  const aimOffY = aimY * 150;
   const vpx = VP_X - aimOffX;
   const vpy = VP_Y - aimOffY;
 

@@ -15,6 +15,8 @@ const BOW_W = WEAPON_W - QUIVER_W;
 let arrowDrag = null; // {x, y} 화살 드래그 중
 let stringDragY = 0;
 let stringDragging = false;
+let stringLastX = 0; // 시위 드래그 중 조준용 이전 좌표
+let stringLastY = 0;
 
 export function initBow() {
   // 화살통 영역 (조이스틱 우측 25%)
@@ -63,6 +65,8 @@ export function initBow() {
         if (state.bow.arrowNocked) {
           stringDragging = true;
           stringDragY = 0;
+          stringLastX = x;
+          stringLastY = y;
           state.bow.drawing = true;
           playBowDraw();
         }
@@ -71,6 +75,14 @@ export function initBow() {
         if (!stringDragging || state.currentWeapon !== 'bow') return;
         stringDragY = Math.max(0, Math.min(100, dy));
         state.bow.drawPower = stringDragY / 100;
+        // 시위 당긴 상태에서 드래그로 조준점 이동
+        const frameDx = x - stringLastX;
+        const frameDy = y - stringLastY;
+        stringLastX = x;
+        stringLastY = y;
+        const aimSens = 0.005;
+        state.aimX = Math.max(-1, Math.min(1, state.aimX + frameDx * aimSens));
+        state.aimY = Math.max(-1, Math.min(1, state.aimY + frameDy * aimSens));
       },
       onEnd(x, y, dx, dy) {
         if (!stringDragging || state.currentWeapon !== 'bow') return;

@@ -9,7 +9,7 @@ const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
 const JOY_R = 42;                         // 외곽 반지름
 const THUMB_R = 16;                        // 엄지 반지름
 const MAX_OFFSET = 35;                     // 최대 이동량
-const AIM_SPEED = 2.5;                     // 조준 이동 속도
+const AIM_SPEED = 4.0;                     // 조준 이동 속도
 
 // 조이스틱 상태
 let active = false;
