@@ -1,23 +1,23 @@
 // ── Tactical Range - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=11';
-import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=11';
-import { drawRange, drawCrosshair } from './renderer.js?v=11';
-import { initPistol, drawPistol } from './pistol.js?v=11';
-import { initBow, drawBow } from './bow.js?v=11';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=11';
-import { initMG, updateMG, drawMG } from './mg.js?v=11';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=11';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=11';
-import { updateTargets, checkHits, drawTargets, drawWaveBanner, getWaveClearBonus } from './targets.js?v=11';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=11';
-import { updateParticles, drawParticles } from './particles.js?v=11';
+import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=12';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=12';
+import { drawRange, drawCrosshair } from './renderer.js?v=12';
+import { initPistol, drawPistol } from './pistol.js?v=12';
+import { initBow, drawBow } from './bow.js?v=12';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=12';
+import { initMG, updateMG, drawMG } from './mg.js?v=12';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=12';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=12';
+import { updateTargets, checkHits, drawTargets, drawWaveBanner, getWaveClearBonus } from './targets.js?v=12';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=12';
+import { updateParticles, drawParticles } from './particles.js?v=12';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=11';
-import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=11';
-import { spawnParticles } from './particles.js?v=11';
-import { initSettings, drawSettings } from './settings.js?v=11';
+} from './hud.js?v=12';
+import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=12';
+import { spawnParticles } from './particles.js?v=12';
+import { initSettings, drawSettings } from './settings.js?v=12';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');

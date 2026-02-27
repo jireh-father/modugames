@@ -1,15 +1,15 @@
-// ── 입력 시스템: 터치/마우스 드래그를 통합 관리 ──
-import { W, H, state } from './game.js?v=11';
+// ── 입력 시스템: 멀티터치 + 마우스 드래그 통합 관리 ──
+import { W, H, state } from './game.js?v=12';
 
 const canvas = document.getElementById('c');
 
-// 현재 포인터 상태
+// 현재 포인터 상태 (마우스 / 첫 번째 터치 호환용)
 export const pointer = {
   down: false,
-  x: 0, y: 0,        // 현재 위치 (캔버스 좌표)
-  startX: 0, startY: 0, // 드래그 시작 위치
-  dx: 0, dy: 0,       // 프레임간 이동량
-  dragDx: 0, dragDy: 0, // 드래그 시작부터 총 이동량
+  x: 0, y: 0,
+  startX: 0, startY: 0,
+  dx: 0, dy: 0,
+  dragDx: 0, dragDy: 0,
 };
 
 // 영역별 핸들러 등록
@@ -22,7 +22,7 @@ const handlers = [];
  * @param {number} priority - 높을수록 먼저 체크 (기본 0)
  */
 export function registerZone(zone, callbacks, priority = 0) {
-  handlers.push({ zone, callbacks, priority, active: false });
+  handlers.push({ zone, callbacks, priority });
   handlers.sort((a, b) => b.priority - a.priority);
 }
 
@@ -43,96 +43,152 @@ function inZone(x, y, z) {
   return x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h;
 }
 
-// 이벤트 핸들링
-let activeHandler = null;
+// ── 멀티터치 추적: touchId → { handler, startX, startY, x, y } ──
+const activeTouches = new Map();
 
-function onDown(cx, cy) {
-  pointer.down = true;
-  pointer.x = cx; pointer.y = cy;
-  pointer.startX = cx; pointer.startY = cy;
-  pointer.dx = 0; pointer.dy = 0;
-  pointer.dragDx = 0; pointer.dragDy = 0;
-
-  activeHandler = null;
+function findHandler(cx, cy) {
   for (const h of handlers) {
-    // 타이틀/게임오버 화면에서는 음수 우선순위(화면 전환) 핸들러만 허용
-    // paused 화면에서는 음수 우선순위 + 일시정지 관련 핸들러(priority 100) 허용
     if ((state.screen === 'paused' || state.screen === 'settings') && h.priority !== -1 && h.priority !== 100) continue;
     if (state.screen !== 'playing' && state.screen !== 'paused' && state.screen !== 'settings' && h.priority >= 0) continue;
     if (inZone(cx, cy, h.zone)) {
-      // onStart가 false를 반환하면 이 핸들러를 건너뛰고 다음 핸들러 시도
-      if (h.callbacks.onStart) {
-        const result = h.callbacks.onStart(cx, cy);
-        if (result === false) continue;
-      }
-      activeHandler = h;
-      h.active = true;
-      break;
+      return h;
     }
+  }
+  return null;
+}
+
+function touchDown(id, cx, cy) {
+  const h = findHandler(cx, cy);
+  if (!h) return;
+
+  // onStart가 false를 반환하면 건너뜀
+  if (h.callbacks.onStart) {
+    const result = h.callbacks.onStart(cx, cy);
+    if (result === false) return;
+  }
+
+  activeTouches.set(id, {
+    handler: h,
+    startX: cx, startY: cy,
+    x: cx, y: cy,
+  });
+}
+
+function touchMove(id, cx, cy) {
+  const info = activeTouches.get(id);
+  if (!info) return;
+
+  const dragDx = cx - info.startX;
+  const dragDy = cy - info.startY;
+  info.x = cx;
+  info.y = cy;
+
+  if (info.handler.callbacks.onMove) {
+    info.handler.callbacks.onMove(cx, cy, dragDx, dragDy);
   }
 }
 
-function onMove(cx, cy) {
-  pointer.dx = cx - pointer.x;
-  pointer.dy = cy - pointer.y;
-  pointer.x = cx;
-  pointer.y = cy;
-  pointer.dragDx = cx - pointer.startX;
-  pointer.dragDy = cy - pointer.startY;
+function touchUp(id) {
+  const info = activeTouches.get(id);
+  if (!info) return;
 
-  if (activeHandler && activeHandler.callbacks.onMove) {
-    activeHandler.callbacks.onMove(cx, cy, pointer.dragDx, pointer.dragDy);
+  const dragDx = info.x - info.startX;
+  const dragDy = info.y - info.startY;
+  const wasDrag = Math.abs(dragDx) > 5 || Math.abs(dragDy) > 5;
+
+  if (info.handler.callbacks.onEnd) {
+    info.handler.callbacks.onEnd(info.x, info.y, dragDx, dragDy);
   }
-}
-
-function onUp(cx, cy) {
-  const wasDrag = Math.abs(pointer.dragDx) > 5 || Math.abs(pointer.dragDy) > 5;
-
-  if (activeHandler) {
-    if (activeHandler.callbacks.onEnd) {
-      activeHandler.callbacks.onEnd(cx, cy, pointer.dragDx, pointer.dragDy);
-    }
-    if (!wasDrag && activeHandler.callbacks.onTap) {
-      activeHandler.callbacks.onTap(cx, cy);
-    }
-    activeHandler.active = false;
-    activeHandler = null;
+  if (!wasDrag && info.handler.callbacks.onTap) {
+    info.handler.callbacks.onTap(info.x, info.y);
   }
 
-  pointer.down = false;
-  pointer.dx = 0;
-  pointer.dy = 0;
+  activeTouches.delete(id);
 }
 
-// 마우스 이벤트
+// ── 마우스 이벤트 (단일 포인터, ID='mouse') ──
 canvas.addEventListener('mousedown', e => {
   const p = toCanvas(e.clientX, e.clientY);
-  onDown(p.x, p.y);
+  pointer.down = true;
+  pointer.x = p.x; pointer.y = p.y;
+  pointer.startX = p.x; pointer.startY = p.y;
+  pointer.dx = 0; pointer.dy = 0;
+  pointer.dragDx = 0; pointer.dragDy = 0;
+  touchDown('mouse', p.x, p.y);
 });
 canvas.addEventListener('mousemove', e => {
   const p = toCanvas(e.clientX, e.clientY);
-  onMove(p.x, p.y);
+  pointer.dx = p.x - pointer.x;
+  pointer.dy = p.y - pointer.y;
+  pointer.x = p.x;
+  pointer.y = p.y;
+  pointer.dragDx = p.x - pointer.startX;
+  pointer.dragDy = p.y - pointer.startY;
+  touchMove('mouse', p.x, p.y);
 });
 canvas.addEventListener('mouseup', e => {
-  const p = toCanvas(e.clientX, e.clientY);
-  onUp(p.x, p.y);
+  touchUp('mouse');
+  pointer.down = false;
+  pointer.dx = 0;
+  pointer.dy = 0;
 });
 
-// 터치 이벤트
+// ── 터치 이벤트 (멀티터치 지원) ──
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
-  const t = e.touches[0];
-  const p = toCanvas(t.clientX, t.clientY);
-  onDown(p.x, p.y);
+  // changedTouches: 이번 이벤트에서 새로 추가된 터치만
+  for (const t of e.changedTouches) {
+    const p = toCanvas(t.clientX, t.clientY);
+    touchDown(t.identifier, p.x, p.y);
+  }
+  // pointer 호환 (첫 번째 터치)
+  const first = e.touches[0];
+  if (first) {
+    const p = toCanvas(first.clientX, first.clientY);
+    pointer.down = true;
+    pointer.x = p.x; pointer.y = p.y;
+  }
 }, { passive: false });
+
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
-  const t = e.touches[0];
-  const p = toCanvas(t.clientX, t.clientY);
-  onMove(p.x, p.y);
+  for (const t of e.changedTouches) {
+    const p = toCanvas(t.clientX, t.clientY);
+    touchMove(t.identifier, p.x, p.y);
+  }
+  // pointer 호환
+  const first = e.touches[0];
+  if (first) {
+    const p = toCanvas(first.clientX, first.clientY);
+    pointer.dx = p.x - pointer.x;
+    pointer.dy = p.y - pointer.y;
+    pointer.x = p.x;
+    pointer.y = p.y;
+  }
 }, { passive: false });
+
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
-  const p = { x: pointer.x, y: pointer.y };
-  onUp(p.x, p.y);
+  // changedTouches: 이번 이벤트에서 끝난 터치만
+  for (const t of e.changedTouches) {
+    touchUp(t.identifier);
+  }
+  // 모든 터치가 끝났으면 pointer 리셋
+  if (e.touches.length === 0) {
+    pointer.down = false;
+    pointer.dx = 0;
+    pointer.dy = 0;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    touchUp(t.identifier);
+  }
+  if (e.touches.length === 0) {
+    pointer.down = false;
+    pointer.dx = 0;
+    pointer.dy = 0;
+  }
 }, { passive: false });
