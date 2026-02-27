@@ -1,9 +1,9 @@
 // ── 저격총 시스템: 볼트액션 + 스코프 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { fireProjectile } from './projectiles.js?v=2';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { fireProjectile } from './projectiles.js?v=3';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -16,6 +16,8 @@ const COL_W = WEAPON_W / 3;
 let boltDragY = 0;
 let boltDragging = false;
 let scopeDragging = false;
+let triggerDragging = false;
+let triggerLastX = 0;
 
 export function initSniper() {
   // ── 볼트 영역 (왼쪽) - 위로 드래그: 볼트 열기, 아래로: 볼트 닫기 ──
@@ -59,12 +61,27 @@ export function initSniper() {
     5
   );
 
-  // ── 방아쇠 영역 (가운데) - 탭 즉시 발사 ──
+  // ── 방아쇠 영역 (가운데) - 터치+좌우 드래그=조준, 놓으면 발사 ──
   registerZone(
     { x: JOYSTICK_W + COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'sniper') return false;
+        triggerDragging = true;
+        triggerLastX = x;
+      },
+      onMove(x, y) {
+        if (!triggerDragging || state.currentWeapon !== 'sniper') return;
+        const frameDx = x - triggerLastX;
+        triggerLastX = x;
+        // 스코프 활성 시 더 정밀한 조준
+        const aimSens = state.sniper.scoping ? 0.002 : 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+      },
+      onEnd() {
+        if (!triggerDragging || state.currentWeapon !== 'sniper') { triggerDragging = false; return; }
+        triggerDragging = false;
+
         const s = state.sniper;
         if (s.chambered && !s.boltOpen) {
           s.chambered = false;
@@ -75,7 +92,6 @@ export function initSniper() {
           s.boltOpen = true;
         }
       },
-      onEnd() {},
     },
     5
   );
@@ -252,7 +268,7 @@ export function drawSniper(ctx) {
 
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
-  ctx.fillText('탭: 발사', trigX, CONTROLS_BOTTOM - 8);
+  ctx.fillText('드래그:조준 놓기:발사', trigX, CONTROLS_BOTTOM - 8);
 
   // ── 스코프 버튼 ──
   const scopeX = ox + COL_W * 2.5;

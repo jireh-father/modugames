@@ -1,9 +1,9 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { fireProjectile } from './projectiles.js?v=2';
-import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { fireProjectile } from './projectiles.js?v=3';
+import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -17,6 +17,7 @@ let slideDragY = 0;
 let slideDragging = false;
 let triggerDragY = 0;
 let triggerDragging = false;
+let triggerLastX = 0;
 let magDragY = 0;
 let magDragging = false;
 
@@ -68,7 +69,7 @@ export function initPistol() {
     5
   );
 
-  // ── 방아쇠 영역 (가운데) - 탭 즉시 발사 ──
+  // ── 방아쇠 영역 (가운데) - 터치+좌우 드래그=조준, 놓으면 발사 ──
   registerZone(
     { x: JOYSTICK_W + COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
@@ -76,8 +77,23 @@ export function initPistol() {
         if (state.currentWeapon !== 'pistol' || state.pistol.reloadMode) return false;
         triggerDragging = true;
         triggerDragY = 20; // 시각 피드백용
+        triggerLastX = x;
+      },
+      onMove(x, y, dx, dy) {
+        if (!triggerDragging || state.currentWeapon !== 'pistol') return;
+        triggerDragY = Math.max(0, Math.min(40, dy));
+        // 좌우 드래그로 조준 이동
+        const frameDx = x - triggerLastX;
+        triggerLastX = x;
+        const aimSens = 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+      },
+      onEnd() {
+        if (!triggerDragging || state.currentWeapon !== 'pistol') { triggerDragging = false; return; }
+        triggerDragging = false;
+        triggerDragY = 0;
 
-        // 즉시 발사
+        // 놓으면 발사
         const p = state.pistol;
         if (p.chambered) {
           p.chambered = false;
@@ -97,14 +113,6 @@ export function initPistol() {
             p.slideBack = true;
           }
         }
-      },
-      onMove(x, y, dx, dy) {
-        if (!triggerDragging || state.currentWeapon !== 'pistol') return;
-        triggerDragY = Math.max(0, Math.min(40, dy));
-      },
-      onEnd() {
-        triggerDragging = false;
-        triggerDragY = 0;
       },
     },
     5
@@ -322,7 +330,7 @@ function drawNormalMode(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('탭: 발사', trigX, CONTROLS_BOTTOM - 8);
+  ctx.fillText('드래그:조준 놓기:발사', trigX, CONTROLS_BOTTOM - 8);
 
   // ── 탄창 ──
   const magColX = ox + COL_W * 2;

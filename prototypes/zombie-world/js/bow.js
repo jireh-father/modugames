@@ -1,9 +1,9 @@
 // ── 활 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { fireProjectile } from './projectiles.js?v=2';
-import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { fireProjectile } from './projectiles.js?v=3';
+import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -17,7 +17,8 @@ const BOW_W = WEAPON_W - QUIVER_W;
 let arrowDrag = null; // {x, y} 화살 드래그 중
 let stringDragY = 0;
 let stringDragging = false;
-let stringLastX = 0; // 시위 드래그 중 조준용 이전 좌표
+let bowTouching = false; // 활 영역 터치 중 (조준용)
+let stringLastX = 0; // 드래그 중 조준용 이전 좌표
 let stringLastY = 0;
 
 export function initBow() {
@@ -58,34 +59,39 @@ export function initBow() {
     5
   );
 
-  // 활+시위 영역 (오른쪽 75%)
+  // 활+시위 영역 (오른쪽 75%) - 항상 좌우 드래그=조준, 화살 장전 시 아래로 드래그=시위 당기기
   registerZone(
     { x: JOYSTICK_W + QUIVER_W, y: CTRL_Y, w: BOW_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'bow') return false;
+        bowTouching = true;
+        stringLastX = x;
+        stringLastY = y;
         if (state.bow.arrowNocked) {
           stringDragging = true;
           stringDragY = 0;
-          stringLastX = x;
-          stringLastY = y;
           state.bow.drawing = true;
           playBowDraw();
         }
       },
       onMove(x, y, dx, dy) {
-        if (!stringDragging || state.currentWeapon !== 'bow') return;
-        stringDragY = Math.max(0, Math.min(100, dy));
-        state.bow.drawPower = stringDragY / 100;
-        // 시위 당긴 상태에서 좌우 드래그로 조준 각도 미세 조정
+        if (!bowTouching || state.currentWeapon !== 'bow') return;
+        // 좌우 드래그로 항상 조준 이동 (장전 전후 모두)
         const frameDx = x - stringLastX;
         stringLastX = x;
         stringLastY = y;
-        const aimSens = 0.003;
+        const aimSens = 0.005;
         state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+        // 시위 당기기 (화살 장전 시에만)
+        if (stringDragging) {
+          stringDragY = Math.max(0, Math.min(100, dy));
+          state.bow.drawPower = stringDragY / 100;
+        }
       },
       onEnd(x, y, dx, dy) {
-        if (!stringDragging || state.currentWeapon !== 'bow') return;
+        bowTouching = false;
+        if (!stringDragging || state.currentWeapon !== 'bow') { stringDragging = false; return; }
         stringDragging = false;
         const b = state.bow;
         b.drawing = false;
@@ -289,11 +295,11 @@ export function drawBow(ctx) {
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
   if (!b.arrowNocked) {
-    ctx.fillText('화살통→활: 장전', bowCX, CONTROLS_BOTTOM - 8);
+    ctx.fillText('화살통→활: 장전 | ←→조준', bowCX, CONTROLS_BOTTOM - 8);
   } else if (!b.drawing) {
-    ctx.fillText('↓드래그: 시위 당기기', bowCX, CONTROLS_BOTTOM - 8);
+    ctx.fillText('↓시위 | ←→조준', bowCX, CONTROLS_BOTTOM - 8);
   } else {
-    ctx.fillText('놓으면 발사!', bowCX, CONTROLS_BOTTOM - 8);
+    ctx.fillText('놓으면 발사! ←→조준', bowCX, CONTROLS_BOTTOM - 8);
   }
 
   ctx.restore();

@@ -1,9 +1,9 @@
 // ── 크로스보우 시스템: 크랭크 장전 + 볼트 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { fireProjectile } from './projectiles.js?v=2';
-import { playCrossbowShoot, playCrossbowCrank, playCrossbowLoad } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { fireProjectile } from './projectiles.js?v=3';
+import { playCrossbowShoot, playCrossbowCrank, playCrossbowLoad } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -16,6 +16,8 @@ const COL_W = WEAPON_W / 3;
 let crankDragY = 0;
 let crankDragging = false;
 let boltDrag = null; // {x, y} 볼트 드래그
+let bodyDragging = false;
+let bodyLastX = 0;
 
 export function initCrossbow() {
   // ── 볼트 슬롯 (왼쪽) - 볼트를 드래그해서 크로스보우에 장전 ──
@@ -54,12 +56,26 @@ export function initCrossbow() {
     5
   );
 
-  // ── 크로스보우 본체 (가운데) - 탭: 발사 ──
+  // ── 크로스보우 본체 (가운데) - 터치+좌우 드래그=조준, 놓으면 발사 ──
   registerZone(
     { x: JOYSTICK_W + COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'crossbow') return false;
+        bodyDragging = true;
+        bodyLastX = x;
+      },
+      onMove(x, y) {
+        if (!bodyDragging || state.currentWeapon !== 'crossbow') return;
+        const frameDx = x - bodyLastX;
+        bodyLastX = x;
+        const aimSens = 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+      },
+      onEnd() {
+        if (!bodyDragging || state.currentWeapon !== 'crossbow') { bodyDragging = false; return; }
+        bodyDragging = false;
+
         const c = state.crossbow;
         if (c.loaded && c.cocked) {
           c.loaded = false;
@@ -70,7 +86,6 @@ export function initCrossbow() {
           spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
         }
       },
-      onEnd() {},
     },
     5
   );
@@ -228,7 +243,7 @@ export function drawCrossbow(ctx) {
   ctx.textAlign = 'center';
   if (!c.cocked) ctx.fillText('크랭크→코킹', bowCX, CONTROLS_BOTTOM - 8);
   else if (!c.loaded) ctx.fillText('볼트→장전', bowCX, CONTROLS_BOTTOM - 8);
-  else ctx.fillText('탭: 발사!', bowCX, CONTROLS_BOTTOM - 8);
+  else ctx.fillText('드래그:조준 놓기:발사', bowCX, CONTROLS_BOTTOM - 8);
 
   // ── 크랭크 (오른쪽) ──
   const crankX = ox + COL_W * 2.5;

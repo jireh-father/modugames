@@ -1,6 +1,6 @@
 // ── 좀비 시스템 (8종 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y } from './game.js?v=2';
-import { getWallY, getWallSegments } from './wall.js?v=2';
+import { W, state, WALL_Y, TOWER_Y } from './game.js?v=3';
+import { getWallY, getWallSegments } from './wall.js?v=3';
 
 const WALL_SEGMENTS = getWallSegments();
 

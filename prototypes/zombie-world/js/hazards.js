@@ -1,7 +1,7 @@
 // ── 지뢰 & 위험 지역 (화염/독) 시스템 ──
-import { state } from './game.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
-import { playMineExplosion } from './audio.js?v=2';
+import { state } from './game.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
+import { playMineExplosion } from './audio.js?v=3';
 
 /**
  * 지뢰 업데이트: 좀비와 접촉 시 폭발

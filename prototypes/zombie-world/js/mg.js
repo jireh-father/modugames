@@ -1,9 +1,9 @@
 // ── 기관총 시스템: 연사 + 과열 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { fireProjectile } from './projectiles.js?v=2';
-import { playMGShot, playMGBurstEnd, playMGCock, playMGOverheat, playMGCooldown } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { fireProjectile } from './projectiles.js?v=3';
+import { playMGShot, playMGBurstEnd, playMGCock, playMGOverheat, playMGCooldown } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -18,11 +18,43 @@ const OVERHEAT_THRESHOLD = 1.0;
 const COOLDOWN_TIME = 2.0; // 과열 후 강제 쿨다운
 
 let triggerHeld = false;
+let fireLastX = 0;
+
+const LOAD_W = WEAPON_W * 0.25; // 왼쪽 25% 장전 영역
+const FIRE_W = WEAPON_W - LOAD_W; // 나머지 발사 영역
 
 export function initMG() {
-  // ── 전체 무기 영역: 누르고 있으면 연사 ──
+  // ── 탄띠 장전 영역 (왼쪽 25%) - 아래로 드래그하면 예비탄에서 장전 ──
   registerZone(
-    { x: JOYSTICK_W, y: CTRL_Y, w: WEAPON_W, h: CTRL_H },
+    { x: JOYSTICK_W, y: CTRL_Y, w: LOAD_W, h: CTRL_H },
+    {
+      onStart(x, y) {
+        if (state.currentWeapon !== 'mg') return false;
+        const m = state.mg;
+        if (m.reserveAmmo > 0 && m.ammo < 30) {
+          return; // 시작은 허용
+        }
+        return false;
+      },
+      onMove() {},
+      onEnd(x, y, dx, dy) {
+        if (state.currentWeapon !== 'mg') return;
+        const m = state.mg;
+        // 아래로 드래그하면 탄띠 장전
+        if (dy > 30 && m.reserveAmmo > 0 && m.ammo < 30) {
+          const reload = Math.min(30 - m.ammo, m.reserveAmmo);
+          m.reserveAmmo -= reload;
+          m.ammo += reload;
+          playMGCock();
+        }
+      },
+    },
+    5
+  );
+
+  // ── 발사 영역 (오른쪽 75%): 누르고 있으면 연사, 좌우 드래그=조준 ──
+  registerZone(
+    { x: JOYSTICK_W + LOAD_W, y: CTRL_Y, w: FIRE_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'mg') return false;
@@ -30,8 +62,16 @@ export function initMG() {
         if (m.overheated || !m.cocked) return false;
         triggerHeld = true;
         m.firing = true;
+        fireLastX = x;
       },
-      onMove() {},
+      onMove(x, y) {
+        if (state.currentWeapon !== 'mg' || !triggerHeld) return;
+        // 좌우 드래그로 조준 이동
+        const frameDx = x - fireLastX;
+        fireLastX = x;
+        const aimSens = 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+      },
       onEnd() {
         if (state.currentWeapon !== 'mg') return;
         triggerHeld = false;
@@ -113,12 +153,6 @@ export function updateMG(dt) {
       m.firing = false;
       m.cocked = false;
       triggerHeld = false;
-      // 예비탄 자동 재장전
-      if (m.reserveAmmo > 0) {
-        const reload = Math.min(30, m.reserveAmmo);
-        m.reserveAmmo -= reload;
-        m.ammo = reload;
-      }
     }
   }
 }
@@ -132,22 +166,49 @@ export function drawMG(ctx) {
 
   ctx.save();
 
-  // 구분선
+  // 영역 구분선
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(ox, CTRL_Y);
   ctx.lineTo(ox, CONTROLS_BOTTOM);
+  ctx.moveTo(ox + LOAD_W, CTRL_Y);
+  ctx.lineTo(ox + LOAD_W, CONTROLS_BOTTOM);
   ctx.stroke();
 
   // 레이블
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('기관총', ox + WEAPON_W / 2, CTRL_Y + 14);
+  ctx.fillText('탄띠', ox + LOAD_W / 2, CTRL_Y + 14);
+  ctx.fillText('기관총', ox + LOAD_W + FIRE_W / 2, CTRL_Y + 14);
 
-  // ── 총 몸체 ──
-  const gunCX = ox + WEAPON_W / 2;
+  // ── 왼쪽: 탄띠 장전 영역 ──
+  const loadCX = ox + LOAD_W / 2;
+  // 탄띠 상자
+  ctx.fillStyle = '#3a3a2a';
+  ctx.fillRect(loadCX - 25, baseY + 20, 50, 100);
+  ctx.strokeStyle = '#5a5a3a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(loadCX - 25, baseY + 20, 50, 100);
+  // 탄띠 표시
+  const beltCount = Math.min(Math.ceil(m.reserveAmmo / 10), 8);
+  for (let i = 0; i < beltCount; i++) {
+    ctx.fillStyle = '#aa8844';
+    ctx.fillRect(loadCX - 18, baseY + 30 + i * 12, 36, 8);
+  }
+  // 예비탄 수
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${m.reserveAmmo}`, loadCX, baseY + 135);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '9px monospace';
+  ctx.fillText('↓드래그:장전', loadCX, CONTROLS_BOTTOM - 8);
+
+  // ── 오른쪽: 총 몸체 ──
+  const gunCX = ox + LOAD_W + FIRE_W / 2;
   const gunCY = baseY + 60;
 
   // 몸통
@@ -177,9 +238,9 @@ export function drawMG(ctx) {
   ctx.fillText(m.cocked ? '코킹됨' : '코킹', cockX, cockY + 4);
 
   // ── 과열 게이지 ──
-  const gaugeX = ox + 15;
+  const gaugeX = ox + LOAD_W + 15;
   const gaugeY = baseY + 120;
-  const gaugeW = WEAPON_W - 30;
+  const gaugeW = FIRE_W - 30;
   const gaugeH = 16;
 
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -202,7 +263,7 @@ export function drawMG(ctx) {
       ctx.fillStyle = '#ff4444';
       ctx.font = 'bold 12px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('OVERHEAT!', ox + WEAPON_W / 2, gaugeY - 5);
+      ctx.fillText('OVERHEAT!', gunCX, gaugeY - 5);
     }
   }
 
@@ -210,13 +271,7 @@ export function drawMG(ctx) {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(`${m.ammo}`, ox + WEAPON_W / 2 - 30, gaugeY + gaugeH + 25);
-
-  if (m.reserveAmmo > 0) {
-    ctx.fillStyle = '#888';
-    ctx.font = '12px monospace';
-    ctx.fillText(`+${m.reserveAmmo}`, ox + WEAPON_W / 2 + 30, gaugeY + gaugeH + 25);
-  }
+  ctx.fillText(`${m.ammo}`, gunCX, gaugeY + gaugeH + 25);
 
   // 머즐 플래시 효과 (연사 중)
   if (m.firing && m.ammo > 0) {
@@ -230,7 +285,7 @@ export function drawMG(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('꾹 누르기: 연사 | 과열 주의!', ox + WEAPON_W / 2, CONTROLS_BOTTOM - 8);
+  ctx.fillText('꾹:연사 ←→조준', ox + LOAD_W + FIRE_W / 2, CONTROLS_BOTTOM - 8);
 
   ctx.restore();
 }

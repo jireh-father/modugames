@@ -1,5 +1,5 @@
 // ── 낮/밤 사이클 & 손전등 효과 ──
-import { W, H, state, TOWER_Y } from './game.js?v=2';
+import { W, H, state, TOWER_Y } from './game.js?v=3';
 
 const TOWER_X = W / 2;
 

@@ -1,8 +1,8 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=2';
-import { registerZone } from './input.js?v=2';
-import { playItemPickup, playItemDrop } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=3';
+import { registerZone } from './input.js?v=3';
+import { playItemPickup, playItemDrop } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 // ── 아이템 정의 ──
 const ITEM_TYPES = [

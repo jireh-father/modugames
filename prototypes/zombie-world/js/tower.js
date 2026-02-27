@@ -1,5 +1,5 @@
 // ── 타워 렌더링 ──
-import { W, state, TOWER_Y } from './game.js?v=2';
+import { W, state, TOWER_Y } from './game.js?v=3';
 
 const TOWER_X = W / 2;
 const TOWER_SIZE = 24;
