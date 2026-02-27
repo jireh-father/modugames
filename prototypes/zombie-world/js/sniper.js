@@ -1,10 +1,11 @@
 // ── 저격총 시스템: 볼트액션 + 스코프 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=1';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=1';
 import { registerZone } from './input.js?v=1';
 import { fireProjectile } from './projectiles.js?v=1';
 import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=1';
 import { spawnParticles } from './particles.js?v=1';
-import { getCrosshairScreen } from './renderer.js?v=1';
+
+const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -67,7 +68,7 @@ export function initSniper() {
         const s = state.sniper;
         if (s.chambered && !s.boltOpen) {
           s.chambered = false;
-          fireProjectile('sniper', state.aimX, state.aimY, false);
+          fireProjectile('sniper', state.aimAngle);
           playSniperShot();
           spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
           // 자동 볼트 열림 (반동)
@@ -114,73 +115,63 @@ export function updateSniper(dt) {
   }
 }
 
-// ── 스코프 오버레이 렌더링 (사격장 위에 그려짐) ──
+// ── 스코프 오버레이 렌더링 (정밀 조준 레이저 라인) ──
 export function drawScopeOverlay(ctx) {
   const s = state.sniper;
   if (s.scopeZoom <= 0) return;
 
   const alpha = s.scopeZoom;
-  const { cx, cy } = getCrosshairScreen();
+  const tx = W / 2, ty = TOWER_Y;
+  const dx = Math.cos(state.aimAngle);
+  const dy = -Math.sin(state.aimAngle); // canvas Y is inverted
+  const lineLen = 800;
 
-  // 스코프 원 크기 (줌에 따라 커짐)
-  const scopeR = 60 + alpha * 100;
-
-  // 스코프 밖은 어둡게
   ctx.save();
-  ctx.fillStyle = `rgba(0,0,0,${alpha * 0.85})`;
-  ctx.fillRect(0, RANGE_TOP, W, RANGE_BOTTOM - RANGE_TOP);
 
-  // 스코프 원 (안은 밝게 = 클리어)
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(cx, cy, scopeR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.restore();
+  // 정밀 레이저 라인 (밝고 좁은 선)
+  const lineWidth = 3 - alpha * 2; // 줌할수록 좁아짐 (3 → 1)
 
-  // 스코프 테두리
-  ctx.strokeStyle = `rgba(40,40,40,${alpha})`;
-  ctx.lineWidth = 4;
+  // 글로우 효과
+  ctx.strokeStyle = `rgba(255,60,60,${alpha * 0.15})`;
+  ctx.lineWidth = lineWidth + 6;
   ctx.beginPath();
-  ctx.arc(cx, cy, scopeR, 0, Math.PI * 2);
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx + dx * lineLen, ty + dy * lineLen);
   ctx.stroke();
 
-  // 스코프 내부 십자선 (얇고 정밀)
+  // 메인 레이저 라인
   ctx.strokeStyle = `rgba(255,80,80,${alpha * 0.7})`;
-  ctx.lineWidth = 1;
-  // 가로
+  ctx.lineWidth = lineWidth;
   ctx.beginPath();
-  ctx.moveTo(cx - scopeR + 10, cy);
-  ctx.lineTo(cx - 8, cy);
-  ctx.moveTo(cx + 8, cy);
-  ctx.lineTo(cx + scopeR - 10, cy);
-  ctx.stroke();
-  // 세로
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - scopeR + 10);
-  ctx.lineTo(cx, cy - 8);
-  ctx.moveTo(cx, cy + 8);
-  ctx.lineTo(cx, cy + scopeR - 10);
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx + dx * lineLen, ty + dy * lineLen);
   ctx.stroke();
 
-  // 밀 닷 (거리 눈금)
-  ctx.fillStyle = `rgba(255,80,80,${alpha * 0.5})`;
-  for (let i = 1; i <= 3; i++) {
-    const d = i * 20;
+  // 중심 밝은 라인
+  ctx.strokeStyle = `rgba(255,200,200,${alpha * 0.5})`;
+  ctx.lineWidth = Math.max(0.5, lineWidth - 1);
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx + dx * lineLen, ty + dy * lineLen);
+  ctx.stroke();
+
+  // 거리 눈금 점 (레이저 라인 위에)
+  ctx.fillStyle = `rgba(255,80,80,${alpha * 0.6})`;
+  for (let i = 1; i <= 5; i++) {
+    const d = i * 80;
     ctx.beginPath();
-    ctx.arc(cx, cy + d, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy - d, 1.5, 0, Math.PI * 2);
+    ctx.arc(tx + dx * d, ty + dy * d, 2, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 배율 표시
+  // 배율 표시 (필드 상단 모서리)
   const zoom = (2 + alpha * 4).toFixed(1);
   ctx.fillStyle = `rgba(255,255,255,${alpha * 0.5})`;
   ctx.font = '10px monospace';
   ctx.textAlign = 'right';
-  ctx.fillText(`${zoom}x`, cx + scopeR - 15, cy + scopeR - 15);
+  ctx.fillText(`${zoom}x`, W - 10, FIELD_TOP + 15);
+
+  ctx.restore();
 }
 
 // ── 조작부 렌더링 ──

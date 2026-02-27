@@ -1,5 +1,7 @@
 // ── 기관총 시스템: 연사 + 과열 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=1';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
+
+const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 import { registerZone } from './input.js?v=1';
 import { fireProjectile } from './projectiles.js?v=1';
 import { playMGShot, playMGBurstEnd, playMGCock, playMGOverheat, playMGCooldown } from './audio.js?v=1';
@@ -88,10 +90,11 @@ export function updateMG(dt) {
   // 연사 중
   if (m.firing && !m.overheated && m.cocked && m.ammo > 0) {
     m.fireTimer += dt;
-    while (m.fireTimer >= FIRE_RATE && m.ammo > 0) {
-      m.fireTimer -= FIRE_RATE;
+    const effectiveRate = state.buffs.speedTimer > 0 ? FIRE_RATE * 0.5 : FIRE_RATE;
+    while (m.fireTimer >= effectiveRate && m.ammo > 0) {
+      m.fireTimer -= effectiveRate;
       m.ammo--;
-      fireProjectile('mgBullet', state.aimX, state.aimY, false);
+      fireProjectile('mgBullet', state.aimAngle);
       playMGShot();
       spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
 

@@ -1,5 +1,7 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=1';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
+
+const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 import { registerZone } from './input.js?v=1';
 import { fireProjectile } from './projectiles.js?v=1';
 import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=1';
@@ -82,7 +84,7 @@ export function initPistol() {
           const isSpecial = p.specialBullets > 0;
           if (isSpecial) p.specialBullets--;
 
-          fireProjectile('bullet', state.aimX, state.aimY, isSpecial);
+          fireProjectile('bullet', state.aimAngle, isSpecial);
           playGunshot();
           spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
 

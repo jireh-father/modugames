@@ -1,5 +1,7 @@
 // ── 크로스보우 시스템: 크랭크 장전 + 볼트 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=1';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
+
+const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 import { registerZone } from './input.js?v=1';
 import { fireProjectile } from './projectiles.js?v=1';
 import { playCrossbowShoot, playCrossbowCrank, playCrossbowLoad } from './audio.js?v=1';
@@ -63,7 +65,7 @@ export function initCrossbow() {
           c.loaded = false;
           c.cocked = false;
           c.crankProgress = 0;
-          fireProjectile('bolt', state.aimX, state.aimY, false);
+          fireProjectile('bolt', state.aimAngle, false, 1);
           playCrossbowShoot();
           spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
         }

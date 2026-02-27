@@ -1,5 +1,7 @@
 // ── 활 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=1';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
+
+const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 import { registerZone } from './input.js?v=1';
 import { fireProjectile } from './projectiles.js?v=1';
 import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=1';
@@ -75,12 +77,12 @@ export function initBow() {
         if (!stringDragging || state.currentWeapon !== 'bow') return;
         stringDragY = Math.max(0, Math.min(100, dy));
         state.bow.drawPower = stringDragY / 100;
-        // 시위 당긴 상태에서 좌우 드래그로 조준점 이동 (상하는 시위 당기기에 사용)
+        // 시위 당긴 상태에서 좌우 드래그로 조준 각도 미세 조정
         const frameDx = x - stringLastX;
         stringLastX = x;
         stringLastY = y;
-        const aimSens = 0.005;
-        state.aimX = Math.max(-1, Math.min(1, state.aimX + frameDx * aimSens));
+        const aimSens = 0.003;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
       },
       onEnd(x, y, dx, dy) {
         if (!stringDragging || state.currentWeapon !== 'bow') return;
@@ -91,7 +93,7 @@ export function initBow() {
         // 충분히 당겼으면 발사
         if (b.drawPower > 0.15 && b.arrowNocked) {
           const isSpecial = b._specialNocked || false;
-          fireProjectile('arrow', state.aimX, state.aimY, isSpecial, b.drawPower);
+          fireProjectile('arrow', state.aimAngle, isSpecial, b.drawPower);
           playBowRelease();
           const bowCX = JOYSTICK_W + QUIVER_W + BOW_W * 0.5;
           spawnParticles(bowCX, CTRL_Y + CTRL_H * 0.35, 'bowString');
