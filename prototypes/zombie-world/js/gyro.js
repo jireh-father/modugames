@@ -1,7 +1,7 @@
 // ── 자이로 조준 시스템 ──
 // DeviceOrientation 기반: 폰 기울기 각도 변화에 따라 조준점 이동
-import { state } from './game.js?v=1';
-import { settings } from './settings.js?v=1';
+import { state } from './game.js?v=2';
+import { settings } from './settings.js?v=2';
 
 let enabled = false;
 let supported = false;
@@ -56,9 +56,8 @@ function onOrientation(e) {
     if (Math.abs(dGamma) > 30) dGamma = 0;
     if (Math.abs(dBeta) > 30) dBeta = 0;
 
-    // 기울기 반전: 오른쪽 기울기 → 조준점 왼쪽, 위로 기울기 → 조준점 아래
-    state.aimX = Math.max(-1, Math.min(1, state.aimX - dGamma * settings.gyroSens));
-    state.aimY = Math.max(-1, Math.min(1, state.aimY - dBeta * settings.gyroSens));
+    // 기울기 반전: 오른쪽 기울기 → 조준 각도 감소 (오른쪽), 왼쪽 기울기 → 증가 (왼쪽)
+    state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle + dGamma * settings.gyroSens * 0.02));
   }
 
   lastGamma = gamma;

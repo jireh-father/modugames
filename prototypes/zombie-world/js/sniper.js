@@ -1,9 +1,9 @@
 // ── 저격총 시스템: 볼트액션 + 스코프 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=1';
-import { registerZone } from './input.js?v=1';
-import { fireProjectile } from './projectiles.js?v=1';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=1';
-import { spawnParticles } from './particles.js?v=1';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=2';
+import { registerZone } from './input.js?v=2';
+import { fireProjectile } from './projectiles.js?v=2';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=2';
+import { spawnParticles } from './particles.js?v=2';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 

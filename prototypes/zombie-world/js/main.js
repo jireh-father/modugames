@@ -1,25 +1,26 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=1';
-import { initDial, updateDial, drawDial } from './aiming.js?v=1';
-import { drawField, drawFiringLine } from './renderer.js?v=1';
-import { initPistol, drawPistol } from './pistol.js?v=1';
-import { initBow, drawBow } from './bow.js?v=1';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=1';
-import { initMG, updateMG, drawMG } from './mg.js?v=1';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=1';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=1';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=1';
-import { updateWalls, drawWalls } from './wall.js?v=1';
-import { drawTower } from './tower.js?v=1';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=1';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=1';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=1';
+import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=2';
+import { initDial, updateDial, drawDial } from './aiming.js?v=2';
+import { drawField, drawFiringLine } from './renderer.js?v=2';
+import { initPistol, drawPistol } from './pistol.js?v=2';
+import { initBow, drawBow } from './bow.js?v=2';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=2';
+import { initMG, updateMG, drawMG } from './mg.js?v=2';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=2';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=2';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=2';
+import { updateWalls, drawWalls } from './wall.js?v=2';
+import { drawTower } from './tower.js?v=2';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=2';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=2';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=2';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=1';
-import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=1';
-import { initSettings, drawSettings } from './settings.js?v=1';
+} from './hud.js?v=2';
+import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=2';
+import { initSettings, drawSettings } from './settings.js?v=2';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=2';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -170,65 +171,6 @@ function update(dt, realDt) {
   }
 }
 
-/**
- * 지뢰 업데이트: 좀비와 접촉 시 폭발
- */
-function updateMines(dt) {
-  for (let i = state.mines.length - 1; i >= 0; i--) {
-    const mine = state.mines[i];
-    let exploded = false;
-
-    for (const z of state.zombies) {
-      if (!z.alive) continue;
-      const dist = Math.hypot(z.x - mine.x, z.y - mine.y);
-      if (dist < mine.radius * 0.5) {
-        // 트리거: 폭발
-        exploded = true;
-        break;
-      }
-    }
-
-    if (exploded) {
-      // 폭발: 반경 내 모든 좀비에 데미지
-      for (const z of state.zombies) {
-        if (!z.alive) continue;
-        const dist = Math.hypot(z.x - mine.x, z.y - mine.y);
-        if (dist < mine.radius) {
-          z.hp -= mine.damage;
-          z.hitFlash = 0.15;
-        }
-      }
-      // 폭발 파티클
-      spawnParticles(mine.x, mine.y, 'explosion', { color: '#ff4400', count: 20 });
-      state.mines.splice(i, 1);
-    }
-  }
-}
-
-/**
- * 위험 지역 업데이트: 시간 감소, 범위 내 좀비에 데미지
- */
-function updateHazards(dt) {
-  for (let i = state.hazards.length - 1; i >= 0; i--) {
-    const hz = state.hazards[i];
-    hz.timer -= dt;
-
-    // 범위 내 좀비에 지속 데미지
-    for (const z of state.zombies) {
-      if (!z.alive) continue;
-      const dist = Math.hypot(z.x - hz.x, z.y - hz.y);
-      if (dist < hz.radius) {
-        z.hp -= hz.damage * dt;
-        z.hitFlash = Math.max(z.hitFlash, 0.03);
-      }
-    }
-
-    if (hz.timer <= 0) {
-      state.hazards.splice(i, 1);
-    }
-  }
-}
-
 function draw() {
   if (state.screen === 'title') {
     drawTitle(ctx);
@@ -263,7 +205,7 @@ function draw() {
   drawMines(ctx);
 
   // 위험 지역 렌더링
-  drawHazardsVisual(ctx);
+  drawHazards(ctx);
 
   // 프로젝타일
   drawProjectiles(ctx);
@@ -320,73 +262,6 @@ function draw() {
   // 게임 오버
   if (state.screen === 'gameover') {
     drawGameOver(ctx);
-  }
-}
-
-/**
- * 지뢰 렌더링
- */
-function drawMines(ctx) {
-  for (const mine of state.mines) {
-    // 반경 표시
-    ctx.fillStyle = 'rgba(255, 50, 50, 0.06)';
-    ctx.beginPath();
-    ctx.arc(mine.x, mine.y, mine.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 지뢰 본체
-    ctx.fillStyle = '#cc2222';
-    ctx.beginPath();
-    ctx.arc(mine.x, mine.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // X 마크
-    ctx.strokeStyle = '#ff6666';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(mine.x - 3, mine.y - 3);
-    ctx.lineTo(mine.x + 3, mine.y + 3);
-    ctx.moveTo(mine.x + 3, mine.y - 3);
-    ctx.lineTo(mine.x - 3, mine.y + 3);
-    ctx.stroke();
-  }
-}
-
-/**
- * 위험 지역 렌더링
- */
-function drawHazardsVisual(ctx) {
-  for (const hz of state.hazards) {
-    const flicker = 0.3 + Math.sin(state.time * 10 + hz.x) * 0.15;
-
-    if (hz.type === 'fire') {
-      // 불 지역 - 주황
-      ctx.fillStyle = `rgba(255, 120, 30, ${flicker})`;
-      ctx.beginPath();
-      ctx.arc(hz.x, hz.y, hz.radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 불꽃 테두리
-      ctx.strokeStyle = `rgba(255, 80, 0, ${flicker + 0.1})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(hz.x, hz.y, hz.radius, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      // 기타 (독 등) - 초록
-      ctx.fillStyle = `rgba(80, 255, 80, ${flicker * 0.7})`;
-      ctx.beginPath();
-      ctx.arc(hz.x, hz.y, hz.radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 남은 시간 표시
-    if (hz.timer < 1) {
-      ctx.fillStyle = `rgba(255,255,255,${hz.timer})`;
-      ctx.font = '8px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${hz.timer.toFixed(1)}s`, hz.x, hz.y - hz.radius - 4);
-    }
   }
 }
 

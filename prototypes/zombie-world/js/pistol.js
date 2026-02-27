@@ -1,11 +1,11 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
+import { registerZone } from './input.js?v=2';
+import { fireProjectile } from './projectiles.js?v=2';
+import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=2';
+import { spawnParticles } from './particles.js?v=2';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
-import { registerZone } from './input.js?v=1';
-import { fireProjectile } from './projectiles.js?v=1';
-import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=1';
-import { spawnParticles } from './particles.js?v=1';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;

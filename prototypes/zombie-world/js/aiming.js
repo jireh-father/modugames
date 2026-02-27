@@ -1,6 +1,6 @@
 // ── 반원 다이얼 조준 시스템 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
-import { registerZone } from './input.js?v=1';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=2';
+import { registerZone } from './input.js?v=2';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
