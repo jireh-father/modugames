@@ -1,9 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=9';
-import { registerZone } from './input.js?v=9';
-import { playStart, playGameOver } from './audio.js?v=9';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=9';
-import { openSettings } from './settings.js?v=9';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=10';
+import { registerZone } from './input.js?v=10';
+import { playStart, playGameOver } from './audio.js?v=10';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=10';
+import { openSettings } from './settings.js?v=10';
 
 let gameOverTriggered = false;
 let newBestScore = false;

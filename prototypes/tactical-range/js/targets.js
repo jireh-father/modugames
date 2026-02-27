@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반 - 순차 스폰) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=9';
-import { worldToScreen } from './renderer.js?v=9';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=9';
-import { spawnParticles } from './particles.js?v=9';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
+import { worldToScreen } from './renderer.js?v=10';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=10';
+import { spawnParticles } from './particles.js?v=10';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
@@ -22,6 +22,7 @@ function getWaveConfig(wave) {
   const baseSizeScale = Math.max(0.4, 1 - cycle * 0.08);
 
   let normals = 0, fasts = 0, golds = 0, bonuses = 0, supplies = 0, obstacles = 0;
+  let walledTargets = 0; // 벽 뒤 과녁 (활로만 공격 가능)
   let sizeScale = baseSizeScale;
   let moveSpeed = baseSpeed;
 
@@ -43,11 +44,12 @@ function getWaveConfig(wave) {
       bonuses = cycle >= 1 ? 1 : 0;
       supplies = 1 + Math.floor(cycle / 2);
       break;
-    case 4: // 장애물
+    case 4: // 장애물 + 벽뒤 과녁
       normals = baseCount;
       fasts = Math.min(1 + cycle, 3);
       supplies = 1;
       obstacles = 1 + Math.min(cycle, 3);
+      walledTargets = 1 + Math.min(cycle, 2); // 벽 뒤 과녁
       break;
     case 5: // 보스웨이브
       normals = baseCount + 1;
@@ -56,23 +58,24 @@ function getWaveConfig(wave) {
       bonuses = 1;
       supplies = 2;
       obstacles = Math.min(cycle, 3);
+      walledTargets = Math.min(1 + cycle, 3); // 보스웨이브에도 벽뒤 과녁
       sizeScale *= 0.85;
       moveSpeed *= 1.2;
       break;
   }
 
   // 과녁 캡
-  const total = normals + fasts + golds + bonuses;
+  const total = normals + fasts + golds + bonuses + walledTargets;
   if (total > 10) normals = Math.max(1, normals - (total - 10));
   moveSpeed = Math.min(moveSpeed, 1.5);
   sizeScale = Math.max(sizeScale, 0.35);
 
   // 제한시간: 과녁 수 * 기본 시간 (사이클 올라가면 줄어듦)
-  const totalTargets = normals + fasts + golds + bonuses;
+  const totalTargets = normals + fasts + golds + bonuses + walledTargets;
   const timePerTarget = Math.max(3, 6 - cycle * 0.5);
   const timeLimit = totalTargets * timePerTarget;
 
-  return { normals, fasts, golds, bonuses, supplies, obstacles, sizeScale, moveSpeed, timeLimit };
+  return { normals, fasts, golds, bonuses, supplies, obstacles, walledTargets, sizeScale, moveSpeed, timeLimit };
 }
 
 /**
@@ -84,7 +87,7 @@ function startWave() {
   state.waveTimer = 0;
 
   const config = getWaveConfig(state.wave);
-  const totalTargets = config.normals + config.fasts + config.golds + config.bonuses;
+  const totalTargets = config.normals + config.fasts + config.golds + config.bonuses + config.walledTargets;
   state.waveTargetsLeft = totalTargets;
   state.waveTimeLimit = config.timeLimit;
 
@@ -92,6 +95,11 @@ function startWave() {
   state.obstacles = [];
   for (let i = 0; i < config.obstacles; i++) {
     spawnObstacle();
+  }
+
+  // 벽뒤 과녁 스폰 (전용 벽 + 그 뒤의 과녁)
+  for (let i = 0; i < config.walledTargets; i++) {
+    spawnWalledTarget(config);
   }
 
   // 기본 과녁은 즉시 스폰
@@ -197,7 +205,59 @@ function spawnObstacle() {
     x, y: 0, z,
     w: 0.2 + Math.random() * 0.2,
     h: 0.3 + Math.random() * 0.3,
+    hits: 0,        // 총알 피격 횟수
+    maxHits: 5,     // 이 횟수 맞으면 관통
+    broken: false,  // 관통 여부
+    isWall: false,  // 벽뒤 과녁용 전용 벽 여부
   });
+}
+
+/**
+ * 벽뒤 과녁 스폰: 전용 벽 + 그 뒤에 과녁 배치
+ * 화살은 포물선으로 벽을 넘어서 맞출 수 있음
+ */
+function spawnWalledTarget(config) {
+  // 벽 위치: 중간~먼 거리 (화살이 넘을 수 있도록)
+  const wallZ = 0.3 + Math.random() * 0.3;
+  const wallX = (Math.random() - 0.5) * 1.0;
+
+  // 벽 생성 (넓고 높은 전용 벽)
+  const wall = {
+    x: wallX, y: 0, z: wallZ,
+    w: 0.25 + Math.random() * 0.1,
+    h: 0.35 + Math.random() * 0.1,
+    hits: 0,
+    maxHits: 5,
+    broken: false,
+    isWall: true, // 벽뒤 과녁용 전용 벽
+  };
+  state.obstacles.push(wall);
+
+  // 과녁은 벽 바로 뒤에 배치 (z가 더 큼 = 더 먼 곳)
+  const targetZ = wallZ + 0.08 + Math.random() * 0.05;
+  // X는 벽 범위 안에 (벽에 가려지도록)
+  const targetX = wallX + (Math.random() - 0.5) * wall.w * 0.5;
+  // Y는 벽보다 약간 위 (화살이 넘어서 맞출 수 있는 높이)
+  const targetY = -0.1 - Math.random() * 0.15;
+
+  const baseSize = config.sizeScale;
+  const target = {
+    type: 'walled', // 벽뒤 과녁 타입
+    x: targetX, y: targetY, z: targetZ,
+    size: baseSize * 0.9,
+    moveSpeed: 0, // 벽뒤라 고정
+    moveDir: 1,
+    moveRange: 0,
+    originX: targetX,
+    fallSpeed: 0,
+    originY: targetY,
+    lifeTime: Infinity,
+    alive: true,
+    time: 0,
+    hitPoints: [],
+    wallRef: wall, // 연결된 벽 참조
+  };
+  state.targets.push(target);
 }
 
 /**
@@ -292,13 +352,23 @@ export function checkHits(projectiles) {
     // 화살 관통 멀티킬 카운터
     let arrowHitCount = 0;
 
-    // 장애물 체크 (관통탄/화살 제외)
+    // 장애물 체크
+    // 화살은 포물선으로 넘어가므로 장애물 무시
+    // 관통탄도 장애물 무시
     if (!p.special && p.type !== 'arrow') {
       for (const obs of state.obstacles) {
+        if (obs.broken) continue; // 관통된 벽은 무시
         const dz = Math.abs(p.z - obs.z);
         const dx = Math.abs(p.x - obs.x);
         const dy = Math.abs(p.y - obs.y);
         if (dz < 0.05 && dx < obs.w / 2 && dy < obs.h / 2) {
+          // 벽 피격 카운트
+          obs.hits++;
+          if (obs.hits >= obs.maxHits) {
+            obs.broken = true;
+            const scr = worldToScreen(obs.x, obs.y - obs.h * 0.3, obs.z, state.aimX, state.aimY);
+            spawnParticles(scr.sx, scr.sy, 'explosion');
+          }
           p.alive = false;
           const scr = worldToScreen(p.x, p.y, p.z, state.aimX, state.aimY);
           spawnParticles(scr.sx, scr.sy, 'woodChips', { count: 3 });
@@ -377,6 +447,8 @@ export function checkHits(projectiles) {
 export function drawTargets(ctx, aimX, aimY) {
   // 장애물
   for (const obs of state.obstacles) {
+    if (obs.broken) continue; // 관통된 벽은 렌더링 안함
+
     const scr = worldToScreen(obs.x, obs.y, obs.z, aimX, aimY);
     const w = obs.w * 300 * scr.scale;
     const h = obs.h * 300 * scr.scale;
@@ -391,11 +463,45 @@ export function drawTargets(ctx, aimX, aimY) {
 
     ctx.globalAlpha = hasTargetBehind ? 0.35 : 1;
 
-    ctx.fillStyle = '#4a3520';
-    ctx.fillRect(scr.sx - w / 2, scr.sy - h, w, h);
-    ctx.strokeStyle = '#5a4530';
-    ctx.lineWidth = 2 * scr.scale;
-    ctx.strokeRect(scr.sx - w / 2, scr.sy - h, w, h);
+    // 벽뒤 과녁용 전용 벽은 다른 색
+    if (obs.isWall) {
+      // 피격 정도에 따라 균열 표현
+      const dmgRatio = obs.hits / obs.maxHits;
+      ctx.fillStyle = dmgRatio > 0.6 ? '#5a3828' : dmgRatio > 0.3 ? '#4d3222' : '#3a2818';
+      ctx.fillRect(scr.sx - w / 2, scr.sy - h, w, h);
+
+      // 벽 테두리 (빨간 표시 = 활로만 공격 가능)
+      ctx.strokeStyle = dmgRatio > 0.6 ? '#ff6644' : '#884422';
+      ctx.lineWidth = 2 * scr.scale;
+      ctx.strokeRect(scr.sx - w / 2, scr.sy - h, w, h);
+
+      // 균열 효과
+      if (obs.hits > 0) {
+        ctx.strokeStyle = `rgba(255,150,50,${0.3 + dmgRatio * 0.5})`;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < obs.hits; i++) {
+          const cx = scr.sx - w * 0.3 + (i * w * 0.6 / obs.maxHits);
+          const cy = scr.sy - h * 0.3;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - h * 0.2);
+          ctx.lineTo(cx + w * 0.05, cy);
+          ctx.lineTo(cx - w * 0.03, cy + h * 0.2);
+          ctx.stroke();
+        }
+      }
+
+      // 피격 카운트 표시
+      ctx.fillStyle = '#ff8844';
+      ctx.font = `bold ${Math.max(10, 14 * scr.scale)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${obs.hits}/${obs.maxHits}`, scr.sx, scr.sy - h - 4 * scr.scale);
+    } else {
+      ctx.fillStyle = '#4a3520';
+      ctx.fillRect(scr.sx - w / 2, scr.sy - h, w, h);
+      ctx.strokeStyle = '#5a4530';
+      ctx.lineWidth = 2 * scr.scale;
+      ctx.strokeRect(scr.sx - w / 2, scr.sy - h, w, h);
+    }
 
     ctx.strokeStyle = 'rgba(90,70,50,0.3)';
     ctx.lineWidth = 1;
@@ -466,6 +572,7 @@ function drawTargetCircle(ctx, x, y, r, target) {
     fast: ['#ddd', '#666', '#ddd', '#666', '#333'],
     gold: ['#ffe44d', '#ffcc00', '#ff9900', '#ff6600', '#ff3300'],
     bonus: ['#ff6666', '#ff0000', '#cc0000', '#990000', '#660000'],
+    walled: ['#88ccff', '#4488cc', '#88ccff', '#4488cc', '#2266aa'], // 파란색 = 벽뒤 과녁
   };
 
   const rings = colors[target.type] || colors.normal;
@@ -493,6 +600,14 @@ function drawTargetCircle(ctx, x, y, r, target) {
     ctx.beginPath();
     ctx.arc(x, y, r * 1.1, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // 벽뒤 과녁 활 아이콘 표시
+  if (target.type === 'walled') {
+    ctx.fillStyle = 'rgba(100,180,255,0.8)';
+    ctx.font = `bold ${Math.max(8, r * 0.6)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('🏹', x, y - r - 4);
   }
 
   ctx.globalAlpha = 1;
