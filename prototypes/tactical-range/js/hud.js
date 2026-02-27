@@ -2,6 +2,7 @@
 import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js';
 import { registerZone } from './input.js';
 import { playStart, playGameOver } from './audio.js';
+import { requestGyro, isGyroEnabled, isGyroSupported } from './gyro.js';
 
 let gameOverTriggered = false;
 
@@ -73,6 +74,14 @@ export function drawHUD(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
   ctx.fillText(`BEST: ${state.bestScore}`, W - 10, 38);
+
+  // 자이로 상태
+  if (isGyroEnabled()) {
+    ctx.fillStyle = 'rgba(100,255,100,0.4)';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('GYRO', W / 2, 12);
+  }
 }
 
 /**
@@ -230,10 +239,12 @@ export function initScreenHandlers() {
     {
       onTap() {
         if (state.screen === 'title') {
+          requestGyro(); // iOS 사용자 제스처 내에서 권한 요청
           resetGame();
           playStart();
         } else if (state.screen === 'gameover') {
           gameOverTriggered = false;
+          requestGyro();
           resetGame();
           playStart();
         }
