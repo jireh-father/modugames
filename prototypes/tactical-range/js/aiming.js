@@ -53,7 +53,10 @@ export function updateJoystick(dt) {
   const nx = offsetX / MAX_OFFSET; // -1 ~ 1
   const ny = offsetY / MAX_OFFSET;
   state.aimX = Math.max(-1, Math.min(1, state.aimX + nx * AIM_SPEED * dt));
-  state.aimY = Math.max(-1, Math.min(1, state.aimY + ny * AIM_SPEED * dt));
+  // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
+  if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
+    state.aimY = Math.max(-1, Math.min(1, state.aimY + ny * AIM_SPEED * dt));
+  }
 }
 
 export function drawJoystick(ctx) {
