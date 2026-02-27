@@ -1,5 +1,5 @@
 // ── 입력 시스템: 멀티터치 + 마우스 드래그 통합 관리 ──
-import { W, H, state } from './game.js?v=7';
+import { W, H, state } from './game.js?v=8';
 
 const canvas = document.getElementById('c');
 

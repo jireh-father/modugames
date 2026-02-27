@@ -1,9 +1,9 @@
 // ── 활 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=7';
-import { registerZone } from './input.js?v=7';
-import { fireProjectile } from './projectiles.js?v=7';
-import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=7';
-import { spawnParticles } from './particles.js?v=7';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=8';
+import { registerZone } from './input.js?v=8';
+import { fireProjectile } from './projectiles.js?v=8';
+import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=8';
+import { spawnParticles } from './particles.js?v=8';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 

@@ -1,6 +1,6 @@
 // ── 좀비 시스템 (8종 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y } from './game.js?v=7';
-import { getWallY, getWallSegments } from './wall.js?v=7';
+import { W, state, WALL_Y, TOWER_Y } from './game.js?v=8';
+import { getWallY, getWallSegments } from './wall.js?v=8';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -114,25 +114,16 @@ function updateZombies(dt) {
           if (z.y < stopY) {
             z.y += z.speed * dt * speedMul;
             if (z.y > stopY) z.y = stopY;
-            // 벽 중앙을 향해 x 이동
-            const dxToWall = wallCenterX - z.x;
-            if (Math.abs(dxToWall) > 2) {
-              z.x += Math.sign(dxToWall) * z.speed * 0.5 * dt * speedMul;
-            }
           }
           // 네크로맨서는 벽에 도달하지 않음
         } else if (z.type === 'runner' || z.type === 'spider') {
-          // 러너/스파이더: 지그재그 이동
+          // 러너/스파이더: 지그재그 이동 (자기 x 기준)
           z.zigzagPhase += dt * (z.type === 'spider' ? 8 : 5);
           const zigAmp = z.type === 'spider' ? 40 : 25;
           const zigOffset = Math.sin(z.zigzagPhase) * zigAmp;
 
           z.y += z.speed * dt * speedMul;
-
-          // x를 벽 중앙 + 지그재그 오프셋으로
-          const targetX = wallCenterX + zigOffset;
-          const dxToTarget = targetX - z.x;
-          z.x += dxToTarget * dt * 3;
+          z.x += zigOffset * dt * 3;
 
           // 화면 바운드
           z.x = Math.max(5, Math.min(W - 5, z.x));
@@ -140,6 +131,7 @@ function updateZombies(dt) {
           // 벽 도달 체크
           if (z.y >= wallY) {
             z.y = wallY;
+            z.targetWallIdx = xToWallIdx(z.x);
             if (state.walls[z.targetWallIdx].hp > 0) {
               z.attackingWall = true;
             } else {
@@ -152,15 +144,10 @@ function updateZombies(dt) {
           const ramSpeedMul = distToWall < 100 ? 2 : 1;
           z.y += z.speed * dt * speedMul * ramSpeedMul;
 
-          // 벽 중앙을 향해 x 이동
-          const dxToWall = wallCenterX - z.x;
-          if (Math.abs(dxToWall) > 2) {
-            z.x += Math.sign(dxToWall) * z.speed * 0.3 * dt * speedMul;
-          }
-
           // 벽 도달 체크
           if (z.y >= wallY) {
             z.y = wallY;
+            z.targetWallIdx = xToWallIdx(z.x);
             if (state.walls[z.targetWallIdx].hp > 0) {
               z.attackingWall = true;
               // 래머 돌진 데미지 (1회)
@@ -174,18 +161,13 @@ function updateZombies(dt) {
             }
           }
         } else {
-          // 워커, 탱커, 스플리터, 빅원: 직선 이동
+          // 워커, 탱커, 스플리터, 빅원: 직선 이동 (x 유지)
           z.y += z.speed * dt * speedMul;
-
-          // 벽 중앙을 향해 x 이동
-          const dxToWall = wallCenterX - z.x;
-          if (Math.abs(dxToWall) > 2) {
-            z.x += Math.sign(dxToWall) * z.speed * 0.3 * dt * speedMul;
-          }
 
           // 벽 도달 체크
           if (z.y >= wallY) {
             z.y = wallY;
+            z.targetWallIdx = xToWallIdx(z.x);
             if (state.walls[z.targetWallIdx].hp > 0) {
               z.attackingWall = true;
             } else {
