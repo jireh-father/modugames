@@ -276,7 +276,7 @@ export function getWaveClearBonus() {
   const timeLeft = Math.max(0, state.waveTimeLimit - state.waveTimer);
   const ratio = timeLeft / state.waveTimeLimit;
   // 남은 시간 비율 × 웨이브 번호 × 10
-  return Math.floor(ratio * state.wave * 10);
+  return Math.floor(ratio * state.wave * 1000);
 }
 
 /**
@@ -350,7 +350,7 @@ export function checkHits(projectiles) {
                 state.waveTargetsLeft = Math.max(0, state.waveTargetsLeft - 1);
               }
               arrowHitCount++;
-              results.push({ target: other, hitDist: 0.5, score: 5 * distMul, type: t.type, arrowMulti: arrowHitCount });
+              results.push({ target: other, hitDist: 0.5, score: 500 * distMul, type: t.type, arrowMulti: arrowHitCount });
             }
           }
         }
@@ -359,7 +359,7 @@ export function checkHits(projectiles) {
         if (p.type === 'arrow') arrowHitCount++;
         const arrowMul = p.type === 'arrow' ? arrowHitCount : 1;
 
-        const score = ringScore * distMul * arrowMul;
+        const score = ringScore * distMul * arrowMul * 100;
         results.push({ target: t, hitDist, score, type: t.type, arrowMulti: arrowMul });
         playTargetHit();
 

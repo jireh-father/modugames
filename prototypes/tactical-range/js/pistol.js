@@ -66,24 +66,18 @@ export function initPistol() {
     5
   );
 
-  // ── 방아쇠 영역 (가운데) ──
+  // ── 방아쇠 영역 (가운데) - 탭 즉시 발사 ──
   registerZone(
     { x: JOYSTICK_W + COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'pistol' || state.pistol.reloadMode) return false;
         triggerDragging = true;
-        triggerDragY = 0;
-      },
-      onMove(x, y, dx, dy) {
-        if (!triggerDragging || state.currentWeapon !== 'pistol') return;
-        triggerDragY = Math.max(0, Math.min(40, dy));
-      },
-      onEnd(x, y, dx, dy) {
-        if (!triggerDragging || state.currentWeapon !== 'pistol') return;
-        triggerDragging = false;
+        triggerDragY = 20; // 시각 피드백용
+
+        // 즉시 발사
         const p = state.pistol;
-        if (triggerDragY > 20 && p.chambered) {
+        if (p.chambered) {
           p.chambered = false;
           const isSpecial = p.specialBullets > 0;
           if (isSpecial) p.specialBullets--;
@@ -101,6 +95,13 @@ export function initPistol() {
             p.slideBack = true;
           }
         }
+      },
+      onMove(x, y, dx, dy) {
+        if (!triggerDragging || state.currentWeapon !== 'pistol') return;
+        triggerDragY = Math.max(0, Math.min(40, dy));
+      },
+      onEnd() {
+        triggerDragging = false;
         triggerDragY = 0;
       },
     },
@@ -319,7 +320,7 @@ function drawNormalMode(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('↓드래그: 발사', trigX, CONTROLS_BOTTOM - 8);
+  ctx.fillText('탭: 발사', trigX, CONTROLS_BOTTOM - 8);
 
   // ── 탄창 ──
   const magColX = ox + COL_W * 2;
