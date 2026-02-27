@@ -9,7 +9,7 @@ const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
 const JOY_R = 42;                         // 외곽 반지름
 const THUMB_R = 16;                        // 엄지 반지름
 const MAX_OFFSET = 35;                     // 최대 이동량
-const DRAG_SENS = 0.018;                   // 드래그 감도 (px → aim 변환)
+const DRAG_SENS = 0.009;                   // 드래그 감도 (px → aim 변환)
 
 // 조이스틱 상태
 let active = false;
