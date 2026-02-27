@@ -1,24 +1,33 @@
 // ── 타워 렌더링 + 이동 ──
-import { W, state, TOWER_Y, FIELD_BOTTOM } from './game.js?v=8';
-import { registerZone } from './input.js?v=8';
+import { W, state, TOWER_Y, FIELD_BOTTOM } from './game.js?v=9';
+import { registerZone } from './input.js?v=9';
 
 const TOWER_SIZE = 24;
 const TOWER_ZONE_H = FIELD_BOTTOM - TOWER_Y + TOWER_SIZE; // tower area height
 
-// ── 타워 터치 이동 ──
+// ── 타워 드래그 이동 ──
+const GRAB_RADIUS = 50; // 타워 근처 터치해야 잡힘
+let dragging = false;
+let dragOffsetX = 0;    // 터치점과 타워 중심 간 오프셋
+
 export function initTower() {
   registerZone(
     { x: 0, y: TOWER_Y - TOWER_SIZE, w: W, h: TOWER_ZONE_H + TOWER_SIZE },
     {
-      onStart(x, _y) {
+      onStart(x, y) {
         if (state.screen !== 'playing') return false;
-        state.tower.x = Math.max(TOWER_SIZE, Math.min(W - TOWER_SIZE, x));
+        const dist = Math.hypot(x - state.tower.x, y - TOWER_Y);
+        if (dist > GRAB_RADIUS) return false; // 타워 근처가 아니면 무시
+        dragging = true;
+        dragOffsetX = state.tower.x - x;
       },
       onMove(x, _y) {
-        if (state.screen !== 'playing') return;
-        state.tower.x = Math.max(TOWER_SIZE, Math.min(W - TOWER_SIZE, x));
+        if (!dragging) return;
+        state.tower.x = Math.max(TOWER_SIZE, Math.min(W - TOWER_SIZE, x + dragOffsetX));
       },
-      onEnd() {},
+      onEnd() {
+        dragging = false;
+      },
     },
     3 // 필드보다 높은 우선순위
   );
