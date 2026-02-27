@@ -1,9 +1,9 @@
 // ── 아이템 드랍 & 줍기 시스템 ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=3';
-import { worldToScreen } from './renderer.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { playItemPickup, playCombo } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=4';
+import { worldToScreen } from './renderer.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { playItemPickup, playCombo } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 // 아이템 정의
 const ITEM_TYPES = [

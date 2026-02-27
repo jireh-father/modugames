@@ -1,8 +1,8 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { playStart, playGameOver } from './audio.js?v=3';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=3';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { playStart, playGameOver } from './audio.js?v=4';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=4';
 
 let gameOverTriggered = false;
 
@@ -43,7 +43,17 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'left';
   ctx.fillText(`${state.score}`, 10, 32);
 
+  // 웨이브 + 남은 과녁
+  if (state.wave > 0) {
+    ctx.fillStyle = '#c0a060';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    const remaining = state.targets.filter(t => t.alive && t.type !== 'supply').length;
+    ctx.fillText(`WAVE ${state.wave}  ×${remaining}`, W / 2, 20);
+  }
+
   // 콤보
+  ctx.textAlign = 'left';
   if (state.combo > 1) {
     ctx.fillStyle = '#ffdd44';
     ctx.font = 'bold 14px monospace';
@@ -190,10 +200,14 @@ export function drawGameOver(ctx) {
   ctx.font = '14px monospace';
   ctx.fillText('SCORE', W / 2, H * 0.42 + 24);
 
-  // 최대 콤보
-  ctx.fillStyle = '#ffdd44';
+  // 웨이브 + 최대 콤보
+  ctx.fillStyle = '#c0a060';
   ctx.font = 'bold 20px monospace';
-  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.55);
+  ctx.fillText(`WAVE ${state.wave}`, W / 2, H * 0.52);
+
+  ctx.fillStyle = '#ffdd44';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.58);
 
   // 하이스코어
   const isNew = state.score > state.bestScore;

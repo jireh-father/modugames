@@ -53,6 +53,12 @@ export const state = {
   particles: [],
   obstacles: [],
 
+  // 웨이브
+  wave: 0,
+  waveTargetsLeft: 0, // 이번 웨이브에서 아직 안 맞춘 과녁 수
+  waveCleared: false,
+  wavePause: 0, // 웨이브 간 대기 시간
+
   // 슬로모션
   slowMo: false,
   slowMoTimer: 0,
@@ -80,6 +86,10 @@ export function resetGame() {
   state.items = [];
   state.particles = [];
   state.obstacles = [];
+  state.wave = 0;
+  state.waveTargetsLeft = 0;
+  state.waveCleared = false;
+  state.wavePause = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
 }

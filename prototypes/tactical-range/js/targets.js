@@ -1,53 +1,142 @@
-// ── 과녁 시스템 ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=3';
-import { worldToScreen } from './renderer.js?v=3';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
-
-// 과녁 스폰 타이머
-let spawnTimer = 0;
-let supplyTimer = 0;
+// ── 과녁 시스템 (웨이브 기반) ──
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=4';
+import { worldToScreen } from './renderer.js?v=4';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
 
+let supplyTimer = 0;
+
+/**
+ * 웨이브 설계: 웨이브 번호에 따라 과녁 구성 결정
+ */
+function getWaveConfig(wave) {
+  const w = wave; // 1-based
+
+  // 기본 과녁 수: 2개에서 시작, 점점 증가
+  let normals = Math.min(2 + Math.floor(w / 2), 6);
+  let fasts = w >= 3 ? Math.min(Math.floor((w - 2) / 2), 3) : 0;
+  let golds = w >= 2 && w % 3 === 0 ? 1 : 0;
+  let bonuses = w >= 4 && w % 2 === 0 ? 1 : 0;
+  let obstacles = w >= 4 ? Math.min(Math.floor((w - 3) / 2), 3) : 0;
+
+  // 과녁 크기 축소 (웨이브 올라갈수록)
+  const sizeScale = Math.max(0.5, 1 - (w - 1) * 0.04);
+  // 이동 속도 증가
+  const moveSpeed = Math.min(0.1 + w * 0.08, 1.0);
+
+  return { normals, fasts, golds, bonuses, obstacles, sizeScale, moveSpeed };
+}
+
+/**
+ * 웨이브 시작: 과녁 일괄 배치
+ */
+function startWave() {
+  state.wave++;
+  state.waveCleared = false;
+
+  const config = getWaveConfig(state.wave);
+  const totalTargets = config.normals + config.fasts + config.golds + config.bonuses;
+  state.waveTargetsLeft = totalTargets;
+
+  // 장애물 초기화 후 재배치
+  state.obstacles = [];
+  for (let i = 0; i < config.obstacles; i++) {
+    spawnObstacle();
+  }
+
+  // 과녁 배치 (겹치지 않게 분산)
+  const positions = generatePositions(totalTargets);
+  let idx = 0;
+
+  for (let i = 0; i < config.normals; i++) {
+    spawnTarget('normal', positions[idx++], config);
+  }
+  for (let i = 0; i < config.fasts; i++) {
+    spawnTarget('fast', positions[idx++], config);
+  }
+  for (let i = 0; i < config.golds; i++) {
+    spawnTarget('gold', positions[idx++], config);
+  }
+  for (let i = 0; i < config.bonuses; i++) {
+    spawnTarget('bonus', positions[idx++], config);
+  }
+}
+
+/**
+ * 겹치지 않는 위치 생성
+ */
+function generatePositions(count) {
+  const positions = [];
+  for (let i = 0; i < count; i++) {
+    let x, y, z, ok;
+    let tries = 0;
+    do {
+      z = 0.2 + Math.random() * 0.7;
+      x = (Math.random() - 0.5) * 1.4;
+      y = (Math.random() - 0.5) * 0.5;
+      ok = true;
+      for (const p of positions) {
+        if (Math.abs(p.z - z) < 0.15 && Math.hypot(p.x - x, p.y - y) < 0.25) {
+          ok = false;
+          break;
+        }
+      }
+      tries++;
+    } while (!ok && tries < 30);
+    positions.push({ x, y, z });
+  }
+  return positions;
+}
+
 /**
  * 과녁 생성
  */
-function spawnTarget(type = 'normal') {
-  const diff = state.difficulty;
-  const z = type === 'supply' ? 0.1 : (0.2 + Math.random() * 0.7); // 깊이
-  const x = (Math.random() - 0.5) * 1.5;
-  const y = (Math.random() - 0.5) * 0.6;
-
+function spawnTarget(type, pos, config) {
   const baseSize = type === 'fast' ? 0.6 : type === 'bonus' ? 0.7 : 1;
-  const sizeScale = 1 - diff * 0.4;
 
   const target = {
-    type, // normal | fast | gold | bonus | supply
-    x, y, z,
-    size: baseSize * sizeScale,
-    // 이동
-    moveSpeed: type === 'fast' ? 0.8 : type === 'supply' ? 0 : diff * 0.5,
+    type,
+    x: pos.x, y: pos.y, z: pos.z,
+    size: baseSize * config.sizeScale,
+    moveSpeed: type === 'fast' ? config.moveSpeed * 1.5 : type === 'bonus' ? 0 : config.moveSpeed,
     moveDir: Math.random() > 0.5 ? 1 : -1,
-    moveRange: 0.6 + Math.random() * 0.4,
-    originX: x,
-    // 보급품은 위에서 낙하
-    fallSpeed: type === 'supply' ? 0.15 : 0,
-    originY: type === 'supply' ? -0.8 : y,
-    // 보너스는 시간 제한
-    lifeTime: type === 'bonus' ? 2 + Math.random() * 2 : Infinity,
+    moveRange: 0.3 + Math.random() * 0.3,
+    originX: pos.x,
+    fallSpeed: 0,
+    originY: pos.y,
+    lifeTime: type === 'bonus' ? 3 + state.wave * 0.5 : Infinity,
     alive: true,
     time: 0,
-    hitPoints: [], // 명중 자국
+    hitPoints: [],
   };
 
-  if (type === 'supply') {
-    target.y = -0.8;
-    target.x = (Math.random() - 0.5) * 1.0;
-    target.z = 0.3 + Math.random() * 0.3;
-  }
+  state.targets.push(target);
+}
 
+/**
+ * 보급품 과녁 생성
+ */
+function spawnSupply() {
+  const target = {
+    type: 'supply',
+    x: (Math.random() - 0.5) * 1.0,
+    y: -0.8,
+    z: 0.3 + Math.random() * 0.3,
+    size: 1,
+    moveSpeed: 0,
+    moveDir: 1,
+    moveRange: 0,
+    originX: 0,
+    fallSpeed: 0.15,
+    originY: -0.8,
+    lifeTime: Infinity,
+    alive: true,
+    time: 0,
+    hitPoints: [],
+  };
   state.targets.push(target);
 }
 
@@ -68,39 +157,38 @@ function spawnObstacle() {
  * 과녁 업데이트
  */
 export function updateTargets(dt) {
-  const diff = state.difficulty;
-  spawnTimer -= dt;
-  supplyTimer -= dt;
+  // 웨이브 시작 (게임 시작 or 웨이브 클리어 후)
+  if (state.wave === 0) {
+    state.wavePause = 0.5;
+  }
 
-  // 스폰 간격: 초반 넉넉 → 후반 빡빡
-  const spawnInterval = Math.max(0.8, 3 - diff * 2);
-  if (spawnTimer <= 0 && state.targets.length < 8) {
-    spawnTimer = spawnInterval;
-
-    // 과녁 종류 결정
-    const r = Math.random();
-    if (r < 0.05 + diff * 0.05) {
-      spawnTarget('bonus');
-    } else if (r < 0.15 - diff * 0.05) {
-      spawnTarget('gold');
-    } else if (diff > 0.3 && r < 0.3) {
-      spawnTarget('fast');
-    } else {
-      spawnTarget('normal');
+  // 웨이브 간 대기
+  if (state.waveCleared || state.wave === 0) {
+    state.wavePause -= dt;
+    if (state.wavePause <= 0) {
+      startWave();
     }
+    // 대기 중에도 보급품/기존 과녁 업데이트
+  }
 
-    // 장애물 추가 (중반 이후)
-    if (diff > 0.3 && state.obstacles.length < Math.floor(diff * 4) && Math.random() < 0.3) {
-      spawnObstacle();
+  // 보급품 스폰 (3웨이브마다)
+  if (state.wave > 0) {
+    supplyTimer -= dt;
+    const supplyInterval = Math.max(8, 18 - state.wave * 1.5);
+    if (supplyTimer <= 0) {
+      supplyTimer = supplyInterval;
+      spawnSupply();
+      playSupplyDrop();
     }
   }
 
-  // 보급품 스폰
-  const supplyInterval = Math.max(8, 20 - diff * 10);
-  if (supplyTimer <= 0) {
-    supplyTimer = supplyInterval;
-    spawnTarget('supply');
-    playSupplyDrop();
+  // 웨이브 클리어 체크: 보급품 제외 과녁이 다 사라졌는지
+  if (state.wave > 0 && !state.waveCleared) {
+    const remaining = state.targets.filter(t => t.alive && t.type !== 'supply').length;
+    if (remaining === 0 && state.waveTargetsLeft <= 0) {
+      state.waveCleared = true;
+      state.wavePause = 1.5; // 다음 웨이브 전 대기
+    }
   }
 
   // 과녁 업데이트
@@ -116,12 +204,18 @@ export function updateTargets(dt) {
     // 보급품 낙하
     if (t.fallSpeed > 0) {
       t.y += t.fallSpeed * dt;
-      t.x += Math.sin(t.time * 2) * 0.1 * dt; // 흔들림
-      if (t.y > 0.8) t.alive = false; // 화면 밖으로 사라짐
+      t.x += Math.sin(t.time * 2) * 0.1 * dt;
+      if (t.y > 0.8) t.alive = false;
     }
 
     // 수명
-    if (t.time > t.lifeTime) t.alive = false;
+    if (t.time > t.lifeTime) {
+      t.alive = false;
+      // 보너스 타임아웃은 빗나감으로 안 침 (웨이브 카운트에서는 빼야 함)
+      if (t.type === 'bonus') {
+        state.waveTargetsLeft = Math.max(0, state.waveTargetsLeft - 1);
+      }
+    }
 
     if (!t.alive) {
       state.targets.splice(i, 1);
@@ -131,7 +225,6 @@ export function updateTargets(dt) {
 
 /**
  * 발사체와 과녁 충돌 판정
- * @returns {Array} 명중 결과 [{target, hitDist, score}]
  */
 export function checkHits(projectiles) {
   const results = [];
@@ -140,7 +233,7 @@ export function checkHits(projectiles) {
     const p = projectiles[pi];
     if (!p.alive) continue;
 
-    // 장애물 체크 (관통탄/화살 제외 - 화살은 포물선으로 장애물을 넘음)
+    // 장애물 체크 (관통탄/화살 제외)
     if (!p.special && p.type !== 'arrow') {
       for (const obs of state.obstacles) {
         const dz = Math.abs(p.z - obs.z);
@@ -148,7 +241,6 @@ export function checkHits(projectiles) {
         const dy = Math.abs(p.y - obs.y);
         if (dz < 0.05 && dx < obs.w / 2 && dy < obs.h / 2) {
           p.alive = false;
-          // 장애물 명중 이펙트
           const scr = worldToScreen(p.x, p.y, p.z, state.aimX, state.aimY);
           spawnParticles(scr.sx, scr.sy, 'woodChips', { count: 3 });
           break;
@@ -163,7 +255,7 @@ export function checkHits(projectiles) {
       if (!t.alive) continue;
 
       const dz = Math.abs(p.z - t.z);
-      if (dz > 0.08) continue; // Z 근접해야 판정
+      if (dz > 0.08) continue;
 
       const hitRadius = t.size * 0.15;
       const dx = p.x - t.x;
@@ -171,17 +263,19 @@ export function checkHits(projectiles) {
       const dist = Math.hypot(dx, dy);
 
       if (dist < hitRadius) {
-        // 명중!
-        const hitDist = dist / hitRadius; // 0=정중앙, 1=외곽
+        const hitDist = dist / hitRadius;
         const ringScore = Math.max(1, Math.ceil(10 * (1 - hitDist)));
         const distZone = t.z < 0.4 ? 0 : t.z < 0.7 ? 1 : 2;
         const distMul = DIST_MULTIPLIER[distZone];
 
-        // 화살은 관통 (alive 유지), 총알은 소멸
         if (p.type !== 'arrow') p.alive = false;
         t.alive = false;
 
-        // 명중 자국
+        // 웨이브 카운트 감소 (보급품 제외)
+        if (t.type !== 'supply') {
+          state.waveTargetsLeft = Math.max(0, state.waveTargetsLeft - 1);
+        }
+
         const scr = worldToScreen(t.x, t.y, t.z, state.aimX, state.aimY);
         spawnParticles(scr.sx, scr.sy, 'woodChips');
         spawnParticles(scr.sx, scr.sy, 'hitMarker');
@@ -189,12 +283,14 @@ export function checkHits(projectiles) {
         // 폭발 화살
         if (p.type === 'arrow' && p.special) {
           spawnParticles(scr.sx, scr.sy, 'explosion');
-          // 범위 피해 - 주변 과녁도 제거
           for (const other of state.targets) {
             if (other === t || !other.alive) continue;
             const odist = Math.hypot(other.x - t.x, other.y - t.y);
             if (odist < 0.3 && Math.abs(other.z - t.z) < 0.15) {
               other.alive = false;
+              if (other.type !== 'supply') {
+                state.waveTargetsLeft = Math.max(0, state.waveTargetsLeft - 1);
+              }
               results.push({ target: other, hitDist: 0.5, score: 5 * distMul, type: t.type });
             }
           }
@@ -204,7 +300,6 @@ export function checkHits(projectiles) {
         results.push({ target: t, hitDist, score, type: t.type });
         playTargetHit();
 
-        // 총알은 하나만, 화살은 관통하여 여러 과녁 맞춤
         if (p.type !== 'arrow') break;
       }
     }
@@ -217,13 +312,12 @@ export function checkHits(projectiles) {
  * 과녁 렌더링
  */
 export function drawTargets(ctx, aimX, aimY) {
-  // 장애물 먼저 (뒤에 과녁이 있으면 반투명)
+  // 장애물
   for (const obs of state.obstacles) {
     const scr = worldToScreen(obs.x, obs.y, obs.z, aimX, aimY);
     const w = obs.w * 300 * scr.scale;
     const h = obs.h * 300 * scr.scale;
 
-    // 장애물 뒤에 과녁이 있는지 체크
     let hasTargetBehind = false;
     for (const t of state.targets) {
       if (t.z > obs.z && Math.abs(t.x - obs.x) < obs.w && Math.abs(t.y - obs.y) < obs.h * 1.5) {
@@ -240,7 +334,6 @@ export function drawTargets(ctx, aimX, aimY) {
     ctx.lineWidth = 2 * scr.scale;
     ctx.strokeRect(scr.sx - w / 2, scr.sy - h, w, h);
 
-    // 나무 무늬
     ctx.strokeStyle = 'rgba(90,70,50,0.3)';
     ctx.lineWidth = 1;
     for (let i = 0; i < 3; i++) {
@@ -254,7 +347,7 @@ export function drawTargets(ctx, aimX, aimY) {
     ctx.globalAlpha = 1;
   }
 
-  // 과녁 (깊이순 정렬: 먼 것 먼저)
+  // 과녁 (깊이순)
   const sorted = [...state.targets].sort((a, b) => b.z - a.z);
 
   for (const t of sorted) {
@@ -269,6 +362,36 @@ export function drawTargets(ctx, aimX, aimY) {
   }
 }
 
+/**
+ * 웨이브 배너 그리기 (HUD에서 호출)
+ */
+export function drawWaveBanner(ctx, w, h) {
+  if (state.wave <= 0) return;
+
+  // 웨이브 클리어 배너
+  if (state.waveCleared) {
+    ctx.fillStyle = 'rgba(255,200,100,0.9)';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('WAVE CLEAR!', w / 2, h * 0.35);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '14px monospace';
+    ctx.fillText(`NEXT WAVE...`, w / 2, h * 0.35 + 30);
+    return;
+  }
+
+  // 웨이브 시작 직후 배너 (1.5초간)
+  const firstTarget = state.targets.find(t => t.type !== 'supply');
+  if (firstTarget && firstTarget.time < 1.5) {
+    const alpha = Math.max(0, 1 - firstTarget.time / 1.5);
+    ctx.fillStyle = `rgba(255,200,100,${alpha})`;
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`WAVE ${state.wave}`, w / 2, h * 0.35);
+  }
+}
+
 function drawTargetCircle(ctx, x, y, r, target) {
   const colors = {
     normal: ['#f5e6c8', '#d4341b', '#f5e6c8', '#d4341b', '#d4341b'],
@@ -280,19 +403,14 @@ function drawTargetCircle(ctx, x, y, r, target) {
   const rings = colors[target.type] || colors.normal;
   const ringCount = 5;
 
-  // 보너스: 깜빡임
   if (target.type === 'bonus') {
     const blink = Math.sin(target.time * 8) > 0;
-    if (!blink) {
-      ctx.globalAlpha = 0.5;
-    }
+    if (!blink) ctx.globalAlpha = 0.5;
   }
 
-  // 과녁 받침대
   ctx.fillStyle = '#5a3a1a';
   ctx.fillRect(x - 3, y, 6, r * 1.5);
 
-  // 과녁 링
   for (let i = 0; i < ringCount; i++) {
     const ringR = r * (1 - i / ringCount);
     ctx.fillStyle = rings[i];
@@ -304,7 +422,6 @@ function drawTargetCircle(ctx, x, y, r, target) {
     ctx.stroke();
   }
 
-  // 금색 반짝임
   if (target.type === 'gold') {
     const sparkle = Math.sin(target.time * 5) * 0.3 + 0.7;
     ctx.fillStyle = `rgba(255,255,200,${sparkle * 0.3})`;
@@ -319,7 +436,6 @@ function drawTargetCircle(ctx, x, y, r, target) {
 function drawSupply(ctx, x, y, r, target) {
   const boxSize = r * 1.2;
 
-  // 낙하산
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.beginPath();
   ctx.moveTo(x - boxSize, y - boxSize * 1.5);
@@ -330,7 +446,6 @@ function drawSupply(ctx, x, y, r, target) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // 줄
   ctx.strokeStyle = 'rgba(180,180,180,0.5)';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -340,14 +455,12 @@ function drawSupply(ctx, x, y, r, target) {
   ctx.lineTo(x + boxSize * 0.3, y - boxSize * 0.3);
   ctx.stroke();
 
-  // 상자
   ctx.fillStyle = '#6a5a3a';
   ctx.fillRect(x - boxSize * 0.4, y - boxSize * 0.4, boxSize * 0.8, boxSize * 0.8);
   ctx.strokeStyle = '#8a7a5a';
   ctx.lineWidth = 2;
   ctx.strokeRect(x - boxSize * 0.4, y - boxSize * 0.4, boxSize * 0.8, boxSize * 0.8);
 
-  // + 마크
   ctx.strokeStyle = '#cc0000';
   ctx.lineWidth = 3;
   const s = boxSize * 0.2;
@@ -357,9 +470,4 @@ function drawSupply(ctx, x, y, r, target) {
   ctx.moveTo(x, y - s);
   ctx.lineTo(x, y + s);
   ctx.stroke();
-
-  // 흔들림 효과
-  const sway = Math.sin(target.time * 3) * 3;
-  ctx.translate(sway, 0);
-  ctx.translate(-sway, 0);
 }

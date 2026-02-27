@@ -1,5 +1,5 @@
 // ── 사격장 배경 렌더링 + 원근감 ──
-import { W, RANGE_TOP, RANGE_BOTTOM, state } from './game.js?v=3';
+import { W, RANGE_TOP, RANGE_BOTTOM, state } from './game.js?v=4';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2; // 소실점 X

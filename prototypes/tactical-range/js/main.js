@@ -1,19 +1,19 @@
 // ── Tactical Range - 메인 게임 루프 ──
-import { W, H, state, isGameOver } from './game.js?v=3';
-import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=3';
-import { drawRange, drawCrosshair } from './renderer.js?v=3';
-import { initPistol, drawPistol } from './pistol.js?v=3';
-import { initBow, drawBow } from './bow.js?v=3';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=3';
-import { updateTargets, checkHits, drawTargets } from './targets.js?v=3';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=3';
-import { updateParticles, drawParticles } from './particles.js?v=3';
+import { W, H, state, isGameOver } from './game.js?v=4';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=4';
+import { drawRange, drawCrosshair } from './renderer.js?v=4';
+import { initPistol, drawPistol } from './pistol.js?v=4';
+import { initBow, drawBow } from './bow.js?v=4';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=4';
+import { updateTargets, checkHits, drawTargets, drawWaveBanner } from './targets.js?v=4';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=4';
+import { updateParticles, drawParticles } from './particles.js?v=4';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=3';
-import { playCombo } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+} from './hud.js?v=4';
+import { playCombo } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -57,7 +57,7 @@ function update(dt, realDt) {
   if (state.screen !== 'playing') return;
 
   state.time += dt;
-  state.difficulty = Math.min(state.time / 180, 1);
+  state.difficulty = Math.min(state.wave / 20, 1);
 
   // 조이스틱 기반 조준
   updateJoystick(dt);
@@ -153,6 +153,9 @@ function draw() {
 
   // 십자선
   drawCrosshair(ctx);
+
+  // 웨이브 배너
+  drawWaveBanner(ctx, W, H);
 
   // 슬로모션 오버레이
   if (state.slowMo) {
