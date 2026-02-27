@@ -133,13 +133,22 @@ function startWave() {
 }
 
 /**
- * 단일 위치 생성 (기존 과녁과 겹치지 않게)
+ * 웨이브에 따른 최대 거리 계산
+ * wave 1: 0.4, wave 5: 0.54, wave 10: 0.71, wave 16+: 0.9 (캡)
+ */
+function getMaxZ() {
+  return Math.min(0.9, 0.35 + state.wave * 0.035);
+}
+
+/**
+ * 단일 위치 생성 (기존 과녁과 겹치지 않게, 웨이브에 따라 거리 스케일링)
  */
 function generateOnePosition() {
+  const maxZ = getMaxZ();
   let x, y, z;
   let tries = 0;
   do {
-    z = 0.2 + Math.random() * 0.7;
+    z = 0.2 + Math.random() * (maxZ - 0.2);
     x = (Math.random() - 0.5) * 1.4;
     y = (Math.random() - 0.5) * 0.5;
     let ok = true;
@@ -190,7 +199,7 @@ function spawnSupply() {
     type: 'supply',
     x: (Math.random() - 0.5) * 1.0,
     y: -0.8,
-    z: 0.3 + Math.random() * 0.3,
+    z: 0.2 + Math.random() * Math.max(0.1, getMaxZ() - 0.3),
     size: 1,
     moveSpeed: 0, moveDir: 1, moveRange: 0, originX: 0,
     fallSpeed: 0.15, originY: -0.8,
@@ -199,7 +208,8 @@ function spawnSupply() {
 }
 
 function spawnObstacle() {
-  const z = 0.3 + Math.random() * 0.4;
+  const maxZ = getMaxZ();
+  const z = 0.3 + Math.random() * Math.max(0.1, maxZ - 0.4);
   const x = (Math.random() - 0.5) * 1.2;
   state.obstacles.push({
     x, y: 0, z,
@@ -217,8 +227,9 @@ function spawnObstacle() {
  * 화살은 포물선으로 벽을 넘어서 맞출 수 있음
  */
 function spawnWalledTarget(config) {
-  // 벽 위치: 중간~먼 거리 (화살이 넘을 수 있도록)
-  const wallZ = 0.3 + Math.random() * 0.3;
+  // 벽 위치: 웨이브에 따른 거리 스케일링
+  const maxZ = getMaxZ();
+  const wallZ = 0.3 + Math.random() * Math.max(0.1, maxZ - 0.4);
   const wallX = (Math.random() - 0.5) * 1.0;
 
   // 벽 생성 (넓고 높은 전용 벽)
