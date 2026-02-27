@@ -39,12 +39,20 @@ function crosshairWorldAt(z, aimX, aimY) {
 export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
   const start = crosshairWorldAt(0, aimX, aimY);
 
+  // 총알 확산: 약간의 랜덤 오차 (멀수록 벌어짐)
+  let spreadX = 0, spreadY = 0;
+  if (type === 'bullet') {
+    const spread = 0.015; // 확산 정도
+    spreadX = (Math.random() - 0.5) * spread;
+    spreadY = (Math.random() - 0.5) * spread;
+  }
+
   const proj = {
     type,
     special,
     // 발사 시점의 조준 방향 기록 (깊이별 위치 계산용)
-    firedAimX: aimX,
-    firedAimY: aimY,
+    firedAimX: aimX + spreadX,
+    firedAimY: aimY + spreadY,
     x: start.x,
     y: start.y,
     z: 0,

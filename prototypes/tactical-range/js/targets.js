@@ -386,7 +386,9 @@ export function checkHits(projectiles) {
       const dz = Math.abs(p.z - t.z);
       if (dz > 0.08) continue;
 
-      const hitRadius = t.size * 0.15;
+      // 먼 거리 타겟 히트박스 보정: z가 클수록 약간 넓어짐
+      const distBonus = 1 + t.z * 0.4; // z=0: 1.0x, z=0.5: 1.2x, z=1: 1.4x
+      const hitRadius = t.size * 0.15 * distBonus;
       const dx = p.x - t.x;
       const dy = p.y - t.y;
       const dist = Math.hypot(dx, dy);
