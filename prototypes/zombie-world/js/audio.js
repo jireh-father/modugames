@@ -329,3 +329,40 @@ export function playWeaponSwitch() {
   tone(500, 0.03, 'triangle', 0.1);
   setTimeout(() => tone(700, 0.03, 'triangle', 0.1), 30);
 }
+
+// ── 좀비 사운드 ──
+export function playZombieGroan() {
+  // 낮은 주파수 톱니파 스윕: 80→60 Hz, 0.5초, 낮은 음량
+  sweep(80, 60, 0.5, 'sawtooth', 0.08);
+}
+
+export function playZombieHit() {
+  // 짧은 노이즈 버스트: 0.05초, 밴드패스 필터 800Hz
+  noise(0.05, 0.25, 800);
+}
+
+export function playZombieDeath() {
+  // 하강 톤: 200→50 Hz 사인파, 0.3초, 빠른 페이드
+  sweep(200, 50, 0.3, 'sine', 0.2);
+}
+
+export function playTowerHit() {
+  // 금속 쨍 소리: 800Hz 사인파 + 빠른 감쇠, 0.15초
+  tone(800, 0.15, 'sine', 0.25);
+  tone(1200, 0.08, 'triangle', 0.1);
+}
+
+export function playMineExplosion() {
+  // 폭발: 노이즈 + 사인파 스윕 200→50, 0.5초, 큰 음량
+  noise(0.5, 0.6, 1500);
+  sweep(200, 50, 0.5, 'sine', 0.4);
+  tone(40, 0.4, 'square', 0.3);
+  setTimeout(() => noise(0.3, 0.3, 600), 80);
+}
+
+export function playDayComplete() {
+  // 승리 징글: C5, E5, G5 3음 상승, 각 0.15초
+  tone(523, 0.15, 'sine', 0.18);                    // C5
+  setTimeout(() => tone(659, 0.15, 'sine', 0.18), 150); // E5
+  setTimeout(() => tone(784, 0.2, 'sine', 0.22), 300);  // G5
+}
