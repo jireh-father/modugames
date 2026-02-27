@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=4';
-import { worldToScreen } from './renderer.js?v=4';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=4';
-import { spawnParticles } from './particles.js?v=4';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=5';
+import { worldToScreen } from './renderer.js?v=5';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=5';
+import { spawnParticles } from './particles.js?v=5';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
@@ -10,22 +10,71 @@ const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
 let supplyTimer = 0;
 
 /**
- * 웨이브 설계: 웨이브 번호에 따라 과녁 구성 결정
+ * 웨이브 난이도 패턴 (무한 스케일링)
+ *
+ * 5웨이브 단위 사이클:
+ *   x1: 워밍업 - normal만, 적은 수
+ *   x2: 스피드 - fast 등장
+ *   x3: 보너스 - gold + bonus 등장
+ *   x4: 장애물 - 장애물 추가
+ *   x5: 보스웨이브 - 전부 많이 + 작은 과녁
+ *
+ * 사이클 반복하며 기본 수치가 올라감
  */
 function getWaveConfig(wave) {
-  const w = wave; // 1-based
+  const w = wave;
+  const cycle = Math.floor((w - 1) / 5);  // 0, 1, 2, ... (사이클 번호)
+  const phase = ((w - 1) % 5) + 1;        // 1~5 (사이클 내 페이즈)
 
-  // 기본 과녁 수: 2개에서 시작, 점점 증가
-  let normals = Math.min(2 + Math.floor(w / 2), 6);
-  let fasts = w >= 3 ? Math.min(Math.floor((w - 2) / 2), 3) : 0;
-  let golds = w >= 2 && w % 3 === 0 ? 1 : 0;
-  let bonuses = w >= 4 && w % 2 === 0 ? 1 : 0;
-  let obstacles = w >= 4 ? Math.min(Math.floor((w - 3) / 2), 3) : 0;
+  // 기본 수치: 사이클마다 증가
+  const baseCount = 2 + cycle;             // 2, 3, 4, 5...
+  const baseSpeed = 0.15 + cycle * 0.12;   // 0.15, 0.27, 0.39...
+  const baseSizeScale = Math.max(0.4, 1 - cycle * 0.08); // 1.0, 0.92, 0.84...
 
-  // 과녁 크기 축소 (웨이브 올라갈수록)
-  const sizeScale = Math.max(0.5, 1 - (w - 1) * 0.04);
-  // 이동 속도 증가
-  const moveSpeed = Math.min(0.1 + w * 0.08, 1.0);
+  let normals = 0, fasts = 0, golds = 0, bonuses = 0, obstacles = 0;
+  let sizeScale = baseSizeScale;
+  let moveSpeed = baseSpeed;
+
+  switch (phase) {
+    case 1: // 워밍업
+      normals = baseCount;
+      moveSpeed *= 0.5;
+      break;
+    case 2: // 스피드
+      normals = Math.max(1, baseCount - 1);
+      fasts = 1 + Math.floor(cycle / 2);
+      moveSpeed *= 1.3;
+      break;
+    case 3: // 보너스
+      normals = baseCount;
+      golds = 1;
+      bonuses = cycle >= 1 ? 1 : 0;
+      break;
+    case 4: // 장애물
+      normals = baseCount;
+      fasts = Math.min(1 + cycle, 3);
+      obstacles = 1 + Math.min(cycle, 3);
+      break;
+    case 5: // 보스웨이브
+      normals = baseCount + 1;
+      fasts = 1 + Math.floor(cycle / 2);
+      golds = 1;
+      bonuses = 1;
+      obstacles = Math.min(cycle, 3);
+      sizeScale *= 0.85;
+      moveSpeed *= 1.2;
+      break;
+  }
+
+  // 총 과녁 캡: 최대 10개
+  const total = normals + fasts + golds + bonuses;
+  if (total > 10) {
+    normals = Math.max(1, normals - (total - 10));
+  }
+
+  // 속도/크기 캡
+  moveSpeed = Math.min(moveSpeed, 1.5);
+  sizeScale = Math.max(sizeScale, 0.35);
 
   return { normals, fasts, golds, bonuses, obstacles, sizeScale, moveSpeed };
 }

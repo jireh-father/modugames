@@ -1,6 +1,6 @@
 // ── 조이스틱 조준 시스템 ──
-import { state, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=4';
-import { registerZone } from './input.js?v=4';
+import { state, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=5';
+import { registerZone } from './input.js?v=5';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
