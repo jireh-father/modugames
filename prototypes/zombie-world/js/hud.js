@@ -1,8 +1,8 @@
-// ── HUD + 무기 교체 + 게임 화면 ──
+// ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
 import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=1';
 import { registerZone } from './input.js?v=1';
 import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=1';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=1';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=1';
 import { openSettings } from './settings.js?v=1';
 
 let gameOverTriggered = false;
@@ -45,7 +45,6 @@ export function initHUD() {
     { x: 0, y: 0, w: W, h: H },
     {
       onStart() {
-        // paused 상태가 아니면 이 핸들러를 건너뛰고 다음 핸들러로
         if (state.screen !== 'paused') return false;
       },
       onTap(x, y) {
@@ -95,7 +94,7 @@ export function initHUD() {
   registerZone(
     { x: 0, y: CONTROLS_TOP, w: W, h: SLOT_H },
     {
-      onTap(x, y) {
+      onTap(x, _y) {
         if (state.screen !== 'playing') return;
         const prev = state.currentWeapon;
         const idx = Math.min(WEAPONS.length - 1, Math.floor(x / slotW));
@@ -115,44 +114,35 @@ export function drawHUD(ctx) {
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(0, 0, W, HUD_H);
 
-  // 점수
+  // 점수 (좌측)
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 20px monospace';
   ctx.textAlign = 'left';
   ctx.fillText(`${state.score}`, 10, 32);
 
-  // 웨이브 + 남은 과녁 + 타이머
-  if (state.wave > 0 && !state.waveCleared) {
+  // Day / Wave 정보 (중앙)
+  if (state.wave > 0) {
+    const waveInDay = ((state.wave - 1) % 5) + 1;
+    const zombieCount = state.zombies.filter(z => z.alive).length + state.waveSpawnQueue.length;
+    const icon = state.isNight ? '\uD83C\uDF19' : '\u2600';
+
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#c0a060';
+    ctx.fillStyle = state.isNight ? '#8888cc' : '#c0a060';
     ctx.font = 'bold 12px monospace';
-    const remaining = state.targets.filter(t => t.alive && t.type !== 'supply').length;
-    const queueLeft = state.waveSpawnQueue.filter(q => q.type !== 'supply').length;
-    ctx.fillText(`WAVE ${state.wave}  ×${remaining + queueLeft}`, W / 2, 20);
-
-    // 타이머 바
-    const timeLeft = Math.max(0, state.waveTimeLimit - state.waveTimer);
-    const ratio = timeLeft / state.waveTimeLimit;
-    const barW = 120;
-    const barX = W / 2 - barW / 2;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(barX, 26, barW, 5);
-    ctx.fillStyle = ratio > 0.5 ? '#4f4' : ratio > 0.25 ? '#fa4' : '#f44';
-    ctx.fillRect(barX, 26, barW * ratio, 5);
+    ctx.fillText(`Day ${state.day} - W${waveInDay} ${icon}  x${zombieCount}`, W / 2, 20);
   }
 
-  // 콤보
-  ctx.textAlign = 'left';
+  // 콤보 (중앙 아래)
   if (state.combo > 1) {
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#ffdd44';
-    ctx.font = 'bold 14px monospace';
-    ctx.fillText(`×${state.combo} COMBO`, 120, 30);
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText(`x${state.combo} COMBO`, W / 2, 36);
   }
 
-  // 탄약 현황 (오른쪽)
+  // 탄약 현황 (우측)
   const totalAmmo = getTotalAmmo();
   const lowAmmo = totalAmmo <= 3;
-
   ctx.textAlign = 'right';
 
   if (lowAmmo && Math.sin(state.time * 8) > 0) {
@@ -161,14 +151,20 @@ export function drawHUD(ctx) {
     ctx.fillStyle = '#aaa';
   }
   ctx.font = '12px monospace';
+  ctx.fillText(`AMMO:${totalAmmo}`, W - 10, 18);
 
-  const ammo = getTotalAmmo();
-  ctx.fillText(`AMMO:${ammo}`, W - 10, 22);
-
-  // 하이스코어 (점수 + 웨이브)
+  // 타워 HP 미니바 (우측)
+  const hpRatio = Math.max(0, state.tower.hp / state.tower.maxHp);
+  const barX = W - 75;
+  const barW = 60;
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(barX, 24, barW, 5);
+  ctx.fillStyle = hpRatio > 0.5 ? '#44ff44' : hpRatio > 0.25 ? '#ffff44' : '#ff4444';
+  ctx.fillRect(barX, 24, barW * hpRatio, 5);
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = '10px monospace';
-  ctx.fillText(`BEST: ${state.bestScore} W${state.bestWave}`, W - 10, 38);
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('TOWER', W - 10, 38);
 
   // 자이로 상태
   if (isGyroEnabled()) {
@@ -242,20 +238,20 @@ export function drawControlsBg(ctx) {
  */
 export function drawTitle(ctx) {
   // 배경
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#0a0808';
   ctx.fillRect(0, 0, W, H);
 
   // 제목
-  ctx.fillStyle = '#c0a060';
-  ctx.font = 'bold 40px monospace';
+  ctx.fillStyle = '#880000';
+  ctx.font = 'bold 42px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('TACTICAL', W / 2, H * 0.3);
-  ctx.fillText('RANGE', W / 2, H * 0.3 + 48);
+  ctx.fillText('ZOMBIE', W / 2, H * 0.28);
+  ctx.fillText('WORLD', W / 2, H * 0.28 + 50);
 
   // 부제
-  ctx.fillStyle = '#888';
-  ctx.font = '14px monospace';
-  ctx.fillText('리얼 조작감 사격장 서바이벌', W / 2, H * 0.3 + 90);
+  ctx.fillStyle = '#ddd';
+  ctx.font = '16px monospace';
+  ctx.fillText('\uC131\uBCBD\uC744 \uC9C0\uCF1C\uB77C', W / 2, H * 0.28 + 90);
 
   // 시작 안내
   const alpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
@@ -278,13 +274,13 @@ export function drawTitle(ctx) {
   // 무기 미리보기
   ctx.fillStyle = '#555';
   ctx.font = '11px monospace';
-  ctx.fillText('권총 | 활 | 저격총 | 기관총 | 석궁', W / 2, H * 0.82);
+  ctx.fillText('\uAD8C\uCD1D | \uD65C | \uC800\uACA9\uCD1D | \uAE30\uAD00\uCD1D | \uC11D\uAD81', W / 2, H * 0.82);
 
   // 설정 버튼
   ctx.fillStyle = '#555';
   ctx.font = '14px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('⚙ SETTINGS', W / 2, H * 0.92);
+  ctx.fillText('\u2699 SETTINGS', W / 2, H * 0.92);
 }
 
 /**
@@ -296,7 +292,7 @@ export function drawPauseMenu(ctx) {
   ctx.fillRect(0, 0, W, H);
 
   // PAUSED
-  ctx.fillStyle = '#c0a060';
+  ctx.fillStyle = '#880000';
   ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
   ctx.fillText('PAUSED', W / 2, H * 0.28);
@@ -304,7 +300,7 @@ export function drawPauseMenu(ctx) {
   // 현재 점수/웨이브 표시
   ctx.fillStyle = '#888';
   ctx.font = '14px monospace';
-  ctx.fillText(`SCORE: ${state.score}  |  WAVE ${state.wave}`, W / 2, H * 0.34);
+  ctx.fillText(`SCORE: ${state.score}  |  Day ${state.day} W${((state.wave - 1) % 5) + 1}`, W / 2, H * 0.34);
 
   // 메뉴 버튼들
   const buttons = [
@@ -318,7 +314,6 @@ export function drawPauseMenu(ctx) {
     const by = MENU_Y_START + i * MENU_GAP;
     const bx = W / 2 - MENU_BTN_W / 2;
 
-    // 버튼 배경
     ctx.fillStyle = buttons[i].color;
     ctx.beginPath();
     if (ctx.roundRect) {
@@ -328,9 +323,9 @@ export function drawPauseMenu(ctx) {
     }
     ctx.fill();
 
-    // 버튼 텍스트
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'center';
     ctx.fillText(buttons[i].label, W / 2, by + 33);
   }
 }
@@ -339,40 +334,40 @@ export function drawPauseMenu(ctx) {
  * 게임 오버 화면
  */
 export function drawGameOver(ctx) {
-  // 축하 타이머 갱신
   congratsTimer += 0.016;
 
   // 반투명 오버레이
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(0, 0, W, H);
 
-  // GAME OVER
+  // TOWER DESTROYED
   ctx.fillStyle = '#cc3333';
-  ctx.font = 'bold 36px monospace';
+  ctx.font = 'bold 32px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('GAME OVER', W / 2, H * 0.25);
+  ctx.fillText('TOWER', W / 2, H * 0.22);
+  ctx.fillText('DESTROYED', W / 2, H * 0.22 + 38);
 
   // 점수
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 28px monospace';
-  ctx.fillText(`${state.score}`, W / 2, H * 0.35);
+  ctx.fillText(`${state.score}`, W / 2, H * 0.37);
   ctx.fillStyle = '#aaa';
   ctx.font = '14px monospace';
-  ctx.fillText('SCORE', W / 2, H * 0.35 + 22);
+  ctx.fillText('SCORE', W / 2, H * 0.37 + 22);
 
-  // 웨이브 + 최대 콤보
+  // Day / Wave 도달
   ctx.fillStyle = '#c0a060';
-  ctx.font = 'bold 20px monospace';
-  ctx.fillText(`WAVE ${state.wave}`, W / 2, H * 0.45);
+  ctx.font = 'bold 18px monospace';
+  ctx.fillText(`Day ${state.day} - Wave ${((state.wave - 1) % 5) + 1}`, W / 2, H * 0.46);
 
+  // 최대 콤보
   ctx.fillStyle = '#ffdd44';
   ctx.font = 'bold 16px monospace';
-  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.50);
+  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.51);
 
-  // 기록 표시 (점수 기록 + 웨이브 기록 따로)
-  let recordY = H * 0.56;
+  // 기록 표시
+  let recordY = H * 0.57;
 
-  // 점수 기록
   if (newBestScore) {
     const flash = 0.7 + Math.sin(congratsTimer * 6) * 0.3;
     ctx.fillStyle = `rgba(255,68,68,${flash})`;
@@ -385,7 +380,6 @@ export function drawGameOver(ctx) {
   }
   recordY += 24;
 
-  // 웨이브 기록
   if (newBestWave) {
     const flash = 0.7 + Math.sin(congratsTimer * 6 + 1) * 0.3;
     ctx.fillStyle = `rgba(255,170,68,${flash})`;
@@ -398,7 +392,6 @@ export function drawGameOver(ctx) {
   }
   recordY += 24;
 
-  // 둘 다 갱신 시 축하 메시지
   if (newBestScore && newBestWave) {
     const bigFlash = 0.6 + Math.sin(congratsTimer * 4) * 0.4;
     ctx.fillStyle = `rgba(255,215,0,${bigFlash})`;
@@ -410,7 +403,7 @@ export function drawGameOver(ctx) {
   const alpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
   ctx.fillStyle = `rgba(255,200,100,${alpha})`;
   ctx.font = 'bold 18px monospace';
-  ctx.fillText('TAP TO RETRY', W / 2, H * 0.78);
+  ctx.fillText('TAP TO RESTART', W / 2, H * 0.78);
 }
 
 /**
@@ -420,18 +413,18 @@ export function triggerGameOver() {
   if (gameOverTriggered) return;
   gameOverTriggered = true;
 
-  // 점수 기록
+  // 점수 기록 (zw_ prefix)
   newBestScore = state.score > state.bestScore;
   if (newBestScore) {
     state.bestScore = state.score;
-    localStorage.setItem('tr_best', String(state.score));
+    localStorage.setItem('zw_best', String(state.score));
   }
 
   // 웨이브 기록
   newBestWave = state.wave > state.bestWave;
   if (newBestWave) {
     state.bestWave = state.wave;
-    localStorage.setItem('tr_best_wave', String(state.wave));
+    localStorage.setItem('zw_best_wave', String(state.wave));
   }
 
   congratsTimer = 0;
@@ -456,7 +449,7 @@ export function initScreenHandlers() {
             openSettings();
             return;
           }
-          requestGyro(); // iOS 사용자 제스처 내에서 권한 요청
+          requestGyro();
           resetGyroRef();
           resetGame();
           playStart();
@@ -469,6 +462,6 @@ export function initScreenHandlers() {
         }
       },
     },
-    -1 // 가장 낮은 우선순위
+    -1
   );
 }
