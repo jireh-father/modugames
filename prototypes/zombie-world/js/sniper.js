@@ -1,9 +1,9 @@
 // ── 저격총 시스템: 볼트액션 + 스코프 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=6';
-import { registerZone } from './input.js?v=6';
-import { fireProjectile } from './projectiles.js?v=6';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=6';
-import { spawnParticles } from './particles.js?v=6';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=7';
+import { registerZone } from './input.js?v=7';
+import { fireProjectile } from './projectiles.js?v=7';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=7';
+import { spawnParticles } from './particles.js?v=7';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -143,7 +143,7 @@ export function drawScopeOverlay(ctx) {
   if (s.scopeZoom <= 0) return;
 
   const alpha = s.scopeZoom;
-  const tx = W / 2, ty = TOWER_Y;
+  const tx = state.tower.x, ty = TOWER_Y;
   const dx = Math.cos(state.aimAngle);
   const dy = -Math.sin(state.aimAngle); // canvas Y is inverted
   const lineLen = 800;

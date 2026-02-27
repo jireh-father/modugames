@@ -1,6 +1,6 @@
 // ── 좀비 시스템 (8종 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y } from './game.js?v=6';
-import { getWallY, getWallSegments } from './wall.js?v=6';
+import { W, state, WALL_Y, TOWER_Y } from './game.js?v=7';
+import { getWallY, getWallSegments } from './wall.js?v=7';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -80,7 +80,7 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
 
 // ── 좀비 업데이트 ──
 function updateZombies(dt) {
-  const TOWER_X = W / 2;
+  const TOWER_X = state.tower.x;
 
   for (let i = state.zombies.length - 1; i >= 0; i--) {
     const z = state.zombies[i];

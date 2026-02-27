@@ -1,7 +1,5 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, TOWER_Y } from './game.js?v=6';
-
-const TOWER_X = W / 2;
+import { state, W, TOWER_Y } from './game.js?v=7';
 
 /**
  * 발사체 생성
@@ -42,7 +40,7 @@ export function fireProjectile(type, aimAngle, special = false, power = 1) {
   const proj = {
     type,
     special,
-    x: TOWER_X,
+    x: state.tower.x,
     y: TOWER_Y,
     dx: fdx,
     dy: fdy,

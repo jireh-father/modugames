@@ -87,7 +87,7 @@ export const state = {
   ],
 
   // 타워
-  tower: { hp: 200, maxHp: 200 },
+  tower: { hp: 200, maxHp: 200, x: W / 2 },
 
   // 낮/밤
   day: 1,
@@ -162,7 +162,7 @@ export function resetGame() {
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
   ];
-  state.tower = { hp: 200, maxHp: 200 };
+  state.tower = { hp: 200, maxHp: 200, x: W / 2 };
   state.day = 1;
   state.isNight = false;
   state.nightDarkness = 0;

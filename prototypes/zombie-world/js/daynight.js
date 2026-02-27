@@ -1,7 +1,5 @@
 // ── 낮/밤 사이클 & 손전등 효과 ──
-import { W, H, state, TOWER_Y } from './game.js?v=6';
-
-const TOWER_X = W / 2;
+import { W, H, state, TOWER_Y } from './game.js?v=7';
 
 /**
  * 낮/밤 상태 업데이트
@@ -42,23 +40,23 @@ export function drawNightOverlay(ctx) {
 
   ctx.globalCompositeOperation = 'destination-out';
 
-  const grad = ctx.createRadialGradient(TOWER_X, TOWER_Y, 0, TOWER_X, TOWER_Y, coneLen);
+  const grad = ctx.createRadialGradient(state.tower.x, TOWER_Y, 0, state.tower.x, TOWER_Y, coneLen);
   grad.addColorStop(0, `rgba(0,0,0,${darkness * 0.9})`);
   grad.addColorStop(0.7, `rgba(0,0,0,${darkness * 0.5})`);
   grad.addColorStop(1, 'rgba(0,0,0,0)');
 
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.moveTo(TOWER_X, TOWER_Y);
+  ctx.moveTo(state.tower.x, TOWER_Y);
 
   const leftAngle = state.aimAngle + coneAngle;
   const rightAngle = state.aimAngle - coneAngle;
   ctx.lineTo(
-    TOWER_X + Math.cos(leftAngle) * coneLen,
+    state.tower.x + Math.cos(leftAngle) * coneLen,
     TOWER_Y - Math.sin(leftAngle) * coneLen
   );
   ctx.lineTo(
-    TOWER_X + Math.cos(rightAngle) * coneLen,
+    state.tower.x + Math.cos(rightAngle) * coneLen,
     TOWER_Y - Math.sin(rightAngle) * coneLen
   );
   ctx.closePath();

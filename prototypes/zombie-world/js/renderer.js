@@ -1,5 +1,5 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=6';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=7';
 
 /**
  * 필드 배경 그리기 (탑다운 2D)
@@ -68,7 +68,7 @@ export function drawField(ctx) {
  * 발사선 그리기 (타워에서 조준 방향으로 점선)
  */
 export function drawFiringLine(ctx) {
-  const tx = W / 2, ty = TOWER_Y;
+  const tx = state.tower.x, ty = TOWER_Y;
   const dx = Math.cos(state.aimAngle);
   const dy = -Math.sin(state.aimAngle); // canvas Y is down
   const lineLen = 600; // extends past top of screen

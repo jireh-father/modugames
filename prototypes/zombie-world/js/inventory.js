@@ -1,10 +1,10 @@
 // ── 인벤토리 바 UI + 드래그 사용 시스템 ──
-import { state, W, CONTROLS_TOP, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=6';
-import { registerZone } from './input.js?v=6';
-import { useInventoryItem } from './items.js?v=6';
-import { drawItemIcon } from './items.js?v=6';
-import { playItemPickup } from './audio.js?v=6';
-import { spawnParticles } from './particles.js?v=6';
+import { state, W, CONTROLS_TOP, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=7';
+import { registerZone } from './input.js?v=7';
+import { useInventoryItem } from './items.js?v=7';
+import { drawItemIcon } from './items.js?v=7';
+import { playItemPickup } from './audio.js?v=7';
+import { spawnParticles } from './particles.js?v=7';
 
 // ── 레이아웃 상수 ──
 const BAR_Y = CONTROLS_TOP + SLOT_H;       // 아이템 바 시작 Y (무기 슬롯 바로 아래)
@@ -222,22 +222,23 @@ export function drawInventoryDragOverlay(ctx) {
     }
     case 'medkit': {
       // 타워 영역 하이라이트
+      const towerX = state.tower.x;
       ctx.strokeStyle = 'rgba(255,68,68,0.7)';
       ctx.lineWidth = 3;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.arc(W / 2, TOWER_Y, 40, 0, Math.PI * 2);
+      ctx.arc(towerX, TOWER_Y, 40, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(255,68,68,0.15)';
       ctx.beginPath();
-      ctx.arc(W / 2, TOWER_Y, 40, 0, Math.PI * 2);
+      ctx.arc(towerX, TOWER_Y, 40, 0, Math.PI * 2);
       ctx.fill();
       // 라벨
       ctx.fillStyle = 'rgba(255,68,68,0.8)';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('HP 회복', W / 2, TOWER_Y - 48);
+      ctx.fillText('HP 회복', towerX, TOWER_Y - 48);
       break;
     }
     case 'mine':
