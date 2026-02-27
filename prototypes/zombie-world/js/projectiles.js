@@ -1,87 +1,67 @@
-// ── 발사체 시스템 (탄환 + 화살) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=1';
-import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=1';
+// ── 2D 탑다운 발사체 시스템 ──
+import { state, W, TOWER_Y } from './game.js?v=1';
 
-const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
-const VP_X = W / 2;
-const VP_Y = RANGE_TOP + RANGE_H * 0.15;
-const CENTER_SX = W / 2;
-const CENTER_SY = (RANGE_TOP + RANGE_BOTTOM) / 2;
-
-/**
- * 깊이 z에서 십자선 화면 좌표에 대응하는 월드 (x, y) 계산
- * 월드는 고정(aim=0), 십자선이 화면 위를 이동하는 방식의 역변환
- * worldToScreen(x, y, z, 0, 0) = (sx, sy) 의 역함수
- */
-function crosshairWorldAt(z, aimX, aimY) {
-  const p = 1 - z * 0.85;
-  // 십자선의 화면 좌표
-  const sx = CENTER_SX + aimX * AIM_RANGE_X;
-  const sy = CENTER_SY + aimY * AIM_RANGE_Y;
-
-  // worldToScreen(x, y, z, 0, 0):
-  //   sx = VP_X + (x * W/2) * p
-  //   sy = VP_Y + RANGE_H*0.7*(1-z) + (y * RANGE_H*0.3) * p
-  const wx = (sx - VP_X) / (W / 2 * p);
-  const wy = (sy - VP_Y - RANGE_H * 0.7 * (1 - z)) / (RANGE_H * 0.3 * p);
-
-  return { x: wx, y: wy };
-}
+const TOWER_X = W / 2;
 
 /**
  * 발사체 생성
  * @param {string} type - 'bullet' | 'arrow' | 'sniper' | 'mgBullet' | 'bolt'
- * @param {number} aimX - 조준 X (-1~1)
- * @param {number} aimY - 조준 Y (-1~1)
+ * @param {number} aimAngle - 조준 각도 (라디안)
  * @param {boolean} special - 관통탄/폭발화살 여부
- * @param {number} power - 화살 파워 (0~1, 총알은 무시)
+ * @param {number} power - 화살/볼트 파워 (0~1)
  */
-export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
-  const start = crosshairWorldAt(0, aimX, aimY);
+export function fireProjectile(type, aimAngle, special = false, power = 1) {
+  // Spread as angle offset
+  let spreadAngle = 0;
+  if (type === 'bullet') spreadAngle = (Math.random() - 0.5) * 0.03;
+  else if (type === 'mgBullet') spreadAngle = (Math.random() - 0.5) * 0.06;
+  else if (type === 'sniper') spreadAngle = (Math.random() - 0.5) * 0.006;
 
-  // 확산 설정
-  let spreadX = 0, spreadY = 0;
-  if (type === 'bullet') {
-    const spread = 0.015;
-    spreadX = (Math.random() - 0.5) * spread;
-    spreadY = (Math.random() - 0.5) * spread;
-  } else if (type === 'mgBullet') {
-    const spread = 0.025;
-    spreadX = (Math.random() - 0.5) * spread;
-    spreadY = (Math.random() - 0.5) * spread;
-  } else if (type === 'sniper') {
-    const spread = 0.003;
-    spreadX = (Math.random() - 0.5) * spread;
-    spreadY = (Math.random() - 0.5) * spread;
-  }
+  const finalAngle = aimAngle + spreadAngle;
+  const fdx = Math.cos(finalAngle);
+  const fdy = -Math.sin(finalAngle); // canvas Y is inverted
 
-  // 속도 설정
-  let vz = 3.0;
-  if (type === 'arrow') vz = (1.5 + power * 1.5) / 4;
-  else if (type === 'sniper') vz = 5.0;
-  else if (type === 'mgBullet') vz = 3.5;
-  else if (type === 'bolt') vz = 2.0;
+  // Speed (pixels per second)
+  let speed = 800;
+  if (type === 'arrow') speed = 300 + power * 400;
+  else if (type === 'sniper') speed = 1200;
+  else if (type === 'mgBullet') speed = 900;
+  else if (type === 'bolt') speed = 500;
 
-  const isArrow = type === 'arrow';
-  const isBolt = type === 'bolt';
+  // Max range for arrows/bolts (based on power)
+  let maxRange = 9999;
+  if (type === 'arrow') maxRange = 200 + power * 500;
+  else if (type === 'bolt') maxRange = 150 + power * 400;
+
+  // Check buff effects (only apply to non-arrow/bolt projectiles)
+  const isGun = type !== 'arrow' && type !== 'bolt';
+  const freeze = isGun && state.buffs.freezeShots > 0;
+  const chain = isGun && state.buffs.chainShots > 0;
+  const poison = isGun && state.buffs.poisonShots > 0;
 
   const proj = {
     type,
     special,
-    firedAimX: aimX + spreadX,
-    firedAimY: aimY + spreadY,
-    x: start.x,
-    y: start.y,
-    z: 0,
-    vz,
-    gravityOffset: 0,
-    gravity: isArrow ? 0.6 : isBolt ? 0.3 : 0,
-    gravityVel: isArrow ? -0.35 * power : isBolt ? -0.15 : 0,
-    power,
+    x: TOWER_X,
+    y: TOWER_Y,
+    dx: fdx,
+    dy: fdy,
+    speed,
+    maxRange,
+    traveled: 0,
     alive: true,
     trail: [],
     time: 0,
+    power,
+    freeze,
+    chain,
+    poison,
   };
+
+  // Consume buff shots
+  if (freeze) state.buffs.freezeShots--;
+  if (chain) state.buffs.chainShots--;
+  if (poison) state.buffs.poisonShots--;
 
   state.projectiles.push(proj);
 }
@@ -97,28 +77,20 @@ export function updateProjectiles(dt) {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
     p.time += dt;
-    p.z += p.vz * dt;
 
-    // 현재 깊이에서 십자선 레이 위치 계산
-    const ray = crosshairWorldAt(p.z, p.firedAimX, p.firedAimY);
-    p.x = ray.x;
-    p.y = ray.y;
+    const move = p.speed * dt;
+    p.x += p.dx * move;
+    p.y += p.dy * move;
+    p.traveled += move;
 
-    // 화살 중력 편차 (레이 위치 기준으로 아래로 처짐)
-    if (p.gravity) {
-      p.gravityVel += p.gravity * dt;
-      p.gravityOffset += p.gravityVel * dt;
-      p.y += p.gravityOffset;
-    }
-
-    // 잔상 기록 (화살, 볼트)
+    // Trail for arrows/bolts
     if (p.type === 'arrow' || p.type === 'bolt') {
-      p.trail.push({ x: p.x, y: p.y, z: p.z });
+      p.trail.push({ x: p.x, y: p.y });
       if (p.trail.length > 8) p.trail.shift();
     }
 
-    // 범위 벗어남 → 빗나감
-    if (p.z > 1.2 || p.z < -0.1 || Math.abs(p.x) > 2 || Math.abs(p.y) > 3) {
+    // Out of bounds or max range reached
+    if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > 1000 || p.traveled >= p.maxRange) {
       p.alive = false;
       missedThisFrame++;
     }
@@ -130,157 +102,169 @@ export function updateProjectiles(dt) {
 }
 
 /**
- * 발사체 렌더링
+ * 발사체 렌더링 (2D 탑다운)
  */
-export function drawProjectiles(ctx, aimX, aimY) {
+export function drawProjectiles(ctx) {
   for (const p of state.projectiles) {
-    const scr = worldToScreen(p.x, p.y, p.z, aimX, aimY);
-
     if (p.type === 'bullet') {
-      // 총알 - 작은 원
-      const r = 3 * scr.scale;
+      // 총알 - 작은 원 + 짧은 트레일
+      const r = 3;
       ctx.fillStyle = p.special ? '#ffcc00' : '#ffa500';
       ctx.beginPath();
-      ctx.arc(scr.sx, scr.sy, Math.max(1, r), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
 
-      // 총알 궤적
-      if (p.time < 0.1) {
-        ctx.strokeStyle = p.special ? 'rgba(255,204,0,0.5)' : 'rgba(255,165,0,0.3)';
-        ctx.lineWidth = 2 * scr.scale;
+      // 버프 표시
+      if (p.freeze) {
+        ctx.strokeStyle = 'rgba(100,200,255,0.6)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        const prevZ = p.z - p.vz * 0.05;
-        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
-        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
-        ctx.moveTo(back.sx, back.sy);
-        ctx.lineTo(scr.sx, scr.sy);
+        ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (p.poison) {
+        ctx.strokeStyle = 'rgba(100,255,100,0.6)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 트레일
+      if (p.time < 0.1) {
+        const trailLen = 12;
+        ctx.strokeStyle = p.special ? 'rgba(255,204,0,0.4)' : 'rgba(255,165,0,0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - p.dx * trailLen, p.y - p.dy * trailLen);
+        ctx.lineTo(p.x, p.y);
         ctx.stroke();
       }
     } else if (p.type === 'sniper') {
-      // 저격탄 - 밝은 파란 트레이서
-      const r = 4 * scr.scale;
+      // 저격탄 - 밝은 트레이서
+      const r = 4;
       ctx.fillStyle = '#66bbff';
       ctx.beginPath();
-      ctx.arc(scr.sx, scr.sy, Math.max(1.5, r), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
-      // 긴 궤적
+
+      // 밝은 글로우
+      ctx.fillStyle = 'rgba(100,180,255,0.3)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 긴 트레이서 라인
       if (p.time < 0.15) {
+        const trailLen = 30;
         ctx.strokeStyle = 'rgba(100,180,255,0.6)';
-        ctx.lineWidth = 3 * scr.scale;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        const prevZ = p.z - p.vz * 0.08;
-        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
-        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
-        ctx.moveTo(back.sx, back.sy);
-        ctx.lineTo(scr.sx, scr.sy);
+        ctx.moveTo(p.x - p.dx * trailLen, p.y - p.dy * trailLen);
+        ctx.lineTo(p.x, p.y);
         ctx.stroke();
       }
     } else if (p.type === 'mgBullet') {
-      // 기관총탄 - 작은 주황 점
-      const r = 2.5 * scr.scale;
+      // 기관총탄 - 작은 점
+      const r = 2;
       ctx.fillStyle = '#ffaa44';
       ctx.beginPath();
-      ctx.arc(scr.sx, scr.sy, Math.max(1, r), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
+
+      // 짧은 트레일
       if (p.time < 0.06) {
+        const trailLen = 8;
         ctx.strokeStyle = 'rgba(255,170,68,0.4)';
-        ctx.lineWidth = 1.5 * scr.scale;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        const prevZ = p.z - p.vz * 0.03;
-        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
-        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
-        ctx.moveTo(back.sx, back.sy);
-        ctx.lineTo(scr.sx, scr.sy);
+        ctx.moveTo(p.x - p.dx * trailLen, p.y - p.dy * trailLen);
+        ctx.lineTo(p.x, p.y);
         ctx.stroke();
       }
-    } else if (p.type === 'bolt') {
-      // 크로스보우 볼트 - 짧은 화살
-      if (p.trail.length > 1) {
-        for (let i = 1; i < p.trail.length; i++) {
-          const t = p.trail[i];
-          const ts = worldToScreen(t.x, t.y, t.z, aimX, aimY);
-          const alpha = i / p.trail.length * 0.4;
-          ctx.strokeStyle = `rgba(100,255,100,${alpha})`;
-          ctx.lineWidth = 2 * ts.scale;
-          const prev = p.trail[i - 1];
-          const ps = worldToScreen(prev.x, prev.y, prev.z, aimX, aimY);
-          ctx.beginPath();
-          ctx.moveTo(ps.sx, ps.sy);
-          ctx.lineTo(ts.sx, ts.sy);
-          ctx.stroke();
-        }
-      }
-      const len = 18 * scr.scale;
-      const angle = Math.atan2(p.gravityVel, p.vz);
-      ctx.strokeStyle = '#88ff88';
-      ctx.lineWidth = 3 * scr.scale;
-      ctx.beginPath();
-      ctx.moveTo(scr.sx - Math.cos(angle) * len, scr.sy + Math.sin(angle) * len * 0.5);
-      ctx.lineTo(scr.sx + Math.cos(angle) * len, scr.sy - Math.sin(angle) * len * 0.5);
-      ctx.stroke();
-      // 볼트 촉
-      ctx.fillStyle = '#44cc44';
-      const bTipX = scr.sx + Math.cos(angle) * len;
-      const bTipY = scr.sy - Math.sin(angle) * len * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(bTipX, bTipY);
-      ctx.lineTo(bTipX - 6 * scr.scale, bTipY - 4 * scr.scale);
-      ctx.lineTo(bTipX - 6 * scr.scale, bTipY + 4 * scr.scale);
-      ctx.closePath();
-      ctx.fill();
     } else if (p.type === 'arrow') {
-      // 화살 잔상
+      // 화살 - 트레일 + 본체 + 화살촉 + 깃털
+      // 잔상
       if (p.trail.length > 1) {
         for (let i = 1; i < p.trail.length; i++) {
           const t = p.trail[i];
-          const ts = worldToScreen(t.x, t.y, t.z, aimX, aimY);
+          const prev = p.trail[i - 1];
           const alpha = i / p.trail.length * 0.5;
           ctx.strokeStyle = p.special ? `rgba(255,100,0,${alpha})` : `rgba(180,160,100,${alpha})`;
-          ctx.lineWidth = 3 * ts.scale;
-          const prev = p.trail[i - 1];
-          const ps = worldToScreen(prev.x, prev.y, prev.z, aimX, aimY);
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.moveTo(ps.sx, ps.sy);
-          ctx.lineTo(ts.sx, ts.sy);
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(t.x, t.y);
           ctx.stroke();
         }
       }
 
-      // 화살 본체
-      const len = 25 * scr.scale;
-      const angle = Math.atan2(p.gravityVel, p.vz);
+      // 본체 (이동방향을 따라 선)
+      const len = 16;
       ctx.strokeStyle = p.special ? '#ff6600' : '#c0a060';
-      ctx.lineWidth = 4 * scr.scale;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(scr.sx - Math.cos(angle) * len, scr.sy + Math.sin(angle) * len * 0.5);
-      ctx.lineTo(scr.sx + Math.cos(angle) * len, scr.sy - Math.sin(angle) * len * 0.5);
+      ctx.moveTo(p.x - p.dx * len, p.y - p.dy * len);
+      ctx.lineTo(p.x, p.y);
       ctx.stroke();
 
       // 화살촉
       ctx.fillStyle = p.special ? '#ff4400' : '#aaa';
       ctx.beginPath();
-      const tipX = scr.sx + Math.cos(angle) * len;
-      const tipY = scr.sy - Math.sin(angle) * len * 0.5;
-      ctx.moveTo(tipX, tipY);
-      ctx.lineTo(tipX - 8 * scr.scale, tipY - 5 * scr.scale);
-      ctx.lineTo(tipX - 8 * scr.scale, tipY + 5 * scr.scale);
+      ctx.moveTo(p.x + p.dx * 4, p.y + p.dy * 4);
+      ctx.lineTo(p.x + p.dy * 4, p.y - p.dx * 4);
+      ctx.lineTo(p.x - p.dy * 4, p.y + p.dx * 4);
       ctx.closePath();
       ctx.fill();
 
-      // 깃털
-      const tailX = scr.sx - Math.cos(angle) * len;
-      const tailY = scr.sy + Math.sin(angle) * len * 0.5;
+      // 깃털 (후방)
+      const tailX = p.x - p.dx * len;
+      const tailY = p.y - p.dy * len;
       ctx.fillStyle = p.special ? 'rgba(255,100,0,0.6)' : 'rgba(160,130,80,0.6)';
       ctx.beginPath();
       ctx.moveTo(tailX, tailY);
-      ctx.lineTo(tailX - 4 * scr.scale, tailY - 6 * scr.scale);
-      ctx.lineTo(tailX + 6 * scr.scale, tailY);
+      ctx.lineTo(tailX + p.dy * 5, tailY - p.dx * 5);
+      ctx.lineTo(tailX - p.dx * 5, tailY - p.dy * 5);
       ctx.closePath();
       ctx.fill();
       ctx.beginPath();
       ctx.moveTo(tailX, tailY);
-      ctx.lineTo(tailX - 4 * scr.scale, tailY + 6 * scr.scale);
-      ctx.lineTo(tailX + 6 * scr.scale, tailY);
+      ctx.lineTo(tailX - p.dy * 5, tailY + p.dx * 5);
+      ctx.lineTo(tailX - p.dx * 5, tailY - p.dy * 5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (p.type === 'bolt') {
+      // 크로스보우 볼트 - 짧은 녹색 선 + 촉
+      // 잔상
+      if (p.trail.length > 1) {
+        for (let i = 1; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          const prev = p.trail[i - 1];
+          const alpha = i / p.trail.length * 0.4;
+          ctx.strokeStyle = `rgba(100,255,100,${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(t.x, t.y);
+          ctx.stroke();
+        }
+      }
+
+      // 본체
+      const len = 12;
+      ctx.strokeStyle = '#88ff88';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.dx * len, p.y - p.dy * len);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+
+      // 볼트 촉
+      ctx.fillStyle = '#44cc44';
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.dx * 3, p.y + p.dy * 3);
+      ctx.lineTo(p.x + p.dy * 3, p.y - p.dx * 3);
+      ctx.lineTo(p.x - p.dy * 3, p.y + p.dx * 3);
       ctx.closePath();
       ctx.fill();
     }
