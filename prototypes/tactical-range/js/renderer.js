@@ -1,5 +1,5 @@
 // ── 사격장 배경 렌더링 + 원근감 ──
-import { W, RANGE_TOP, RANGE_BOTTOM } from './game.js';
+import { W, RANGE_TOP, RANGE_BOTTOM, state } from './game.js';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2; // 소실점 X
@@ -115,12 +115,25 @@ export function drawRange(ctx, aimX, aimY) {
   ctx.fill();
 }
 
+// 십자선 이동 범위 (화면 좌표)
+export const AIM_RANGE_X = 220;
+export const AIM_RANGE_Y = 150;
+
 /**
- * 십자선 그리기
+ * 십자선의 화면 좌표 반환
+ */
+export function getCrosshairScreen() {
+  return {
+    cx: W / 2 + state.aimX * AIM_RANGE_X,
+    cy: (RANGE_TOP + RANGE_BOTTOM) / 2 + state.aimY * AIM_RANGE_Y,
+  };
+}
+
+/**
+ * 십자선 그리기 (aimX/aimY에 따라 화면 위 이동)
  */
 export function drawCrosshair(ctx) {
-  const cx = W / 2;
-  const cy = (RANGE_TOP + RANGE_BOTTOM) / 2;
+  const { cx, cy } = getCrosshairScreen();
   const size = 16;
 
   ctx.strokeStyle = 'rgba(255,80,80,0.8)';

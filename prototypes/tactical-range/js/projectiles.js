@@ -1,28 +1,29 @@
 // ── 발사체 시스템 (탄환 + 화살) ──
 import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js';
-import { worldToScreen } from './renderer.js';
+import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2;
 const VP_Y = RANGE_TOP + RANGE_H * 0.15;
-const CROSSHAIR_SX = W / 2;
-const CROSSHAIR_SY = (RANGE_TOP + RANGE_BOTTOM) / 2;
+const CENTER_SX = W / 2;
+const CENTER_SY = (RANGE_TOP + RANGE_BOTTOM) / 2;
 
 /**
  * 깊이 z에서 십자선 화면 좌표에 대응하는 월드 (x, y) 계산
- * worldToScreen의 역함수: 화면 중앙(십자선)에 해당하는 월드 좌표
+ * 월드는 고정(aim=0), 십자선이 화면 위를 이동하는 방식의 역변환
+ * worldToScreen(x, y, z, 0, 0) = (sx, sy) 의 역함수
  */
 function crosshairWorldAt(z, aimX, aimY) {
   const p = 1 - z * 0.85;
-  // sx = VP_X + (x * W/2) * p - aimX * 220 * p = CROSSHAIR_SX
-  // → x = (CROSSHAIR_SX - VP_X + aimX * 220 * p) / (W/2 * p)
-  // VP_X = W/2, CROSSHAIR_SX = W/2 이므로:
-  // x = aimX * 220 / (W/2) = aimX * 0.815 (깊이 무관)
-  const wx = aimX * 220 / (W / 2);
+  // 십자선의 화면 좌표
+  const sx = CENTER_SX + aimX * AIM_RANGE_X;
+  const sy = CENTER_SY + aimY * AIM_RANGE_Y;
 
-  // sy = VP_Y + RANGE_H*0.7*(1-z) + y*RANGE_H*0.3*p - aimY*150*p = CROSSHAIR_SY
-  // → y = (CROSSHAIR_SY - VP_Y - RANGE_H*0.7*(1-z) + aimY*150*p) / (RANGE_H*0.3*p)
-  const wy = (CROSSHAIR_SY - VP_Y - RANGE_H * 0.7 * (1 - z) + aimY * 150 * p) / (RANGE_H * 0.3 * p);
+  // worldToScreen(x, y, z, 0, 0):
+  //   sx = VP_X + (x * W/2) * p
+  //   sy = VP_Y + RANGE_H*0.7*(1-z) + (y * RANGE_H*0.3) * p
+  const wx = (sx - VP_X) / (W / 2 * p);
+  const wy = (sy - VP_Y - RANGE_H * 0.7 * (1 - z)) / (RANGE_H * 0.3 * p);
 
   return { x: wx, y: wy };
 }

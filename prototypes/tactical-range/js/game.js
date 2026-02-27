@@ -34,6 +34,7 @@ export const state = {
     magazineOut: false,
     slideBack: false,
     specialBullets: 0,
+    reloadMode: false,
   },
 
   // 활
@@ -69,7 +70,7 @@ export function resetGame() {
   state.currentWeapon = 'pistol';
   state.pistol = {
     magazineBullets: 6, magazineMax: 6, reserveBullets: 0,
-    chambered: true, magazineOut: false, slideBack: false, specialBullets: 0,
+    chambered: true, magazineOut: false, slideBack: false, specialBullets: 0, reloadMode: false,
   };
   state.bow = {
     arrows: 3, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,

@@ -136,14 +136,14 @@ function draw() {
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, W, H);
 
-  // 사격장 배경
-  drawRange(ctx, state.aimX, state.aimY);
+  // 사격장 배경 (월드 고정 - 조준이동에 따라 움직이지 않음)
+  drawRange(ctx, 0, 0);
 
-  // 과녁
-  drawTargets(ctx, state.aimX, state.aimY);
+  // 과녁 (월드 고정)
+  drawTargets(ctx, 0, 0);
 
-  // 발사체
-  drawProjectiles(ctx, state.aimX, state.aimY);
+  // 발사체 (월드 고정)
+  drawProjectiles(ctx, 0, 0);
 
   // 아이템
   drawItems(ctx);
