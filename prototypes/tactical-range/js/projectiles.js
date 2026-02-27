@@ -1,6 +1,6 @@
 // ── 발사체 시스템 (탄환 + 화살) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=8';
-import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=8';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=9';
+import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=9';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2;

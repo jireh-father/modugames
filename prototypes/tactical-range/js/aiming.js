@@ -1,6 +1,7 @@
 // ── 조이스틱 조준 시스템 ──
-import { state, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=8';
-import { registerZone } from './input.js?v=8';
+import { state, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=9';
+import { registerZone } from './input.js?v=9';
+import { settings } from './settings.js?v=9';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -9,7 +10,6 @@ const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
 const JOY_R = 42;                         // 외곽 반지름
 const THUMB_R = 16;                        // 엄지 반지름
 const MAX_OFFSET = 35;                     // 최대 이동량
-const DRAG_SENS = 0.009;                   // 드래그 감도 (px → aim 변환)
 
 // 조이스틱 상태
 let active = false;
@@ -38,10 +38,10 @@ export function initJoystick() {
         prevX = x;
         prevY = y;
 
-        state.aimX = Math.max(-1, Math.min(1, state.aimX + dx * DRAG_SENS));
+        state.aimX = Math.max(-1, Math.min(1, state.aimX + dx * settings.dragSens));
         // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
         if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
-          state.aimY = Math.max(-1, Math.min(1, state.aimY + dy * DRAG_SENS));
+          state.aimY = Math.max(-1, Math.min(1, state.aimY + dy * settings.dragSens));
         }
 
         // 썸스틱 시각적 위치 (중심 기준)

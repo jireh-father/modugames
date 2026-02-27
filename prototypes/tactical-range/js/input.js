@@ -1,5 +1,5 @@
 // ── 입력 시스템: 터치/마우스 드래그를 통합 관리 ──
-import { W, H, state } from './game.js?v=8';
+import { W, H, state } from './game.js?v=9';
 
 const canvas = document.getElementById('c');
 
@@ -57,8 +57,8 @@ function onDown(cx, cy) {
   for (const h of handlers) {
     // 타이틀/게임오버 화면에서는 음수 우선순위(화면 전환) 핸들러만 허용
     // paused 화면에서는 음수 우선순위 + 일시정지 관련 핸들러(priority 100) 허용
-    if (state.screen === 'paused' && h.priority !== -1 && h.priority !== 100) continue;
-    if (state.screen !== 'playing' && state.screen !== 'paused' && h.priority >= 0) continue;
+    if ((state.screen === 'paused' || state.screen === 'settings') && h.priority !== -1 && h.priority !== 100) continue;
+    if (state.screen !== 'playing' && state.screen !== 'paused' && state.screen !== 'settings' && h.priority >= 0) continue;
     if (inZone(cx, cy, h.zone)) {
       // onStart가 false를 반환하면 이 핸들러를 건너뛰고 다음 핸들러 시도
       if (h.callbacks.onStart) {

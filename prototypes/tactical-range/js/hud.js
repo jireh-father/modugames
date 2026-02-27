@@ -1,8 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=8';
-import { registerZone } from './input.js?v=8';
-import { playStart, playGameOver } from './audio.js?v=8';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=8';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=9';
+import { registerZone } from './input.js?v=9';
+import { playStart, playGameOver } from './audio.js?v=9';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=9';
+import { openSettings } from './settings.js?v=9';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -65,8 +66,15 @@ export function initHUD() {
           playStart();
           return;
         }
+        // Settings 버튼
+        const settingsY = MENU_Y_START + MENU_GAP * 2;
+        if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
+            y >= settingsY && y <= settingsY + MENU_BTN_H) {
+          openSettings();
+          return;
+        }
         // Exit 버튼
-        const exitY = MENU_Y_START + MENU_GAP * 2;
+        const exitY = MENU_Y_START + MENU_GAP * 3;
         if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
             y >= exitY && y <= exitY + MENU_BTN_H) {
           state.screen = 'title';
@@ -264,6 +272,12 @@ export function drawTitle(ctx) {
   ctx.fillStyle = '#444';
   ctx.font = '12px monospace';
   ctx.fillText('🔫 권총  ×  🏹 활', W / 2, H * 0.82);
+
+  // 설정 버튼
+  ctx.fillStyle = '#555';
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('⚙ SETTINGS', W / 2, H * 0.92);
 }
 
 /**
@@ -289,6 +303,7 @@ export function drawPauseMenu(ctx) {
   const buttons = [
     { label: 'RESUME', color: '#4a8' },
     { label: 'RESTART', color: '#a84' },
+    { label: 'SETTINGS', color: '#668' },
     { label: 'EXIT', color: '#844' },
   ];
 
@@ -424,8 +439,13 @@ export function initScreenHandlers() {
   registerZone(
     { x: 0, y: 0, w: W, h: H },
     {
-      onTap() {
+      onTap(x, y) {
         if (state.screen === 'title') {
+          // 설정 버튼 영역 (하단)
+          if (y >= H * 0.88 && y <= H * 0.96 && x >= W / 2 - 80 && x <= W / 2 + 80) {
+            openSettings();
+            return;
+          }
           requestGyro(); // iOS 사용자 제스처 내에서 권한 요청
           resetGyroRef();
           resetGame();

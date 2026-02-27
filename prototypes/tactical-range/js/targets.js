@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반 - 순차 스폰) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=8';
-import { worldToScreen } from './renderer.js?v=8';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=8';
-import { spawnParticles } from './particles.js?v=8';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=9';
+import { worldToScreen } from './renderer.js?v=9';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=9';
+import { spawnParticles } from './particles.js?v=9';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
