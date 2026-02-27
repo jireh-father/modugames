@@ -46,8 +46,8 @@ function onDeviceMotion(e) {
   const gx = rate.gamma || 0; // deg/s 좌우
   const gy = rate.beta || 0;  // deg/s 상하
 
-  state.aimX = Math.max(-1, Math.min(1, state.aimX + gx * GYRO_SENS));
-  state.aimY = Math.max(-1, Math.min(1, state.aimY - gy * GYRO_SENS));
+  state.aimX = Math.max(-1, Math.min(1, state.aimX - gx * GYRO_SENS));
+  state.aimY = Math.max(-1, Math.min(1, state.aimY + gy * GYRO_SENS));
 }
 
 export function isGyroEnabled() { return enabled; }
