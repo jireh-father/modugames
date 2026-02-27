@@ -1,6 +1,6 @@
 // ── 발사체 시스템 (탄환 + 화살) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
-import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=10';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=11';
+import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=11';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2;
@@ -30,7 +30,7 @@ function crosshairWorldAt(z, aimX, aimY) {
 
 /**
  * 발사체 생성
- * @param {string} type - 'bullet' | 'arrow'
+ * @param {string} type - 'bullet' | 'arrow' | 'sniper' | 'mgBullet' | 'bolt'
  * @param {number} aimX - 조준 X (-1~1)
  * @param {number} aimY - 조준 Y (-1~1)
  * @param {boolean} special - 관통탄/폭발화살 여부
@@ -39,28 +39,44 @@ function crosshairWorldAt(z, aimX, aimY) {
 export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
   const start = crosshairWorldAt(0, aimX, aimY);
 
-  // 총알 확산: 약간의 랜덤 오차 (멀수록 벌어짐)
+  // 확산 설정
   let spreadX = 0, spreadY = 0;
   if (type === 'bullet') {
-    const spread = 0.015; // 확산 정도
+    const spread = 0.015;
+    spreadX = (Math.random() - 0.5) * spread;
+    spreadY = (Math.random() - 0.5) * spread;
+  } else if (type === 'mgBullet') {
+    const spread = 0.025;
+    spreadX = (Math.random() - 0.5) * spread;
+    spreadY = (Math.random() - 0.5) * spread;
+  } else if (type === 'sniper') {
+    const spread = 0.003;
     spreadX = (Math.random() - 0.5) * spread;
     spreadY = (Math.random() - 0.5) * spread;
   }
 
+  // 속도 설정
+  let vz = 3.0;
+  if (type === 'arrow') vz = (1.5 + power * 1.5) / 4;
+  else if (type === 'sniper') vz = 5.0;
+  else if (type === 'mgBullet') vz = 3.5;
+  else if (type === 'bolt') vz = 2.0;
+
+  const isArrow = type === 'arrow';
+  const isBolt = type === 'bolt';
+
   const proj = {
     type,
     special,
-    // 발사 시점의 조준 방향 기록 (깊이별 위치 계산용)
     firedAimX: aimX + spreadX,
     firedAimY: aimY + spreadY,
     x: start.x,
     y: start.y,
     z: 0,
-    vz: type === 'bullet' ? 3.0 : (1.5 + power * 1.5) / 4,
-    // 화살 포물선: 위로 올라갔다가 중력으로 내려옴 (장애물 넘기)
+    vz,
     gravityOffset: 0,
-    gravity: type === 'arrow' ? 0.6 : 0,
-    gravityVel: type === 'arrow' ? -0.35 * power : 0,
+    gravity: isArrow ? 0.6 : isBolt ? 0.3 : 0,
+    gravityVel: isArrow ? -0.35 * power : isBolt ? -0.15 : 0,
     power,
     alive: true,
     trail: [],
@@ -95,8 +111,8 @@ export function updateProjectiles(dt) {
       p.y += p.gravityOffset;
     }
 
-    // 잔상 기록 (화살)
-    if (p.type === 'arrow') {
+    // 잔상 기록 (화살, 볼트)
+    if (p.type === 'arrow' || p.type === 'bolt') {
       p.trail.push({ x: p.x, y: p.y, z: p.z });
       if (p.trail.length > 8) p.trail.shift();
     }
@@ -140,6 +156,78 @@ export function drawProjectiles(ctx, aimX, aimY) {
         ctx.lineTo(scr.sx, scr.sy);
         ctx.stroke();
       }
+    } else if (p.type === 'sniper') {
+      // 저격탄 - 밝은 파란 트레이서
+      const r = 4 * scr.scale;
+      ctx.fillStyle = '#66bbff';
+      ctx.beginPath();
+      ctx.arc(scr.sx, scr.sy, Math.max(1.5, r), 0, Math.PI * 2);
+      ctx.fill();
+      // 긴 궤적
+      if (p.time < 0.15) {
+        ctx.strokeStyle = 'rgba(100,180,255,0.6)';
+        ctx.lineWidth = 3 * scr.scale;
+        ctx.beginPath();
+        const prevZ = p.z - p.vz * 0.08;
+        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
+        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
+        ctx.moveTo(back.sx, back.sy);
+        ctx.lineTo(scr.sx, scr.sy);
+        ctx.stroke();
+      }
+    } else if (p.type === 'mgBullet') {
+      // 기관총탄 - 작은 주황 점
+      const r = 2.5 * scr.scale;
+      ctx.fillStyle = '#ffaa44';
+      ctx.beginPath();
+      ctx.arc(scr.sx, scr.sy, Math.max(1, r), 0, Math.PI * 2);
+      ctx.fill();
+      if (p.time < 0.06) {
+        ctx.strokeStyle = 'rgba(255,170,68,0.4)';
+        ctx.lineWidth = 1.5 * scr.scale;
+        ctx.beginPath();
+        const prevZ = p.z - p.vz * 0.03;
+        const prevRay = crosshairWorldAt(prevZ, p.firedAimX, p.firedAimY);
+        const back = worldToScreen(prevRay.x, prevRay.y, prevZ, aimX, aimY);
+        ctx.moveTo(back.sx, back.sy);
+        ctx.lineTo(scr.sx, scr.sy);
+        ctx.stroke();
+      }
+    } else if (p.type === 'bolt') {
+      // 크로스보우 볼트 - 짧은 화살
+      if (p.trail.length > 1) {
+        for (let i = 1; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          const ts = worldToScreen(t.x, t.y, t.z, aimX, aimY);
+          const alpha = i / p.trail.length * 0.4;
+          ctx.strokeStyle = `rgba(100,255,100,${alpha})`;
+          ctx.lineWidth = 2 * ts.scale;
+          const prev = p.trail[i - 1];
+          const ps = worldToScreen(prev.x, prev.y, prev.z, aimX, aimY);
+          ctx.beginPath();
+          ctx.moveTo(ps.sx, ps.sy);
+          ctx.lineTo(ts.sx, ts.sy);
+          ctx.stroke();
+        }
+      }
+      const len = 18 * scr.scale;
+      const angle = Math.atan2(p.gravityVel, p.vz);
+      ctx.strokeStyle = '#88ff88';
+      ctx.lineWidth = 3 * scr.scale;
+      ctx.beginPath();
+      ctx.moveTo(scr.sx - Math.cos(angle) * len, scr.sy + Math.sin(angle) * len * 0.5);
+      ctx.lineTo(scr.sx + Math.cos(angle) * len, scr.sy - Math.sin(angle) * len * 0.5);
+      ctx.stroke();
+      // 볼트 촉
+      ctx.fillStyle = '#44cc44';
+      const bTipX = scr.sx + Math.cos(angle) * len;
+      const bTipY = scr.sy - Math.sin(angle) * len * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(bTipX, bTipY);
+      ctx.lineTo(bTipX - 6 * scr.scale, bTipY - 4 * scr.scale);
+      ctx.lineTo(bTipX - 6 * scr.scale, bTipY + 4 * scr.scale);
+      ctx.closePath();
+      ctx.fill();
     } else if (p.type === 'arrow') {
       // 화살 잔상
       if (p.trail.length > 1) {

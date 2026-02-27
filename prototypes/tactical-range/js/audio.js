@@ -230,6 +230,88 @@ export function playSlowMo() {
   setTimeout(() => sweep(600, 150, 0.3, 'triangle', 0.08), 100);
 }
 
+// ── 저격총 사운드 ──
+export function playSniperShot() {
+  noise(0.25, 0.6, 1500);
+  tone(100, 0.15, 'square', 0.4);
+  tone(40, 0.2, 'sine', 0.35);
+  setTimeout(() => noise(0.2, 0.2, 800), 50);
+  // 에코
+  setTimeout(() => noise(0.15, 0.12, 600), 150);
+  setTimeout(() => noise(0.1, 0.06, 400), 300);
+}
+
+export function playSniperBoltUp() {
+  noise(0.04, 0.15, 3500);
+  tone(600, 0.03, 'square', 0.12);
+}
+
+export function playSniperBoltDown() {
+  noise(0.05, 0.18, 3000);
+  tone(500, 0.04, 'square', 0.15);
+  setTimeout(() => tone(700, 0.02, 'square', 0.08), 30);
+}
+
+export function playSniperLoad() {
+  tone(900, 0.03, 'sine', 0.1);
+  setTimeout(() => tone(1100, 0.02, 'sine', 0.08), 25);
+}
+
+export function playScopeZoom() {
+  sweep(300, 600, 0.15, 'sine', 0.06);
+}
+
+// ── 기관총 사운드 ──
+export function playMGShot() {
+  noise(0.06, 0.35, 2500);
+  tone(120, 0.05, 'square', 0.25);
+  tone(50, 0.06, 'sine', 0.15);
+}
+
+export function playMGBurstEnd() {
+  noise(0.1, 0.1, 1000);
+  tone(80, 0.08, 'sine', 0.08);
+}
+
+export function playMGCock() {
+  noise(0.08, 0.2, 3000);
+  tone(400, 0.04, 'square', 0.12);
+  setTimeout(() => {
+    noise(0.06, 0.15, 2500);
+    tone(350, 0.03, 'square', 0.1);
+  }, 50);
+}
+
+export function playMGOverheat() {
+  sweep(800, 200, 0.4, 'sawtooth', 0.1);
+  noise(0.3, 0.15, 600);
+}
+
+export function playMGCooldown() {
+  sweep(200, 500, 0.2, 'sine', 0.06);
+  noise(0.2, 0.08, 400);
+}
+
+// ── 크로스보우 사운드 ──
+export function playCrossbowShoot() {
+  sweep(400, 100, 0.12, 'triangle', 0.2);
+  noise(0.08, 0.2, 4000);
+  tone(60, 0.15, 'sine', 0.12);
+}
+
+export function playCrossbowCrank() {
+  // 크랭크 감기 - 톱니 소리
+  tone(200, 0.04, 'sawtooth', 0.08);
+  setTimeout(() => tone(220, 0.04, 'sawtooth', 0.08), 50);
+  setTimeout(() => tone(240, 0.04, 'sawtooth', 0.08), 100);
+}
+
+export function playCrossbowLoad() {
+  tone(800, 0.03, 'sine', 0.1);
+  noise(0.03, 0.08, 3000);
+  setTimeout(() => tone(1000, 0.02, 'sine', 0.06), 20);
+}
+
 // ── UI 사운드 ──
 export function playUIClick() {
   tone(800, 0.03, 'square', 0.1);

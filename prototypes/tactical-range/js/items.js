@@ -1,18 +1,22 @@
 // ── 아이템 드랍 & 줍기 시스템 ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
-import { worldToScreen } from './renderer.js?v=10';
-import { registerZone } from './input.js?v=10';
-import { playItemPickup, playCombo, playItemDrop } from './audio.js?v=10';
-import { spawnParticles } from './particles.js?v=10';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=11';
+import { worldToScreen } from './renderer.js?v=11';
+import { registerZone } from './input.js?v=11';
+import { playItemPickup, playCombo, playItemDrop } from './audio.js?v=11';
+import { spawnParticles } from './particles.js?v=11';
 
 // 아이템 정의
 const ITEM_TYPES = [
-  { id: 'bullet3', label: '탄환×3', weight: 30, apply: () => { state.pistol.reserveBullets += 3; } },
-  { id: 'bullet6', label: '탄환×6', weight: 15, apply: () => { state.pistol.reserveBullets += 6; } },
-  { id: 'arrow2', label: '화살×2', weight: 30, apply: () => { state.bow.arrows += 2; } },
-  { id: 'arrow5', label: '화살×5', weight: 15, apply: () => { state.bow.arrows += 5; } },
+  { id: 'bullet3', label: '탄환×3', weight: 25, apply: () => { state.pistol.reserveBullets += 3; } },
+  { id: 'bullet6', label: '탄환×6', weight: 12, apply: () => { state.pistol.reserveBullets += 6; } },
+  { id: 'arrow2', label: '화살×2', weight: 25, apply: () => { state.bow.arrows += 2; } },
+  { id: 'arrow5', label: '화살×5', weight: 12, apply: () => { state.bow.arrows += 5; } },
   { id: 'goldBullet', label: '관통탄', weight: 5, apply: () => { state.pistol.specialBullets += 1; } },
   { id: 'explosiveArrow', label: '폭발화살', weight: 5, apply: () => { state.bow.specialArrows += 1; } },
+  { id: 'magUpgrade', label: '탄창+2', weight: 4, apply: () => { state.pistol.magazineMax = Math.min(12, state.pistol.magazineMax + 2); } },
+  { id: 'sniperAmmo', label: '저격탄×2', weight: 8, apply: () => { state.sniper.reserveRounds += 2; } },
+  { id: 'mgAmmo', label: '기관총탄×30', weight: 8, apply: () => { state.mg.reserveAmmo += 30; } },
+  { id: 'bolt2', label: '볼트×2', weight: 8, apply: () => { state.crossbow.bolts += 2; } },
 ];
 
 function pickWeightedItem() {
@@ -149,9 +153,49 @@ export function drawItems(ctx) {
     // 아이콘
     const isAmmo = item.id.startsWith('bullet') || item.id === 'goldBullet';
     const isArrow = item.id.startsWith('arrow') || item.id === 'explosiveArrow';
-    const isSpecial = item.id === 'goldBullet' || item.id === 'explosiveArrow';
+    const isSpecial = item.id === 'goldBullet' || item.id === 'explosiveArrow' || item.id === 'magUpgrade';
+    const isSniperAmmo = item.id === 'sniperAmmo';
+    const isMGAmmo = item.id === 'mgAmmo';
+    const isBolt = item.id === 'bolt2';
 
-    if (isAmmo) {
+    if (item.id === 'magUpgrade') {
+      // 탄창 업그레이드 - 금색 탄창 아이콘
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(x - 6, y - 10, 12, 20);
+      ctx.fillStyle = '#ff9900';
+      ctx.fillRect(x - 6, y - 10, 12, 6);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', x, y + 4);
+    } else if (isSniperAmmo) {
+      // 저격탄 - 긴 탄환
+      ctx.fillStyle = '#66aaff';
+      ctx.fillRect(x - 3, y - 10, 6, 20);
+      ctx.fillStyle = '#4488cc';
+      ctx.fillRect(x - 3, y - 10, 6, 7);
+    } else if (isMGAmmo) {
+      // 기관총탄 - 작은 탄 여러개
+      ctx.fillStyle = '#ff8844';
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(x - 8 + i * 6, y - 5, 4, 10);
+      }
+    } else if (isBolt) {
+      // 크로스보우 볼트
+      ctx.strokeStyle = '#88ff88';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 10, y);
+      ctx.lineTo(x + 10, y);
+      ctx.stroke();
+      ctx.fillStyle = '#44cc44';
+      ctx.beginPath();
+      ctx.moveTo(x - 13, y);
+      ctx.lineTo(x - 7, y - 3);
+      ctx.lineTo(x - 7, y + 3);
+      ctx.closePath();
+      ctx.fill();
+    } else if (isAmmo) {
       ctx.fillStyle = isSpecial ? '#ffcc00' : '#cca040';
       ctx.fillRect(x - 4, y - 8, 8, 16);
       ctx.fillStyle = isSpecial ? '#ffaa00' : '#aa7020';
@@ -173,7 +217,7 @@ export function drawItems(ctx) {
     }
 
     // 레이블
-    ctx.fillStyle = isSpecial ? '#ffcc00' : '#fff';
+    ctx.fillStyle = isSpecial ? '#ffcc00' : isSniperAmmo ? '#66aaff' : isMGAmmo ? '#ff8844' : isBolt ? '#88ff88' : '#fff';
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(item.label, x, y - 14);

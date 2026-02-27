@@ -24,7 +24,7 @@ export const state = {
   aimY: 0, // -1 ~ 1
 
   // 무기 선택
-  currentWeapon: 'pistol', // pistol | bow
+  currentWeapon: 'pistol', // pistol | bow | sniper | mg | crossbow
 
   // 권총
   pistol: {
@@ -45,6 +45,35 @@ export const state = {
     arrowNocked: false,
     drawPower: 0,
     drawing: false,
+  },
+
+  // 저격총
+  sniper: {
+    chambered: true,
+    boltOpen: false,
+    reserveRounds: 3,
+    scoping: false,
+    scopeZoom: 0, // 0~1
+  },
+
+  // 기관총
+  mg: {
+    ammo: 30,
+    reserveAmmo: 0,
+    heat: 0,       // 0~1 과열도
+    overheated: false,
+    firing: false,
+    fireTimer: 0,
+    cocked: true,
+  },
+
+  // 크로스보우
+  crossbow: {
+    bolts: 3,
+    loaded: false,
+    cranking: false,
+    crankProgress: 0, // 0~1
+    cocked: false,     // 크랭크 완료 여부
   },
 
   // 엔티티 배열
@@ -85,6 +114,15 @@ export function resetGame() {
   state.bow = {
     arrows: 3, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,
   };
+  state.sniper = {
+    chambered: true, boltOpen: false, reserveRounds: 3, scoping: false, scopeZoom: 0,
+  };
+  state.mg = {
+    ammo: 30, reserveAmmo: 0, heat: 0, overheated: false, firing: false, fireTimer: 0, cocked: true,
+  };
+  state.crossbow = {
+    bolts: 3, loaded: false, cranking: false, crankProgress: 0, cocked: false,
+  };
   state.targets = [];
   state.projectiles = [];
   state.items = [];
@@ -104,9 +142,14 @@ export function resetGame() {
 export function getTotalAmmo() {
   const p = state.pistol;
   const b = state.bow;
-  return p.magazineBullets + p.reserveBullets + p.specialBullets
-    + (p.chambered ? 1 : 0) + b.arrows + b.specialArrows
-    + (b.arrowNocked ? 1 : 0);
+  const s = state.sniper;
+  const m = state.mg;
+  const c = state.crossbow;
+  return p.magazineBullets + p.reserveBullets + p.specialBullets + (p.chambered ? 1 : 0)
+    + b.arrows + b.specialArrows + (b.arrowNocked ? 1 : 0)
+    + s.reserveRounds + (s.chambered ? 1 : 0)
+    + m.ammo + m.reserveAmmo
+    + c.bolts + (c.loaded ? 1 : 0);
 }
 
 export function isGameOver() {

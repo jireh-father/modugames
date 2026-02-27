@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반 - 순차 스폰) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
-import { worldToScreen } from './renderer.js?v=10';
-import { playTargetHit, playSupplyDrop, playWallHit, playWallBreak, playWaveStart, playWaveClear, playExplosion, playBulletMiss } from './audio.js?v=10';
-import { spawnParticles } from './particles.js?v=10';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=11';
+import { worldToScreen } from './renderer.js?v=11';
+import { playTargetHit, playSupplyDrop, playWallHit, playWallBreak, playWaveStart, playWaveClear, playExplosion, playBulletMiss } from './audio.js?v=11';
+import { spawnParticles } from './particles.js?v=11';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
@@ -366,9 +366,11 @@ export function checkHits(projectiles) {
     let arrowHitCount = 0;
 
     // 장애물 체크
-    // 화살은 포물선으로 넘어가므로 장애물 무시
-    // 관통탄도 장애물 무시
-    if (!p.special && p.type !== 'arrow') {
+    // 화살/볼트는 포물선으로 넘어가므로 장애물 무시
+    // 관통탄/저격탄도 장애물 무시 (관통)
+    const arcType = p.type === 'arrow' || p.type === 'bolt';
+    const pierceType = p.special || p.type === 'sniper';
+    if (!pierceType && !arcType) {
       for (const obs of state.obstacles) {
         if (obs.broken) continue; // 관통된 벽은 무시
         const dz = Math.abs(p.z - obs.z);
@@ -415,7 +417,9 @@ export function checkHits(projectiles) {
         const distZone = t.z < 0.4 ? 0 : t.z < 0.7 ? 1 : 2;
         const distMul = DIST_MULTIPLIER[distZone];
 
-        if (p.type !== 'arrow') p.alive = false;
+        // 관통: 화살/저격탄/볼트는 과녁을 뚫고 지나감
+        const penetrates = p.type === 'arrow' || p.type === 'sniper' || p.type === 'bolt';
+        if (!penetrates) p.alive = false;
         t.alive = false;
 
         if (t.type !== 'supply') {
@@ -444,15 +448,17 @@ export function checkHits(projectiles) {
           }
         }
 
-        // 화살 관통 멀티킬 배수
-        if (p.type === 'arrow') arrowHitCount++;
-        const arrowMul = p.type === 'arrow' ? arrowHitCount : 1;
+        // 관통 멀티킬 배수 (화살/저격탄/볼트)
+        if (penetrates) arrowHitCount++;
+        const arrowMul = penetrates ? arrowHitCount : 1;
 
-        const score = ringScore * distMul * arrowMul * 100;
+        // 저격탄 기본 배수 보너스
+        const sniperBonus = p.type === 'sniper' ? 1.5 : 1;
+        const score = Math.floor(ringScore * distMul * arrowMul * sniperBonus * 100);
         results.push({ target: t, hitDist, score, type: t.type, arrowMulti: arrowMul });
         playTargetHit();
 
-        if (p.type !== 'arrow') break;
+        if (!penetrates) break;
       }
     }
   }

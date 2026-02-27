@@ -1,9 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=10';
-import { registerZone } from './input.js?v=10';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=10';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=10';
-import { openSettings } from './settings.js?v=10';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=11';
+import { registerZone } from './input.js?v=11';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=11';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=11';
+import { openSettings } from './settings.js?v=11';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -89,18 +89,17 @@ export function initHUD() {
     100
   );
 
-  // 무기 슬롯 영역
+  // 무기 슬롯 영역 (5개)
+  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow'];
+  const slotW = W / WEAPONS.length;
   registerZone(
     { x: 0, y: CONTROLS_TOP, w: W, h: SLOT_H },
     {
       onTap(x, y) {
         if (state.screen !== 'playing') return;
         const prev = state.currentWeapon;
-        if (x < W / 2) {
-          state.currentWeapon = 'pistol';
-        } else {
-          state.currentWeapon = 'bow';
-        }
+        const idx = Math.min(WEAPONS.length - 1, Math.floor(x / slotW));
+        state.currentWeapon = WEAPONS[idx];
         if (state.currentWeapon !== prev) playWeaponSwitch();
       },
     },
@@ -163,12 +162,8 @@ export function drawHUD(ctx) {
   }
   ctx.font = '12px monospace';
 
-  const p = state.pistol;
-  const b = state.bow;
-  const pistolTotal = p.magazineBullets + p.reserveBullets + p.specialBullets + (p.chambered ? 1 : 0);
-  const bowTotal = b.arrows + b.specialArrows;
-
-  ctx.fillText(`탄:${pistolTotal} 화살:${bowTotal}`, W - 10, 22);
+  const ammo = getTotalAmmo();
+  ctx.fillText(`AMMO:${ammo}`, W - 10, 22);
 
   // 하이스코어 (점수 + 웨이브)
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -196,36 +191,42 @@ export function drawHUD(ctx) {
  */
 export function drawWeaponSlots(ctx) {
   const y = CONTROLS_TOP;
+  const weapons = [
+    { id: 'pistol', label: '권총', color: '#ffcc66', bg: 'rgba(255,200,100,0.3)' },
+    { id: 'bow', label: '활', color: '#aaddaa', bg: 'rgba(150,200,100,0.3)' },
+    { id: 'sniper', label: '저격', color: '#88bbff', bg: 'rgba(100,150,255,0.3)' },
+    { id: 'mg', label: '기관총', color: '#ffaa66', bg: 'rgba(255,150,80,0.3)' },
+    { id: 'crossbow', label: '석궁', color: '#88ff88', bg: 'rgba(100,255,100,0.3)' },
+  ];
+  const slotW = W / weapons.length;
 
   // 배경
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(0, y, W, SLOT_H);
 
-  // 권총 슬롯
-  const pistolActive = state.currentWeapon === 'pistol';
-  ctx.fillStyle = pistolActive ? 'rgba(255,200,100,0.3)' : 'rgba(255,255,255,0.05)';
-  ctx.fillRect(0, y, W / 2, SLOT_H);
+  for (let i = 0; i < weapons.length; i++) {
+    const w = weapons[i];
+    const active = state.currentWeapon === w.id;
+    const sx = i * slotW;
 
-  ctx.fillStyle = pistolActive ? '#ffcc66' : '#888';
-  ctx.font = 'bold 12px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('권총', W / 4, y + 26);
+    ctx.fillStyle = active ? w.bg : 'rgba(255,255,255,0.05)';
+    ctx.fillRect(sx, y, slotW, SLOT_H);
 
-  // 활 슬롯
-  const bowActive = state.currentWeapon === 'bow';
-  ctx.fillStyle = bowActive ? 'rgba(150,200,100,0.3)' : 'rgba(255,255,255,0.05)';
-  ctx.fillRect(W / 2, y, W / 2, SLOT_H);
+    ctx.fillStyle = active ? w.color : '#888';
+    ctx.font = `bold ${slotW > 100 ? 11 : 9}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(w.label, sx + slotW / 2, y + 26);
 
-  ctx.fillStyle = bowActive ? '#aaddaa' : '#888';
-  ctx.fillText('활', W * 3 / 4, y + 26);
-
-  // 구분선
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W / 2, y);
-  ctx.lineTo(W / 2, y + SLOT_H);
-  ctx.stroke();
+    // 구분선
+    if (i > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, y);
+      ctx.lineTo(sx, y + SLOT_H);
+      ctx.stroke();
+    }
+  }
 }
 
 /**
@@ -275,9 +276,9 @@ export function drawTitle(ctx) {
   }
 
   // 무기 미리보기
-  ctx.fillStyle = '#444';
-  ctx.font = '12px monospace';
-  ctx.fillText('🔫 권총  ×  🏹 활', W / 2, H * 0.82);
+  ctx.fillStyle = '#555';
+  ctx.font = '11px monospace';
+  ctx.fillText('권총 | 활 | 저격총 | 기관총 | 석궁', W / 2, H * 0.82);
 
   // 설정 버튼
   ctx.fillStyle = '#555';
