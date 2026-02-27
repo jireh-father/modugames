@@ -9,7 +9,7 @@ const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
 const JOY_R = 42;                         // 외곽 반지름
 const THUMB_R = 16;                        // 엄지 반지름
 const MAX_OFFSET = 35;                     // 최대 이동량
-const AIM_SPEED = 1.33;                    // 조준 이동 속도 (느리게)
+const AIM_SPEED = 3.0;                      // 조준 이동 속도
 
 // 조이스틱 상태
 let active = false;
@@ -47,15 +47,22 @@ export function initJoystick() {
   );
 }
 
+// 비선형 커브: 작은 기울기 = 미세 조정, 큰 기울기 = 빠른 이동
+function applyCurve(v) {
+  return Math.sign(v) * v * v;
+}
+
 // 매 프레임 호출: 조이스틱 오프셋에 비례해 조준점 이동
 export function updateJoystick(dt) {
   if (!active) return;
   const nx = offsetX / MAX_OFFSET; // -1 ~ 1
   const ny = offsetY / MAX_OFFSET;
-  state.aimX = Math.max(-1, Math.min(1, state.aimX + nx * AIM_SPEED * dt));
+  const cx = applyCurve(nx);
+  const cy = applyCurve(ny);
+  state.aimX = Math.max(-1, Math.min(1, state.aimX + cx * AIM_SPEED * dt));
   // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
   if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
-    state.aimY = Math.max(-1, Math.min(1, state.aimY + ny * AIM_SPEED * dt));
+    state.aimY = Math.max(-1, Math.min(1, state.aimY + cy * AIM_SPEED * dt));
   }
 }
 
