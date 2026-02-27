@@ -1,160 +1,86 @@
-// ── 사격장 배경 렌더링 + 원근감 ──
-import { W, RANGE_TOP, RANGE_BOTTOM, state } from './game.js?v=1';
-
-const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
-const VP_X = W / 2; // 소실점 X
-const VP_Y = RANGE_TOP + RANGE_H * 0.15; // 소실점 Y (상단 근처)
+// ── 탑다운 2D 필드 렌더링 ──
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=1';
 
 /**
- * 3D 월드 좌표 → 2D 캔버스 좌표 변환
- * @param {number} x - 좌우 위치 (-1~1, 0=중앙)
- * @param {number} y - 상하 위치 (-1~1, 0=중앙)
- * @param {number} z - 깊이 (0=가까움, 1=멀리)
- * @param {number} aimX - 에이밍 X 오프셋 (-1~1)
- * @param {number} aimY - 에이밍 Y 오프셋 (-1~1)
- * @returns {{sx: number, sy: number, scale: number}}
+ * 필드 배경 그리기 (탑다운 2D)
  */
-export function worldToScreen(x, y, z, aimX = 0, aimY = 0) {
-  const perspective = 1 - z * 0.85; // z=0 → 1.0, z=1 → 0.15
-  const aimOffX = aimX * 350;
-  const aimOffY = aimY * 280;
+export function drawField(ctx) {
+  // 하늘 그라데이션 (HUD 위 영역은 HUD가 덮으므로 FIELD_TOP부터)
+  // 낮: 밝은 파랑, 밤: 어두운 남색 (nightDarkness로 보간)
+  const nd = state.nightDarkness;
+  const dayR = 100, dayG = 180, dayB = 240;
+  const nightR = 10, nightG = 10, nightB = 40;
+  const skyR = Math.round(dayR + (nightR - dayR) * nd);
+  const skyG = Math.round(dayG + (nightG - dayG) * nd);
+  const skyB = Math.round(dayB + (nightB - dayB) * nd);
 
-  const baseX = VP_X + (x * W * 0.5) * perspective - aimOffX * perspective;
-  const baseY = VP_Y + (RANGE_H * 0.7) * (1 - z) + (y * RANGE_H * 0.3) * perspective - aimOffY * perspective;
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, FIELD_TOP + 40);
+  skyGrad.addColorStop(0, `rgb(${skyR},${skyG},${skyB})`);
+  skyGrad.addColorStop(1, `rgb(${Math.round(skyR * 0.7)},${Math.round(skyG * 0.8)},${Math.round(skyB * 0.9)})`);
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, FIELD_TOP + 40);
 
-  return {
-    sx: baseX,
-    sy: baseY,
-    scale: perspective,
-  };
-}
+  // 지면 (FIELD_TOP ~ FIELD_BOTTOM): 어두운 녹색 잔디
+  const groundR = Math.round(30 + (10 - 30) * nd);
+  const groundG = Math.round(60 + (20 - 60) * nd);
+  const groundB = Math.round(30 + (15 - 30) * nd);
+  ctx.fillStyle = `rgb(${groundR},${groundG},${groundB})`;
+  ctx.fillRect(0, FIELD_TOP, W, FIELD_BOTTOM - FIELD_TOP);
 
-/**
- * 사격장 배경 그리기
- */
-export function drawRange(ctx, aimX, aimY) {
-  const rangeH = RANGE_H;
-
-  // 배경 (어두운 실내)
-  const bgGrad = ctx.createLinearGradient(0, RANGE_TOP, 0, RANGE_BOTTOM);
-  bgGrad.addColorStop(0, '#1a1208');
-  bgGrad.addColorStop(0.3, '#2a1f10');
-  bgGrad.addColorStop(1, '#3a2a15');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, RANGE_TOP, W, rangeH);
-
-  // 소실점 기준 원근 레인
-  const aimOffX = aimX * 350;
-  const aimOffY = aimY * 280;
-  const vpx = VP_X - aimOffX;
-  const vpy = VP_Y - aimOffY;
-
-  // 바닥
-  ctx.fillStyle = '#2d2215';
-  ctx.beginPath();
-  ctx.moveTo(vpx - 40, vpy + 20);
-  ctx.lineTo(vpx + 40, vpy + 20);
-  ctx.lineTo(W + 50, RANGE_BOTTOM);
-  ctx.lineTo(-50, RANGE_BOTTOM);
-  ctx.fill();
-
-  // 레인 구분선
-  ctx.strokeStyle = 'rgba(255,220,150,0.08)';
+  // 미묘한 격자선
+  ctx.strokeStyle = `rgba(0,0,0,${0.06 + nd * 0.04})`;
   ctx.lineWidth = 1;
-  for (let i = -2; i <= 2; i++) {
+  const gridSize = 40;
+  for (let x = 0; x <= W; x += gridSize) {
     ctx.beginPath();
-    ctx.moveTo(vpx + i * 10, vpy + 20);
-    ctx.lineTo(W / 2 + i * 140, RANGE_BOTTOM);
+    ctx.moveTo(x, FIELD_TOP);
+    ctx.lineTo(x, FIELD_BOTTOM);
+    ctx.stroke();
+  }
+  for (let y = FIELD_TOP; y <= FIELD_BOTTOM; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
     ctx.stroke();
   }
 
-  // 거리 표시선 (가로)
-  for (let d = 0; d < 5; d++) {
-    const z = d / 5;
-    const p = worldToScreen(0, 0, z, aimX, aimY);
-    const spread = W * (1 - z * 0.7);
-    ctx.strokeStyle = `rgba(255,200,100,${0.04 + d * 0.02})`;
-    ctx.beginPath();
-    ctx.moveTo(p.sx - spread / 2, p.sy);
-    ctx.lineTo(p.sx + spread / 2, p.sy);
-    ctx.stroke();
-  }
+  // 스폰 영역 표시 (y=48 ~ y=150): 미묘한 빨간 틴트
+  ctx.fillStyle = `rgba(180,30,30,${0.04 + nd * 0.02})`;
+  ctx.fillRect(0, FIELD_TOP, W, 102);
 
-  // 천장 조명
-  for (let i = 0; i < 3; i++) {
-    const z = 0.2 + i * 0.3;
-    const p = worldToScreen(0, -0.8, z, aimX, aimY);
-    const r = 15 * p.scale;
-    const glow = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r * 4);
-    glow.addColorStop(0, 'rgba(255,230,150,0.15)');
-    glow.addColorStop(1, 'rgba(255,230,150,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(p.sx - r * 4, p.sy - r * 4, r * 8, r * 8);
-
-    ctx.fillStyle = '#ffeeaa';
-    ctx.beginPath();
-    ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 좌우 벽
-  ctx.fillStyle = '#251a0d';
-  // 왼쪽
-  ctx.beginPath();
-  ctx.moveTo(0, RANGE_TOP);
-  ctx.lineTo(vpx - 60, vpy);
-  ctx.lineTo(0, RANGE_BOTTOM);
-  ctx.lineTo(0, RANGE_TOP);
-  ctx.fill();
-  // 오른쪽
-  ctx.beginPath();
-  ctx.moveTo(W, RANGE_TOP);
-  ctx.lineTo(vpx + 60, vpy);
-  ctx.lineTo(W, RANGE_BOTTOM);
-  ctx.lineTo(W, RANGE_TOP);
-  ctx.fill();
-}
-
-// 십자선 이동 범위 (화면 좌표) - 전체 사격장 커버
-export const AIM_RANGE_X = 350;
-export const AIM_RANGE_Y = 280;
-
-/**
- * 십자선의 화면 좌표 반환
- */
-export function getCrosshairScreen() {
-  return {
-    cx: W / 2 + state.aimX * AIM_RANGE_X,
-    cy: (RANGE_TOP + RANGE_BOTTOM) / 2 + state.aimY * AIM_RANGE_Y,
-  };
-}
-
-/**
- * 십자선 그리기 (aimX/aimY에 따라 화면 위 이동)
- */
-export function drawCrosshair(ctx) {
-  const { cx, cy } = getCrosshairScreen();
-  const size = 16;
-
-  ctx.strokeStyle = 'rgba(255,80,80,0.8)';
+  // 경로 표시: 스폰에서 벽 구간으로의 미묘한 어두운 선
+  ctx.strokeStyle = `rgba(0,0,0,${0.03 + nd * 0.02})`;
   ctx.lineWidth = 2;
-  // 가로
+  const segXs = [80, 205, 335, 460]; // approximate wall segment centers
+  for (const sx of segXs) {
+    ctx.beginPath();
+    ctx.moveTo(sx, FIELD_TOP + 20);
+    ctx.lineTo(sx, WALL_Y - 10);
+    ctx.stroke();
+  }
+
+  // 성벽 아래 ~ FIELD_BOTTOM: 약간 밝은 내부 영역
+  ctx.fillStyle = `rgba(50,40,30,${0.15 + nd * 0.1})`;
+  ctx.fillRect(0, WALL_Y + 20, W, FIELD_BOTTOM - WALL_Y - 20);
+}
+
+/**
+ * 발사선 그리기 (타워에서 조준 방향으로 점선)
+ */
+export function drawFiringLine(ctx) {
+  const tx = W / 2, ty = TOWER_Y;
+  const dx = Math.cos(state.aimAngle);
+  const dy = -Math.sin(state.aimAngle); // canvas Y is down
+  const lineLen = 600; // extends past top of screen
+
+  ctx.save();
+  ctx.setLineDash([8, 8]);
+  ctx.strokeStyle = 'rgba(255,80,80,0.4)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx - size, cy);
-  ctx.lineTo(cx - 4, cy);
-  ctx.moveTo(cx + 4, cy);
-  ctx.lineTo(cx + size, cy);
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(tx + dx * lineLen, ty + dy * lineLen);
   ctx.stroke();
-  // 세로
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - size);
-  ctx.lineTo(cx, cy - 4);
-  ctx.moveTo(cx, cy + 4);
-  ctx.lineTo(cx, cy + size);
-  ctx.stroke();
-  // 중앙 점
-  ctx.fillStyle = 'rgba(255,80,80,0.9)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
