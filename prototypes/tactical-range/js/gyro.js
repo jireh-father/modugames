@@ -46,13 +46,8 @@ function onDeviceMotion(e) {
   const gx = rate.gamma || 0; // deg/s 좌우
   const gy = rate.beta || 0;  // deg/s 상하
 
-  // 활 당기는 중에는 Y축 비활성화
-  const lockY = state.currentWeapon === 'bow' && state.bow.drawing;
-
   state.aimX = Math.max(-1, Math.min(1, state.aimX + gx * GYRO_SENS));
-  if (!lockY) {
-    state.aimY = Math.max(-1, Math.min(1, state.aimY - gy * GYRO_SENS));
-  }
+  state.aimY = Math.max(-1, Math.min(1, state.aimY - gy * GYRO_SENS));
 }
 
 export function isGyroEnabled() { return enabled; }
