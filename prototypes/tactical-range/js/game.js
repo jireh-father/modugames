@@ -56,8 +56,11 @@ export const state = {
   // 웨이브
   wave: 0,
   waveTargetsLeft: 0, // 이번 웨이브에서 아직 안 맞춘 과녁 수
+  waveSpawnQueue: [],  // 순차 스폰 대기열
   waveCleared: false,
   wavePause: 0, // 웨이브 간 대기 시간
+  waveTimer: 0, // 웨이브 경과 시간
+  waveTimeLimit: 0, // 웨이브 제한 시간
 
   // 슬로모션
   slowMo: false,
@@ -88,8 +91,11 @@ export function resetGame() {
   state.obstacles = [];
   state.wave = 0;
   state.waveTargetsLeft = 0;
+  state.waveSpawnQueue = [];
   state.waveCleared = false;
   state.wavePause = 0;
+  state.waveTimer = 0;
+  state.waveTimeLimit = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
 }

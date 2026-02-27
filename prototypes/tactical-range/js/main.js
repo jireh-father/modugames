@@ -1,19 +1,19 @@
 // ── Tactical Range - 메인 게임 루프 ──
-import { W, H, state, isGameOver } from './game.js?v=6';
-import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=6';
-import { drawRange, drawCrosshair } from './renderer.js?v=6';
-import { initPistol, drawPistol } from './pistol.js?v=6';
-import { initBow, drawBow } from './bow.js?v=6';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=6';
-import { updateTargets, checkHits, drawTargets, drawWaveBanner } from './targets.js?v=6';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=6';
-import { updateParticles, drawParticles } from './particles.js?v=6';
+import { W, H, state, isGameOver } from './game.js?v=7';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=7';
+import { drawRange, drawCrosshair } from './renderer.js?v=7';
+import { initPistol, drawPistol } from './pistol.js?v=7';
+import { initBow, drawBow } from './bow.js?v=7';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=7';
+import { updateTargets, checkHits, drawTargets, drawWaveBanner, getWaveClearBonus } from './targets.js?v=7';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=7';
+import { updateParticles, drawParticles } from './particles.js?v=7';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=6';
-import { playCombo } from './audio.js?v=6';
-import { spawnParticles } from './particles.js?v=6';
+} from './hud.js?v=7';
+import { playCombo } from './audio.js?v=7';
+import { spawnParticles } from './particles.js?v=7';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -80,7 +80,7 @@ function update(dt, realDt) {
   const hits = checkHits(state.projectiles);
 
   for (const hit of hits) {
-    // 콤보 배율 적용: 3연속부터 x1.5, x2.0, x2.5...
+    // 콤보 배율: 3연속부터 x1.5, x2.0, x2.5...
     const comboMul = state.combo >= 2 ? 1 + state.combo * 0.5 : 1;
     const finalScore = Math.floor(hit.score * comboMul);
 
@@ -91,21 +91,32 @@ function update(dt, realDt) {
     // 콤보 이펙트
     if (state.combo >= 3) {
       playCombo(state.combo);
-      const scrY = 100;
-      spawnParticles(W / 2, scrY, 'comboText', { text: `${state.combo}x COMBO!` });
+      spawnParticles(W / 2, 100, 'comboText', { text: `${state.combo}x COMBO!` });
     }
 
-    // 점수 이펙트
+    // 화살 멀티킬 이펙트
+    const arrowMul = hit.arrowMulti || 1;
+    let scoreText = `+${finalScore}`;
+    if (arrowMul > 1) scoreText += ` (${arrowMul}x MULTI!)`;
+
     spawnParticles(W / 2, 80, 'scoreText', {
-      text: `+${finalScore}`,
-      color: finalScore >= 20 ? '#ff4444' : finalScore >= 10 ? '#ffcc44' : '#ffffff',
+      text: scoreText,
+      color: arrowMul > 1 ? '#ff44ff' : finalScore >= 20 ? '#ff4444' : finalScore >= 10 ? '#ffcc44' : '#ffffff',
     });
 
-    // 아이템 드랍
     tryDropItem(hit.type, state.combo);
   }
 
-  // 콤보 리셋: 범위 밖으로 나간 발사체가 있으면 빗나감 → 콤보 리셋
+  // 웨이브 클리어 보너스
+  if (state.waveCleared && state.wavePause > 1.4) {
+    // 클리어 직후 1프레임만 보너스 적용
+    const bonus = getWaveClearBonus();
+    if (bonus > 0) {
+      state.score += bonus;
+    }
+  }
+
+  // 콤보 리셋
   if (missedThisFrame > 0 && hits.length === 0) {
     state.combo = 0;
   }

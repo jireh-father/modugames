@@ -1,8 +1,8 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=6';
-import { registerZone } from './input.js?v=6';
-import { playStart, playGameOver } from './audio.js?v=6';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=6';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=7';
+import { registerZone } from './input.js?v=7';
+import { playStart, playGameOver } from './audio.js?v=7';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=7';
 
 let gameOverTriggered = false;
 
@@ -43,13 +43,24 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'left';
   ctx.fillText(`${state.score}`, 10, 32);
 
-  // 웨이브 + 남은 과녁
-  if (state.wave > 0) {
+  // 웨이브 + 남은 과녁 + 타이머
+  if (state.wave > 0 && !state.waveCleared) {
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#c0a060';
     ctx.font = 'bold 12px monospace';
-    ctx.textAlign = 'center';
     const remaining = state.targets.filter(t => t.alive && t.type !== 'supply').length;
-    ctx.fillText(`WAVE ${state.wave}  ×${remaining}`, W / 2, 20);
+    const queueLeft = state.waveSpawnQueue.filter(q => q.type !== 'supply').length;
+    ctx.fillText(`WAVE ${state.wave}  ×${remaining + queueLeft}`, W / 2, 20);
+
+    // 타이머 바
+    const timeLeft = Math.max(0, state.waveTimeLimit - state.waveTimer);
+    const ratio = timeLeft / state.waveTimeLimit;
+    const barW = 120;
+    const barX = W / 2 - barW / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(barX, 26, barW, 5);
+    ctx.fillStyle = ratio > 0.5 ? '#4f4' : ratio > 0.25 ? '#fa4' : '#f44';
+    ctx.fillRect(barX, 26, barW * ratio, 5);
   }
 
   // 콤보
