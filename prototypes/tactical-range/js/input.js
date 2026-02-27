@@ -46,32 +46,25 @@ function inZone(x, y, z) {
 // ── 멀티터치 추적: touchId → { handler, startX, startY, x, y } ──
 const activeTouches = new Map();
 
-function findHandler(cx, cy) {
+function touchDown(id, cx, cy) {
   for (const h of handlers) {
     if ((state.screen === 'paused' || state.screen === 'settings') && h.priority !== -1 && h.priority !== 100) continue;
     if (state.screen !== 'playing' && state.screen !== 'paused' && state.screen !== 'settings' && h.priority >= 0) continue;
-    if (inZone(cx, cy, h.zone)) {
-      return h;
+    if (!inZone(cx, cy, h.zone)) continue;
+
+    // onStart가 false를 반환하면 이 핸들러를 건너뛰고 다음 핸들러 시도
+    if (h.callbacks.onStart) {
+      const result = h.callbacks.onStart(cx, cy);
+      if (result === false) continue;
     }
+
+    activeTouches.set(id, {
+      handler: h,
+      startX: cx, startY: cy,
+      x: cx, y: cy,
+    });
+    return;
   }
-  return null;
-}
-
-function touchDown(id, cx, cy) {
-  const h = findHandler(cx, cy);
-  if (!h) return;
-
-  // onStart가 false를 반환하면 건너뜀
-  if (h.callbacks.onStart) {
-    const result = h.callbacks.onStart(cx, cy);
-    if (result === false) return;
-  }
-
-  activeTouches.set(id, {
-    handler: h,
-    startX: cx, startY: cy,
-    x: cx, y: cy,
-  });
 }
 
 function touchMove(id, cx, cy) {
