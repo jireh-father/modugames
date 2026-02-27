@@ -112,6 +112,105 @@ export function spawnParticles(x, y, type, opts = {}) {
       }
       break;
     }
+    case 'zombieDeath': {
+      // 좀비 사망 스플래터 (좀비 색상 사용)
+      const zColor = opts.color || '#446644';
+      const count3 = 10;
+      for (let i = 0; i < count3; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 40 + Math.random() * 80;
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 10,
+          y: y + (Math.random() - 0.5) * 10,
+          type: 'circle',
+          r: 2 + Math.random() * 5,
+          dr: -4,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color: zColor,
+          life: 0.4 + Math.random() * 0.4,
+        });
+      }
+      break;
+    }
+    case 'wallHit': {
+      // 벽 피격 - 회색 돌 파편 (작은)
+      for (let i = 0; i < 5; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 30 + Math.random() * 60;
+        state.particles.push({
+          x, y, type: 'rect',
+          w: 2 + Math.random() * 3,
+          h: 2 + Math.random() * 2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 20,
+          gravity: 150,
+          color: `hsl(0, 0%, ${40 + Math.random() * 25}%)`,
+          life: 0.3 + Math.random() * 0.2,
+          rotation: Math.random() * Math.PI,
+          rotSpeed: (Math.random() - 0.5) * 8,
+        });
+      }
+      break;
+    }
+    case 'wallBreak': {
+      // 벽 파괴 - 큰 회색 돌 덩어리
+      for (let i = 0; i < 15; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 120;
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 20,
+          y: y + (Math.random() - 0.5) * 10,
+          type: 'rect',
+          w: 3 + Math.random() * 8,
+          h: 3 + Math.random() * 6,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40,
+          gravity: 250,
+          color: `hsl(30, ${5 + Math.random() * 10}%, ${35 + Math.random() * 25}%)`,
+          life: 0.5 + Math.random() * 0.5,
+          rotation: Math.random() * Math.PI,
+          rotSpeed: (Math.random() - 0.5) * 12,
+        });
+      }
+      break;
+    }
+    case 'healPulse': {
+      // 치유 효과 - 녹색 십자가 상승
+      for (let i = 0; i < 5; i++) {
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 20,
+          y: y + (Math.random() - 0.5) * 10,
+          type: 'cross',
+          size: 4 + Math.random() * 4,
+          vx: (Math.random() - 0.5) * 15,
+          vy: -30 - Math.random() * 40,
+          color: '#44ff66',
+          life: 0.6 + Math.random() * 0.4,
+        });
+      }
+      break;
+    }
+    case 'freezeEffect': {
+      // 빙결 효과 - 파란 얼음 결정
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 50;
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 15,
+          y: y + (Math.random() - 0.5) * 15,
+          type: 'diamond',
+          size: 2 + Math.random() * 4,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 15,
+          color: `hsl(${190 + Math.random() * 20}, 80%, ${60 + Math.random() * 25}%)`,
+          life: 0.4 + Math.random() * 0.3,
+          rotation: Math.random() * Math.PI,
+          rotSpeed: (Math.random() - 0.5) * 6,
+        });
+      }
+      break;
+    }
   }
 }
 
@@ -169,6 +268,27 @@ export function drawParticles(ctx) {
       ctx.moveTo(p.x + s, p.y - s);
       ctx.lineTo(p.x - s, p.y + s);
       ctx.stroke();
+    } else if (p.type === 'cross') {
+      // 십자가 (치유 효과용)
+      const s = p.size || 4;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - s, p.y - s / 3, s * 2, s * 0.66);
+      ctx.fillRect(p.x - s / 3, p.y - s, s * 0.66, s * 2);
+    } else if (p.type === 'diamond') {
+      // 다이아몬드 (빙결 효과용)
+      const s = p.size || 3;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if (p.rotation) ctx.rotate(p.rotation);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -s);
+      ctx.lineTo(s * 0.6, 0);
+      ctx.lineTo(0, s);
+      ctx.lineTo(-s * 0.6, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
   }
   ctx.globalAlpha = 1;
