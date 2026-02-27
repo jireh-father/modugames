@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=5';
-import { worldToScreen } from './renderer.js?v=5';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=5';
-import { spawnParticles } from './particles.js?v=5';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=6';
+import { worldToScreen } from './renderer.js?v=6';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=6';
+import { spawnParticles } from './particles.js?v=6';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
@@ -206,18 +206,18 @@ function spawnObstacle() {
  * 과녁 업데이트
  */
 export function updateTargets(dt) {
-  // 웨이브 시작 (게임 시작 or 웨이브 클리어 후)
+  // 첫 웨이브 즉시 시작
   if (state.wave === 0) {
-    state.wavePause = 0.5;
+    startWave();
+    return;
   }
 
-  // 웨이브 간 대기
-  if (state.waveCleared || state.wave === 0) {
+  // 웨이브 클리어 후 대기 → 다음 웨이브
+  if (state.waveCleared) {
     state.wavePause -= dt;
     if (state.wavePause <= 0) {
       startWave();
     }
-    // 대기 중에도 보급품/기존 과녁 업데이트
   }
 
   // 보급품 스폰 (3웨이브마다)
