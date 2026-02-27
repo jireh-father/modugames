@@ -1,114 +1,98 @@
-// ── 조이스틱 조준 시스템 ──
-import { state, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, JOYSTICK_W } from './game.js?v=1';
+// ── 반원 다이얼 조준 시스템 ──
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=1';
 import { registerZone } from './input.js?v=1';
-import { settings } from './settings.js?v=1';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
-const JOY_CX = JOYSTICK_W / 2;          // 조이스틱 중심 X
-const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
-const JOY_R = 42;                         // 외곽 반지름
-const THUMB_R = 16;                        // 엄지 반지름
-const MAX_OFFSET = 35;                     // 최대 이동량
+const DIAL_CX = W / 2;
+const DIAL_CY = CTRL_Y + CTRL_H * 0.65; // dial center
+const DIAL_R = 75;
+const THUMB_R = 14;
 
-// 조이스틱 상태
 let active = false;
-let offsetX = 0;
-let offsetY = 0;
-let prevX = 0;
-let prevY = 0;
 
-export function initJoystick() {
+function angleFromTouch(x, y) {
+  const dx = x - DIAL_CX;
+  const dy = DIAL_CY - y; // flip Y
+  let angle = Math.atan2(dy, dx);
+  // Clamp to upper half (0 to pi)
+  if (angle < 0.15) angle = 0.15;       // ~8 deg from right
+  if (angle > Math.PI - 0.15) angle = Math.PI - 0.15; // ~8 deg from left
+  return angle;
+}
+
+export function initDial() {
   registerZone(
-    { x: 0, y: CTRL_Y, w: JOYSTICK_W, h: CTRL_H },
+    { x: DIAL_CX - DIAL_R - 20, y: CTRL_Y, w: DIAL_R * 2 + 40, h: CTRL_H },
     {
       onStart(x, y) {
         active = true;
-        offsetX = 0;
-        offsetY = 0;
-        prevX = x;
-        prevY = y;
+        state.aimAngle = angleFromTouch(x, y);
       },
       onMove(x, y) {
         if (!active) return;
-
-        // 드래그 델타 → 즉시 조준점 이동
-        const dx = x - prevX;
-        const dy = y - prevY;
-        prevX = x;
-        prevY = y;
-
-        state.aimX = Math.max(-1, Math.min(1, state.aimX + dx * settings.dragSens));
-        // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
-        if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
-          state.aimY = Math.max(-1, Math.min(1, state.aimY + dy * settings.dragSens));
-        }
-
-        // 썸스틱 시각적 위치 (중심 기준)
-        let ox = x - JOY_CX;
-        let oy = y - JOY_CY;
-        const dist = Math.hypot(ox, oy);
-        if (dist > MAX_OFFSET) {
-          ox = ox / dist * MAX_OFFSET;
-          oy = oy / dist * MAX_OFFSET;
-        }
-        offsetX = ox;
-        offsetY = oy;
+        state.aimAngle = angleFromTouch(x, y);
       },
       onEnd() {
         active = false;
-        offsetX = 0;
-        offsetY = 0;
       },
     },
-    5
+    5 // same priority as old joystick
   );
 }
 
-// 매 프레임 호출 (드래그 방식이라 여기선 할 일 없음)
-export function updateJoystick(dt) {
+export function updateDial(dt) {
+  // Nothing needed per-frame
 }
 
-export function drawJoystick(ctx) {
+export function drawDial(ctx) {
   ctx.save();
 
-  // 외곽 원
+  // Dial arc (upper half)
   ctx.strokeStyle = 'rgba(255,255,255,0.2)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(JOY_CX, JOY_CY, JOY_R, 0, Math.PI * 2);
+  ctx.arc(DIAL_CX, DIAL_CY, DIAL_R, Math.PI, 0, false); // pi to 0 = left to right arc
   ctx.stroke();
 
-  // 십자 가이드
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(JOY_CX - JOY_R, JOY_CY);
-  ctx.lineTo(JOY_CX + JOY_R, JOY_CY);
-  ctx.moveTo(JOY_CX, JOY_CY - JOY_R);
-  ctx.lineTo(JOY_CX, JOY_CY + JOY_R);
-  ctx.stroke();
+  // Tick marks at 30 deg intervals
+  for (let deg = 0; deg <= 180; deg += 30) {
+    const rad = deg * Math.PI / 180;
+    const inner = DIAL_R - 8;
+    const outer = DIAL_R + 4;
+    ctx.strokeStyle = deg === 90 ? 'rgba(255,100,100,0.5)' : 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = deg === 90 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(DIAL_CX + Math.cos(rad) * inner, DIAL_CY - Math.sin(rad) * inner);
+    ctx.lineTo(DIAL_CX + Math.cos(rad) * outer, DIAL_CY - Math.sin(rad) * outer);
+    ctx.stroke();
+  }
 
-  // 엄지 (썸스틱)
-  const thumbX = JOY_CX + offsetX;
-  const thumbY = JOY_CY + offsetY;
+  // Current angle thumb
+  const thumbX = DIAL_CX + Math.cos(state.aimAngle) * DIAL_R;
+  const thumbY = DIAL_CY - Math.sin(state.aimAngle) * DIAL_R;
 
-  ctx.fillStyle = active ? 'rgba(255,200,100,0.6)' : 'rgba(255,255,255,0.2)';
+  ctx.fillStyle = active ? 'rgba(255,100,80,0.7)' : 'rgba(255,200,100,0.4)';
   ctx.beginPath();
   ctx.arc(thumbX, thumbY, THUMB_R, 0, Math.PI * 2);
   ctx.fill();
-
-  ctx.strokeStyle = active ? 'rgba(255,200,100,0.8)' : 'rgba(255,255,255,0.3)';
+  ctx.strokeStyle = active ? '#ff6644' : 'rgba(255,200,100,0.6)';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(thumbX, thumbY, THUMB_R, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 레이블
+  // Direction line from center to thumb
+  ctx.strokeStyle = 'rgba(255,100,80,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(DIAL_CX, DIAL_CY);
+  ctx.lineTo(thumbX, thumbY);
+  ctx.stroke();
+
+  // Label
   ctx.fillStyle = 'rgba(255,255,255,0.25)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('조준', JOY_CX, CTRL_Y + 12);
+  ctx.fillText('\uC870\uC900', DIAL_CX, CTRL_Y + 12);
 
   ctx.restore();
 }
