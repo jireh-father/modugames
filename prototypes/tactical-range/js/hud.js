@@ -1,7 +1,7 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
 import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=10';
 import { registerZone } from './input.js?v=10';
-import { playStart, playGameOver } from './audio.js?v=10';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=10';
 import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=10';
 import { openSettings } from './settings.js?v=10';
 
@@ -33,6 +33,7 @@ export function initHUD() {
       onTap() {
         if (state.screen === 'playing') {
           state.screen = 'paused';
+          playUIPause();
         }
       },
     },
@@ -55,6 +56,7 @@ export function initHUD() {
         if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
             y >= resumeY && y <= resumeY + MENU_BTN_H) {
           state.screen = 'playing';
+          playUIResume();
           return;
         }
         // Restart 버튼
@@ -71,6 +73,7 @@ export function initHUD() {
         if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
             y >= settingsY && y <= settingsY + MENU_BTN_H) {
           openSettings();
+          playUIClick();
           return;
         }
         // Exit 버튼
@@ -78,6 +81,7 @@ export function initHUD() {
         if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
             y >= exitY && y <= exitY + MENU_BTN_H) {
           state.screen = 'title';
+          playUIClick();
           return;
         }
       },
@@ -91,11 +95,13 @@ export function initHUD() {
     {
       onTap(x, y) {
         if (state.screen !== 'playing') return;
+        const prev = state.currentWeapon;
         if (x < W / 2) {
           state.currentWeapon = 'pistol';
         } else {
           state.currentWeapon = 'bow';
         }
+        if (state.currentWeapon !== prev) playWeaponSwitch();
       },
     },
     10
@@ -430,6 +436,9 @@ export function triggerGameOver() {
   congratsTimer = 0;
   state.screen = 'gameover';
   playGameOver();
+  if (newBestScore || newBestWave) {
+    setTimeout(() => playNewRecord(), 600);
+  }
 }
 
 /**

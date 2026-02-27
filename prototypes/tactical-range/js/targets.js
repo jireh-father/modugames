@@ -1,7 +1,7 @@
 // ── 과녁 시스템 (웨이브 기반 - 순차 스폰) ──
 import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
 import { worldToScreen } from './renderer.js?v=10';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=10';
+import { playTargetHit, playSupplyDrop, playWallHit, playWallBreak, playWaveStart, playWaveClear, playExplosion, playBulletMiss } from './audio.js?v=10';
 import { spawnParticles } from './particles.js?v=10';
 
 // 거리별 배율
@@ -85,6 +85,7 @@ function startWave() {
   state.wave++;
   state.waveCleared = false;
   state.waveTimer = 0;
+  playWaveStart();
 
   const config = getWaveConfig(state.wave);
   const totalTargets = config.normals + config.fasts + config.golds + config.bonuses + config.walledTargets;
@@ -309,6 +310,7 @@ export function updateTargets(dt) {
     if (remaining === 0 && nonSupplyInQueue === 0) {
       state.waveCleared = true;
       state.wavePause = 1.5;
+      playWaveClear();
     }
   }
 
@@ -379,6 +381,9 @@ export function checkHits(projectiles) {
             obs.broken = true;
             const scr = worldToScreen(obs.x, obs.y - obs.h * 0.3, obs.z, state.aimX, state.aimY);
             spawnParticles(scr.sx, scr.sy, 'explosion');
+            playWallBreak();
+          } else {
+            playWallHit();
           }
           p.alive = false;
           const scr = worldToScreen(p.x, p.y, p.z, state.aimX, state.aimY);
@@ -424,6 +429,7 @@ export function checkHits(projectiles) {
         // 폭발 화살
         if (p.type === 'arrow' && p.special) {
           spawnParticles(scr.sx, scr.sy, 'explosion');
+          playExplosion();
           for (const other of state.targets) {
             if (other === t || !other.alive) continue;
             const odist = Math.hypot(other.x - t.x, other.y - t.y);

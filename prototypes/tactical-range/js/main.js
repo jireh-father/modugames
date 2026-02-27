@@ -12,7 +12,7 @@ import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
 } from './hud.js?v=10';
-import { playCombo } from './audio.js?v=10';
+import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=10';
 import { spawnParticles } from './particles.js?v=10';
 import { initSettings, drawSettings } from './settings.js?v=10';
 
@@ -119,9 +119,10 @@ function update(dt, realDt) {
     }
   }
 
-  // 콤보 리셋
+  // 콤보 리셋 + 빗나감 소리
   if (missedThisFrame > 0 && hits.length === 0) {
     state.combo = 0;
+    playBulletMiss();
   }
 
   // 마지막 1발 슬로모션
@@ -131,6 +132,7 @@ function update(dt, realDt) {
   if (totalAmmo === 1 && !state.slowMo) {
     state.slowMo = true;
     state.slowMoTimer = 3;
+    playSlowMo();
   }
 
   // 게임 오버 체크

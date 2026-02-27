@@ -1,6 +1,7 @@
 // ── 설정 메뉴 ──
 import { state, W, H } from './game.js?v=10';
 import { registerZone } from './input.js?v=10';
+import { playUIClick } from './audio.js?v=10';
 
 // 설정값 범위
 const DRAG_MIN = 0.003, DRAG_MAX = 0.018, DRAG_STEP = 0.001, DRAG_DEFAULT = 0.009;
@@ -68,13 +69,13 @@ export function initSettings() {
           // 왼쪽 화살표
           if (x >= BAR_X - ARROW_W && x <= BAR_X && y >= rowY && y <= rowY + BAR_H) {
             settings[s.key] = Math.max(s.min, +(settings[s.key] - s.step).toFixed(4));
-            save();
+            save(); playUIClick();
             return;
           }
           // 오른쪽 화살표
           if (x >= BAR_X + BAR_W && x <= BAR_X + BAR_W + ARROW_W && y >= rowY && y <= rowY + BAR_H) {
             settings[s.key] = Math.min(s.max, +(settings[s.key] + s.step).toFixed(4));
-            save();
+            save(); playUIClick();
             return;
           }
           // 바 직접 탭 → 해당 위치로 값 설정
@@ -83,7 +84,7 @@ export function initSettings() {
             const raw = s.min + ratio * (s.max - s.min);
             settings[s.key] = +(Math.round(raw / s.step) * s.step).toFixed(4);
             settings[s.key] = Math.max(s.min, Math.min(s.max, settings[s.key]));
-            save();
+            save(); playUIClick();
             return;
           }
         }
@@ -95,12 +96,12 @@ export function initSettings() {
           const offX = BAR_X + 100;
           if (x >= onX && x <= onX + 80) {
             settings.gyroOn = true;
-            save();
+            save(); playUIClick();
             return;
           }
           if (x >= offX && x <= offX + 80) {
             settings.gyroOn = false;
-            save();
+            save(); playUIClick();
             return;
           }
         }
@@ -108,7 +109,7 @@ export function initSettings() {
         // BACK 버튼
         const backY = H * 0.75;
         if (x >= W / 2 - 100 && x <= W / 2 + 100 && y >= backY && y <= backY + 50) {
-          closeSettings();
+          closeSettings(); playUIClick();
           return;
         }
 
@@ -118,7 +119,7 @@ export function initSettings() {
           settings.dragSens = DRAG_DEFAULT;
           settings.gyroSens = GYRO_DEFAULT;
           settings.gyroOn = true;
-          save();
+          save(); playUIClick();
           return;
         }
       },

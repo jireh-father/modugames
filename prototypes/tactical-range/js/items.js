@@ -2,7 +2,7 @@
 import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=10';
 import { worldToScreen } from './renderer.js?v=10';
 import { registerZone } from './input.js?v=10';
-import { playItemPickup, playCombo } from './audio.js?v=10';
+import { playItemPickup, playCombo, playItemDrop } from './audio.js?v=10';
 import { spawnParticles } from './particles.js?v=10';
 
 // 아이템 정의
@@ -48,6 +48,7 @@ export function tryDropItem(targetType, combo) {
   const screenX = W * 0.15 + Math.random() * W * 0.7;
   const screenY = RANGE_BOTTOM - 80 - Math.random() * 100;
 
+  playItemDrop();
   state.items.push({
     ...item,
     screenX,
