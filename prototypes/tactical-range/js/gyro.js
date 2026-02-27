@@ -1,6 +1,6 @@
 // ── 자이로 조준 시스템 ──
 // DeviceOrientation 기반: 폰 기울기 각도 변화에 따라 조준점 이동
-import { state } from './game.js?v=2';
+import { state } from './game.js?v=3';
 
 const GYRO_SENS = 0.03; // 기울기 각도 변화 → 조준 이동 감도
 let enabled = false;

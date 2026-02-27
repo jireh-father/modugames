@@ -1,8 +1,8 @@
 // ── 과녁 시스템 ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=2';
-import { worldToScreen } from './renderer.js?v=2';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=3';
+import { worldToScreen } from './renderer.js?v=3';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 // 과녁 스폰 타이머
 let spawnTimer = 0;

@@ -1,19 +1,19 @@
 // ── Tactical Range - 메인 게임 루프 ──
-import { W, H, state, isGameOver } from './game.js?v=2';
-import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=2';
-import { drawRange, drawCrosshair } from './renderer.js?v=2';
-import { initPistol, drawPistol } from './pistol.js?v=2';
-import { initBow, drawBow } from './bow.js?v=2';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=2';
-import { updateTargets, checkHits, drawTargets } from './targets.js?v=2';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=2';
-import { updateParticles, drawParticles } from './particles.js?v=2';
+import { W, H, state, isGameOver } from './game.js?v=3';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=3';
+import { drawRange, drawCrosshair } from './renderer.js?v=3';
+import { initPistol, drawPistol } from './pistol.js?v=3';
+import { initBow, drawBow } from './bow.js?v=3';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=3';
+import { updateTargets, checkHits, drawTargets } from './targets.js?v=3';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=3';
+import { updateParticles, drawParticles } from './particles.js?v=3';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=2';
-import { playCombo } from './audio.js?v=2';
-import { spawnParticles } from './particles.js?v=2';
+} from './hud.js?v=3';
+import { playCombo } from './audio.js?v=3';
+import { spawnParticles } from './particles.js?v=3';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');

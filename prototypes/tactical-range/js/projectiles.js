@@ -1,6 +1,6 @@
 // ── 발사체 시스템 (탄환 + 화살) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=2';
-import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=2';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=3';
+import { worldToScreen, AIM_RANGE_X, AIM_RANGE_Y } from './renderer.js?v=3';
 
 const RANGE_H = RANGE_BOTTOM - RANGE_TOP;
 const VP_X = W / 2;
@@ -51,8 +51,8 @@ export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
     vz: type === 'bullet' ? 3.0 : (1.5 + power * 1.5) / 4,
     // 화살 포물선: 위로 올라갔다가 중력으로 내려옴 (장애물 넘기)
     gravityOffset: 0,
-    gravity: type === 'arrow' ? 0.2 : 0,
-    gravityVel: type === 'arrow' ? -0.1 * power : 0,
+    gravity: type === 'arrow' ? 0.6 : 0,
+    gravityVel: type === 'arrow' ? -0.35 * power : 0,
     power,
     alive: true,
     trail: [],
@@ -138,9 +138,9 @@ export function drawProjectiles(ctx, aimX, aimY) {
         for (let i = 1; i < p.trail.length; i++) {
           const t = p.trail[i];
           const ts = worldToScreen(t.x, t.y, t.z, aimX, aimY);
-          const alpha = i / p.trail.length * 0.3;
+          const alpha = i / p.trail.length * 0.5;
           ctx.strokeStyle = p.special ? `rgba(255,100,0,${alpha})` : `rgba(180,160,100,${alpha})`;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 3 * ts.scale;
           const prev = p.trail[i - 1];
           const ps = worldToScreen(prev.x, prev.y, prev.z, aimX, aimY);
           ctx.beginPath();
@@ -151,23 +151,40 @@ export function drawProjectiles(ctx, aimX, aimY) {
       }
 
       // 화살 본체
-      const len = 15 * scr.scale;
+      const len = 25 * scr.scale;
       const angle = Math.atan2(p.gravityVel, p.vz);
       ctx.strokeStyle = p.special ? '#ff6600' : '#c0a060';
-      ctx.lineWidth = 2 * scr.scale;
+      ctx.lineWidth = 4 * scr.scale;
       ctx.beginPath();
       ctx.moveTo(scr.sx - Math.cos(angle) * len, scr.sy + Math.sin(angle) * len * 0.5);
       ctx.lineTo(scr.sx + Math.cos(angle) * len, scr.sy - Math.sin(angle) * len * 0.5);
       ctx.stroke();
 
       // 화살촉
-      ctx.fillStyle = p.special ? '#ff4400' : '#888';
+      ctx.fillStyle = p.special ? '#ff4400' : '#aaa';
       ctx.beginPath();
       const tipX = scr.sx + Math.cos(angle) * len;
       const tipY = scr.sy - Math.sin(angle) * len * 0.5;
       ctx.moveTo(tipX, tipY);
-      ctx.lineTo(tipX - 5 * scr.scale, tipY - 3 * scr.scale);
-      ctx.lineTo(tipX - 5 * scr.scale, tipY + 3 * scr.scale);
+      ctx.lineTo(tipX - 8 * scr.scale, tipY - 5 * scr.scale);
+      ctx.lineTo(tipX - 8 * scr.scale, tipY + 5 * scr.scale);
+      ctx.closePath();
+      ctx.fill();
+
+      // 깃털
+      const tailX = scr.sx - Math.cos(angle) * len;
+      const tailY = scr.sy + Math.sin(angle) * len * 0.5;
+      ctx.fillStyle = p.special ? 'rgba(255,100,0,0.6)' : 'rgba(160,130,80,0.6)';
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(tailX - 4 * scr.scale, tailY - 6 * scr.scale);
+      ctx.lineTo(tailX + 6 * scr.scale, tailY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(tailX - 4 * scr.scale, tailY + 6 * scr.scale);
+      ctx.lineTo(tailX + 6 * scr.scale, tailY);
       ctx.closePath();
       ctx.fill();
     }
