@@ -1,12 +1,14 @@
 // ── 게임 상수 ──
 export const W = 540, H = 960;
 export const HUD_H = 48;
-export const RANGE_TOP = HUD_H;
-export const RANGE_BOTTOM = Math.floor(H * 0.7); // 672
-export const CONTROLS_TOP = RANGE_BOTTOM;
+export const FIELD_TOP = HUD_H;              // 48 - field starts after HUD
+export const WALL_Y = 520;                   // wall arc center Y
+export const TOWER_Y = 590;                  // tower position Y
+export const FIELD_BOTTOM = 640;             // field area ends
+export const CONTROLS_TOP = Math.floor(H * 0.7); // 672
 export const CONTROLS_BOTTOM = H;
-export const SLOT_H = 40; // 무기 슬롯 높이
-export const JOYSTICK_W = 110; // 조이스틱 영역 너비
+export const SLOT_H = 40;                    // 무기 슬롯 높이
+export const DIAL_R = 80;                    // half-circle dial radius
 
 // ── 게임 상태 ──
 export const state = {
@@ -14,14 +16,13 @@ export const state = {
   score: 0,
   combo: 0,
   maxCombo: 0,
-  bestScore: parseInt(localStorage.getItem('tr_best') || '0'),
-  bestWave: parseInt(localStorage.getItem('tr_best_wave') || '0'),
+  bestScore: parseInt(localStorage.getItem('zw_best') || '0'),
+  bestWave: parseInt(localStorage.getItem('zw_best_wave') || '0'),
   time: 0,
   difficulty: 0, // 0~1
 
-  // 에이밍 (화면 중앙 기준 오프셋)
-  aimX: 0, // -1 ~ 1
-  aimY: 0, // -1 ~ 1
+  // 에이밍 (라디안, π/2 = 정면(12시), 0 = 오른쪽, π = 왼쪽)
+  aimAngle: Math.PI / 2,
 
   // 무기 선택
   currentWeapon: 'pistol', // pistol | bow | sniper | mg | crossbow
@@ -76,21 +77,50 @@ export const state = {
     cocked: false,     // 크랭크 완료 여부
   },
 
+  // 성벽 (4구간)
+  walls: [
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+  ],
+
+  // 타워
+  tower: { hp: 200, maxHp: 200 },
+
+  // 낮/밤
+  day: 1,
+  isNight: false,        // true for waves 4,5
+  nightDarkness: 0,      // 0~1 interpolation
+
   // 엔티티 배열
-  targets: [],
+  zombies: [],
+  mines: [],             // placed mines on field
+  hazards: [],           // fire/poison areas
   projectiles: [],
   items: [],
   particles: [],
-  obstacles: [],
+
+  // 버프
+  buffs: {
+    shieldTimer: 0,      // wall invincibility
+    speedTimer: 0,       // fire rate boost
+    freezeShots: 0,      // remaining freeze shots
+    chainShots: 0,       // remaining chain shots
+    poisonShots: 0,      // remaining poison shots
+  },
+
+  // 내부 침투 좀비 수
+  zombiesInside: 0,
 
   // 웨이브
   wave: 0,
-  waveTargetsLeft: 0, // 이번 웨이브에서 아직 안 맞춘 과녁 수
-  waveSpawnQueue: [],  // 순차 스폰 대기열
+  waveZombiesLeft: 0,    // 이번 웨이브에서 남은 좀비 수
+  waveSpawnQueue: [],    // 순차 스폰 대기열
   waveCleared: false,
-  wavePause: 0, // 웨이브 간 대기 시간
-  waveTimer: 0, // 웨이브 경과 시간
-  waveTimeLimit: 0, // 웨이브 제한 시간
+  wavePause: 0,          // 웨이브 간 대기 시간
+  waveTimer: 0,          // 웨이브 경과 시간
+  waveTimeLimit: 0,      // 웨이브 제한 시간
 
   // 슬로모션
   slowMo: false,
@@ -104,8 +134,7 @@ export function resetGame() {
   state.maxCombo = 0;
   state.time = 0;
   state.difficulty = 0;
-  state.aimX = 0;
-  state.aimY = 0;
+  state.aimAngle = Math.PI / 2;
   state.currentWeapon = 'pistol';
   state.pistol = {
     magazineBullets: 6, magazineMax: 6, reserveBullets: 0,
@@ -123,13 +152,32 @@ export function resetGame() {
   state.crossbow = {
     bolts: 3, loaded: false, cranking: false, crankProgress: 0, cocked: false,
   };
-  state.targets = [];
+  state.walls = [
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+  ];
+  state.tower = { hp: 200, maxHp: 200 };
+  state.day = 1;
+  state.isNight = false;
+  state.nightDarkness = 0;
+  state.zombies = [];
+  state.mines = [];
+  state.hazards = [];
   state.projectiles = [];
   state.items = [];
   state.particles = [];
-  state.obstacles = [];
+  state.buffs = {
+    shieldTimer: 0,
+    speedTimer: 0,
+    freezeShots: 0,
+    chainShots: 0,
+    poisonShots: 0,
+  };
+  state.zombiesInside = 0;
   state.wave = 0;
-  state.waveTargetsLeft = 0;
+  state.waveZombiesLeft = 0;
   state.waveSpawnQueue = [];
   state.waveCleared = false;
   state.wavePause = 0;
@@ -153,5 +201,5 @@ export function getTotalAmmo() {
 }
 
 export function isGameOver() {
-  return getTotalAmmo() <= 0;
+  return state.tower.hp <= 0;
 }
