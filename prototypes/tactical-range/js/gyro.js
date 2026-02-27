@@ -55,7 +55,7 @@ function onOrientation(e) {
 
     // 오른쪽 기울기 → 조준점 오른쪽, 위로 기울기 → 조준점 위
     state.aimX = Math.max(-1, Math.min(1, state.aimX + dGamma * GYRO_SENS));
-    state.aimY = Math.max(-1, Math.min(1, state.aimY + dBeta * GYRO_SENS));
+    state.aimY = Math.max(-1, Math.min(1, state.aimY - dBeta * GYRO_SENS));
   }
 
   lastGamma = gamma;
