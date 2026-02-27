@@ -9,12 +9,14 @@ const JOY_CY = CTRL_Y + CTRL_H / 2;     // 조이스틱 중심 Y
 const JOY_R = 42;                         // 외곽 반지름
 const THUMB_R = 16;                        // 엄지 반지름
 const MAX_OFFSET = 35;                     // 최대 이동량
-const AIM_SPEED = 3.0;                      // 조준 이동 속도
+const DRAG_SENS = 0.018;                   // 드래그 감도 (px → aim 변환)
 
 // 조이스틱 상태
 let active = false;
 let offsetX = 0;
 let offsetY = 0;
+let prevX = 0;
+let prevY = 0;
 
 export function initJoystick() {
   registerZone(
@@ -24,18 +26,34 @@ export function initJoystick() {
         active = true;
         offsetX = 0;
         offsetY = 0;
+        prevX = x;
+        prevY = y;
       },
       onMove(x, y) {
         if (!active) return;
-        let dx = x - JOY_CX;
-        let dy = y - JOY_CY;
-        const dist = Math.hypot(dx, dy);
-        if (dist > MAX_OFFSET) {
-          dx = dx / dist * MAX_OFFSET;
-          dy = dy / dist * MAX_OFFSET;
+
+        // 드래그 델타 → 즉시 조준점 이동
+        const dx = x - prevX;
+        const dy = y - prevY;
+        prevX = x;
+        prevY = y;
+
+        state.aimX = Math.max(-1, Math.min(1, state.aimX + dx * DRAG_SENS));
+        // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
+        if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
+          state.aimY = Math.max(-1, Math.min(1, state.aimY + dy * DRAG_SENS));
         }
-        offsetX = dx;
-        offsetY = dy;
+
+        // 썸스틱 시각적 위치 (중심 기준)
+        let ox = x - JOY_CX;
+        let oy = y - JOY_CY;
+        const dist = Math.hypot(ox, oy);
+        if (dist > MAX_OFFSET) {
+          ox = ox / dist * MAX_OFFSET;
+          oy = oy / dist * MAX_OFFSET;
+        }
+        offsetX = ox;
+        offsetY = oy;
       },
       onEnd() {
         active = false;
@@ -47,23 +65,8 @@ export function initJoystick() {
   );
 }
 
-// 비선형 커브: 작은 기울기 = 미세 조정, 큰 기울기 = 빠른 이동
-function applyCurve(v) {
-  return Math.sign(v) * v * v;
-}
-
-// 매 프레임 호출: 조이스틱 오프셋에 비례해 조준점 이동
+// 매 프레임 호출 (드래그 방식이라 여기선 할 일 없음)
 export function updateJoystick(dt) {
-  if (!active) return;
-  const nx = offsetX / MAX_OFFSET; // -1 ~ 1
-  const ny = offsetY / MAX_OFFSET;
-  const cx = applyCurve(nx);
-  const cy = applyCurve(ny);
-  state.aimX = Math.max(-1, Math.min(1, state.aimX + cx * AIM_SPEED * dt));
-  // 활 당기는 중에는 Y축 조준 비활성화 (좌우만 가능)
-  if (!(state.currentWeapon === 'bow' && state.bow.drawing)) {
-    state.aimY = Math.max(-1, Math.min(1, state.aimY + cy * AIM_SPEED * dt));
-  }
 }
 
 export function drawJoystick(ctx) {
