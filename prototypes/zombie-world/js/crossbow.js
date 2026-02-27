@@ -1,13 +1,13 @@
 // ── 크로스보우 시스템: 크랭크 장전 + 볼트 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { fireProjectile } from './projectiles.js?v=3';
-import { playCrossbowShoot, playCrossbowCrank, playCrossbowLoad } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { fireProjectile } from './projectiles.js?v=4';
+import { playCrossbowShoot, playCrossbowCrank, playCrossbowLoad } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
-const CTRL_Y = CONTROLS_TOP + SLOT_H;
+const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
 const WEAPON_W = W - JOYSTICK_W;
 const COL_W = WEAPON_W / 3;
@@ -18,6 +18,7 @@ let crankDragging = false;
 let boltDrag = null; // {x, y} 볼트 드래그
 let bodyDragging = false;
 let bodyLastX = 0;
+let bodyTotalDragX = 0;
 
 export function initCrossbow() {
   // ── 볼트 슬롯 (왼쪽) - 볼트를 드래그해서 크로스보우에 장전 ──
@@ -64,10 +65,12 @@ export function initCrossbow() {
         if (state.currentWeapon !== 'crossbow') return false;
         bodyDragging = true;
         bodyLastX = x;
+        bodyTotalDragX = 0;
       },
       onMove(x, y) {
         if (!bodyDragging || state.currentWeapon !== 'crossbow') return;
         const frameDx = x - bodyLastX;
+        bodyTotalDragX += Math.abs(frameDx);
         bodyLastX = x;
         const aimSens = 0.005;
         state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
@@ -75,6 +78,9 @@ export function initCrossbow() {
       onEnd() {
         if (!bodyDragging || state.currentWeapon !== 'crossbow') { bodyDragging = false; return; }
         bodyDragging = false;
+
+        // 드래그로 조준했으면 발사하지 않음 (탭만 발사)
+        if (bodyTotalDragX >= 10) return;
 
         const c = state.crossbow;
         if (c.loaded && c.cocked) {

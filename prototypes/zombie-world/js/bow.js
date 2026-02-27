@@ -1,13 +1,13 @@
 // ── 활 시스템: 렌더링 + 조작 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { fireProjectile } from './projectiles.js?v=3';
-import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { fireProjectile } from './projectiles.js?v=4';
+import { playBowDraw, playBowRelease, playArrowPick, playArrowNock } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
-const CTRL_Y = CONTROLS_TOP + SLOT_H;
+const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
 const WEAPON_W = W - JOYSTICK_W; // 조이스틱 제외 무기 영역
 const QUIVER_W = WEAPON_W * 0.25;

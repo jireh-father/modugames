@@ -1,9 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=3';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=3';
-import { openSettings } from './settings.js?v=3';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=4';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=4';
+import { openSettings } from './settings.js?v=4';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -229,8 +229,13 @@ export function drawWeaponSlots(ctx) {
  * 조작부 배경
  */
 export function drawControlsBg(ctx) {
+  // 아이템 바 배경
+  ctx.fillStyle = '#0d0a08';
+  ctx.fillRect(0, CONTROLS_TOP + SLOT_H, W, ITEM_BAR_H);
+
+  // 무기 컨트롤 배경 (아이템 바 아래)
   ctx.fillStyle = '#1a1510';
-  ctx.fillRect(0, CONTROLS_TOP + SLOT_H, W, CONTROLS_BOTTOM - CONTROLS_TOP - SLOT_H);
+  ctx.fillRect(0, CONTROLS_TOP + SLOT_H + ITEM_BAR_H, W, CONTROLS_BOTTOM - CONTROLS_TOP - SLOT_H - ITEM_BAR_H);
 }
 
 /**

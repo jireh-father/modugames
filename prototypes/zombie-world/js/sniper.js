@@ -1,13 +1,13 @@
 // ── 저격총 시스템: 볼트액션 + 스코프 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { fireProjectile } from './projectiles.js?v=3';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, TOWER_Y } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { fireProjectile } from './projectiles.js?v=4';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
-const CTRL_Y = CONTROLS_TOP + SLOT_H;
+const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
 const WEAPON_W = W - JOYSTICK_W;
 const COL_W = WEAPON_W / 3;
@@ -18,6 +18,7 @@ let boltDragging = false;
 let scopeDragging = false;
 let triggerDragging = false;
 let triggerLastX = 0;
+let triggerTotalDragX = 0;
 
 export function initSniper() {
   // ── 볼트 영역 (왼쪽) - 위로 드래그: 볼트 열기, 아래로: 볼트 닫기 ──
@@ -69,10 +70,12 @@ export function initSniper() {
         if (state.currentWeapon !== 'sniper') return false;
         triggerDragging = true;
         triggerLastX = x;
+        triggerTotalDragX = 0;
       },
       onMove(x, y) {
         if (!triggerDragging || state.currentWeapon !== 'sniper') return;
         const frameDx = x - triggerLastX;
+        triggerTotalDragX += Math.abs(frameDx);
         triggerLastX = x;
         // 스코프 활성 시 더 정밀한 조준
         const aimSens = state.sniper.scoping ? 0.002 : 0.005;
@@ -81,6 +84,9 @@ export function initSniper() {
       onEnd() {
         if (!triggerDragging || state.currentWeapon !== 'sniper') { triggerDragging = false; return; }
         triggerDragging = false;
+
+        // 드래그로 조준했으면 발사하지 않음 (탭만 발사)
+        if (triggerTotalDragX >= 10) return;
 
         const s = state.sniper;
         if (s.chambered && !s.boltOpen) {

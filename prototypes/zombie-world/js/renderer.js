@@ -1,5 +1,5 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=3';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=4';
 
 /**
  * 필드 배경 그리기 (탑다운 2D)

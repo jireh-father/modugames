@@ -1,13 +1,13 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { fireProjectile } from './projectiles.js?v=3';
-import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { fireProjectile } from './projectiles.js?v=4';
+import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
-const CTRL_Y = CONTROLS_TOP + SLOT_H;
+const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
 const WEAPON_W = W - JOYSTICK_W;
 const COL_W = WEAPON_W / 3;
@@ -18,6 +18,7 @@ let slideDragging = false;
 let triggerDragY = 0;
 let triggerDragging = false;
 let triggerLastX = 0;
+let triggerTotalDragX = 0;
 let magDragY = 0;
 let magDragging = false;
 
@@ -78,12 +79,14 @@ export function initPistol() {
         triggerDragging = true;
         triggerDragY = 20; // 시각 피드백용
         triggerLastX = x;
+        triggerTotalDragX = 0;
       },
       onMove(x, y, dx, dy) {
         if (!triggerDragging || state.currentWeapon !== 'pistol') return;
         triggerDragY = Math.max(0, Math.min(40, dy));
         // 좌우 드래그로 조준 이동
         const frameDx = x - triggerLastX;
+        triggerTotalDragX += Math.abs(frameDx);
         triggerLastX = x;
         const aimSens = 0.005;
         state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
@@ -92,6 +95,9 @@ export function initPistol() {
         if (!triggerDragging || state.currentWeapon !== 'pistol') { triggerDragging = false; return; }
         triggerDragging = false;
         triggerDragY = 0;
+
+        // 드래그로 조준했으면 발사하지 않음 (탭만 발사)
+        if (triggerTotalDragX >= 10) return;
 
         // 놓으면 발사
         const p = state.pistol;

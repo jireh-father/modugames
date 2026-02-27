@@ -1,8 +1,21 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=3';
-import { registerZone } from './input.js?v=3';
-import { playItemPickup, playItemDrop } from './audio.js?v=3';
-import { spawnParticles } from './particles.js?v=3';
+import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=4';
+import { registerZone } from './input.js?v=4';
+import { playItemPickup, playItemDrop } from './audio.js?v=4';
+import { spawnParticles } from './particles.js?v=4';
+
+// 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
+const AUTO_APPLY_IDS = new Set([
+  'bullet3', 'bullet6', 'arrow2', 'arrow5',
+  'sniperAmmo', 'mgAmmo', 'bolt2',
+]);
+
+// 인벤토리 아이템 - 인벤토리에 저장 후 수동 사용
+const INVENTORY_IDS = new Set([
+  'brick', 'medkit', 'mine', 'molotov', 'bomb',
+  'shield', 'speedBoost', 'freeze', 'chain', 'poison',
+  'magUpgrade', 'goldBullet', 'explosiveArrow',
+]);
 
 // ── 아이템 정의 ──
 const ITEM_TYPES = [
@@ -42,11 +55,16 @@ function pickWeightedItem() {
 }
 
 /**
- * 아이템 효과 적용
+ * 아이템 효과 적용 (자동 적용 아이템만 즉시 적용, 나머지는 인벤토리로)
  */
 function applyItem(item) {
+  if (INVENTORY_IDS.has(item.id)) {
+    addToInventory(item);
+    return;
+  }
+
+  // 자동 적용 아이템 (탄약류)
   switch (item.id) {
-    // 탄약류
     case 'bullet3': state.pistol.reserveBullets += 3; break;
     case 'bullet6': state.pistol.reserveBullets += 6; break;
     case 'arrow2':  state.bow.arrows += 2; break;
@@ -54,24 +72,46 @@ function applyItem(item) {
     case 'sniperAmmo': state.sniper.reserveRounds += 2; break;
     case 'mgAmmo':  state.mg.reserveAmmo += 30; break;
     case 'bolt2':   state.crossbow.bolts += 2; break;
-    // 특수탄
-    case 'magUpgrade':
-      state.pistol.magazineMax = Math.min(12, state.pistol.magazineMax + 2);
-      break;
-    case 'goldBullet':
-      state.pistol.specialBullets += 1;
-      break;
-    case 'explosiveArrow':
-      state.bow.specialArrows += 1;
-      break;
-    // 좀비 월드 전용
+  }
+}
+
+/**
+ * 인벤토리에 아이템 추가
+ */
+function addToInventory(item) {
+  const existing = state.inventory.find(i => i.id === item.id);
+  if (existing) {
+    existing.count++;
+  } else {
+    state.inventory.push({
+      id: item.id,
+      label: item.label,
+      color: item.color,
+      count: 1,
+    });
+  }
+}
+
+/**
+ * 인벤토리 아이템 사용 (inventory.js에서 호출)
+ * @param {string} itemId - 아이템 ID
+ * @param {number} targetX - 타겟 X 좌표
+ * @param {number} targetY - 타겟 Y 좌표
+ * @returns {boolean} 사용 성공 여부
+ */
+export function useInventoryItem(itemId, targetX, targetY) {
+  const inv = state.inventory.find(i => i.id === itemId);
+  if (!inv || inv.count <= 0) return false;
+
+  switch (itemId) {
     case 'brick': {
-      // 가장 HP 낮은 벽 구간에 +25
-      let lowest = 0;
-      for (let i = 1; i < state.walls.length; i++) {
-        if (state.walls[i].hp < state.walls[lowest].hp) lowest = i;
+      // 가장 가까운 벽 구간에 +25
+      const segCenters = [80, 205, 335, 460];
+      let best = 0;
+      for (let i = 1; i < 4; i++) {
+        if (Math.abs(targetX - segCenters[i]) < Math.abs(targetX - segCenters[best])) best = i;
       }
-      state.walls[lowest].hp = Math.min(state.walls[lowest].maxHp, state.walls[lowest].hp + 25);
+      state.walls[best].hp = Math.min(state.walls[best].maxHp, state.walls[best].hp + 25);
       break;
     }
     case 'medkit':
@@ -79,8 +119,8 @@ function applyItem(item) {
       break;
     case 'mine':
       state.mines.push({
-        x: 50 + Math.random() * (W - 100),
-        y: 200 + Math.random() * 300,
+        x: Math.max(30, Math.min(510, targetX)),
+        y: Math.max(100, Math.min(500, targetY)),
         radius: 60,
         damage: 5,
       });
@@ -88,12 +128,27 @@ function applyItem(item) {
     case 'molotov':
       state.hazards.push({
         type: 'fire',
-        x: 50 + Math.random() * (W - 100),
-        y: 200 + Math.random() * 250,
+        x: Math.max(30, Math.min(510, targetX)),
+        y: Math.max(100, Math.min(500, targetY)),
         radius: 50,
         damage: 2,
         timer: 3,
       });
+      break;
+    case 'bomb':
+      for (const z of state.zombies) {
+        if (Math.hypot(z.x - targetX, z.y - targetY) < 80) {
+          z.hp -= 5;
+          z.hitFlash = 0.15;
+        }
+      }
+      spawnParticles(targetX, targetY, 'explosion');
+      break;
+    case 'shield':
+      state.buffs.shieldTimer = 5;
+      break;
+    case 'speedBoost':
+      state.buffs.speedTimer = 10;
       break;
     case 'freeze':
       state.buffs.freezeShots += 3;
@@ -104,20 +159,24 @@ function applyItem(item) {
     case 'poison':
       state.buffs.poisonShots += 3;
       break;
-    case 'shield':
-      state.buffs.shieldTimer = 5;
+    case 'magUpgrade':
+      state.pistol.magazineMax = Math.min(12, state.pistol.magazineMax + 2);
       break;
-    case 'speedBoost':
-      state.buffs.speedTimer = 10;
+    case 'goldBullet':
+      state.pistol.specialBullets += 1;
       break;
-    case 'bomb':
-      // 즉시: 모든 좀비에 5 데미지
-      for (const z of state.zombies) {
-        z.hp -= 5;
-        z.hitFlash = 0.15;
-      }
+    case 'explosiveArrow':
+      state.bow.specialArrows += 1;
       break;
+    default:
+      return false;
   }
+
+  inv.count--;
+  if (inv.count <= 0) {
+    state.inventory.splice(state.inventory.indexOf(inv), 1);
+  }
+  return true;
 }
 
 /**
@@ -275,7 +334,7 @@ export function drawItems(ctx) {
 /**
  * 아이템별 아이콘 그리기
  */
-function drawItemIcon(ctx, item, x, y) {
+export function drawItemIcon(ctx, item, x, y) {
   const id = item.id;
   const c = item.color || '#fff';
 

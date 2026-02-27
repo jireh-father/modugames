@@ -1,5 +1,5 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=3';
+import { W, state, WALL_Y } from './game.js?v=4';
 
 // 4 wall segments - positions along the arc
 const WALL_SEGMENTS = [

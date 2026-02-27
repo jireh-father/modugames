@@ -8,6 +8,7 @@ export const FIELD_BOTTOM = 640;             // field area ends
 export const CONTROLS_TOP = Math.floor(H * 0.7); // 672
 export const CONTROLS_BOTTOM = H;
 export const SLOT_H = 40;                    // 무기 슬롯 높이
+export const ITEM_BAR_H = 35;               // 인벤토리 바 높이
 export const DIAL_R = 80;                    // half-circle dial radius
 
 // ── 게임 상태 ──
@@ -93,6 +94,9 @@ export const state = {
   isNight: false,        // true for waves 4,5
   nightDarkness: 0,      // 0~1 interpolation
 
+  // 인벤토리 (사용 아이템)
+  inventory: [],
+
   // 엔티티 배열
   zombies: [],
   mines: [],             // placed mines on field
@@ -162,6 +166,7 @@ export function resetGame() {
   state.day = 1;
   state.isNight = false;
   state.nightDarkness = 0;
+  state.inventory = [];
   state.zombies = [];
   state.mines = [];
   state.hazards = [];

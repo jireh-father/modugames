@@ -1,26 +1,27 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=3';
-import { initDial, updateDial, drawDial } from './aiming.js?v=3';
-import { drawField, drawFiringLine } from './renderer.js?v=3';
-import { initPistol, drawPistol } from './pistol.js?v=3';
-import { initBow, drawBow } from './bow.js?v=3';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=3';
-import { initMG, updateMG, drawMG } from './mg.js?v=3';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=3';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=3';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=3';
-import { updateWalls, drawWalls } from './wall.js?v=3';
-import { drawTower } from './tower.js?v=3';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=3';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=3';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=3';
+import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=4';
+import { initDial, updateDial, drawDial } from './aiming.js?v=4';
+import { drawField, drawFiringLine } from './renderer.js?v=4';
+import { initPistol, drawPistol } from './pistol.js?v=4';
+import { initBow, drawBow } from './bow.js?v=4';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=4';
+import { initMG, updateMG, drawMG } from './mg.js?v=4';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=4';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=4';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=4';
+import { updateWalls, drawWalls } from './wall.js?v=4';
+import { drawTower } from './tower.js?v=4';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=4';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=4';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=4';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=3';
-import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=3';
-import { initSettings, drawSettings } from './settings.js?v=3';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=3';
+} from './hud.js?v=4';
+import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=4';
+import { initSettings, drawSettings } from './settings.js?v=4';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=4';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=4';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -46,6 +47,7 @@ initSniper();
 initMG();
 initCrossbow();
 initItems();
+initInventory();
 initSettings();
 
 // ── 게임 루프 ──
@@ -213,6 +215,9 @@ function draw() {
   // 아이템
   drawItems(ctx);
 
+  // 인벤토리 드래그 오버레이 (필드 위 타겟 하이라이트)
+  drawInventoryDragOverlay(ctx);
+
   // 파티클
   drawParticles(ctx);
 
@@ -240,6 +245,9 @@ function draw() {
 
   // 무기 슬롯
   drawWeaponSlots(ctx);
+
+  // 인벤토리 바
+  drawInventory(ctx);
 
   // 조준 다이얼
   drawDial(ctx);
