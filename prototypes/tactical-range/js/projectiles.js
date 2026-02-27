@@ -49,10 +49,10 @@ export function fireProjectile(type, aimX, aimY, special = false, power = 1) {
     y: start.y,
     z: 0,
     vz: type === 'bullet' ? 3.0 : 1.5 + power * 1.5,
-    // 화살 중력으로 인한 y 편차
+    // 화살 포물선: 위로 올라갔다가 중력으로 내려옴 (장애물 넘기)
     gravityOffset: 0,
-    gravity: type === 'arrow' ? 0.3 : 0,
-    gravityVel: 0,
+    gravity: type === 'arrow' ? 0.8 : 0,
+    gravityVel: type === 'arrow' ? -0.4 * power : 0,
     power,
     alive: true,
     trail: [],

@@ -140,8 +140,8 @@ export function checkHits(projectiles) {
     const p = projectiles[pi];
     if (!p.alive) continue;
 
-    // 장애물 체크 (관통탄 제외)
-    if (!p.special) {
+    // 장애물 체크 (관통탄/화살 제외 - 화살은 포물선으로 장애물을 넘음)
+    if (!p.special && p.type !== 'arrow') {
       for (const obs of state.obstacles) {
         const dz = Math.abs(p.z - obs.z);
         const dx = Math.abs(p.x - obs.x);
@@ -177,7 +177,8 @@ export function checkHits(projectiles) {
         const distZone = t.z < 0.4 ? 0 : t.z < 0.7 ? 1 : 2;
         const distMul = DIST_MULTIPLIER[distZone];
 
-        p.alive = false;
+        // 화살은 관통 (alive 유지), 총알은 소멸
+        if (p.type !== 'arrow') p.alive = false;
         t.alive = false;
 
         // 명중 자국
@@ -203,7 +204,8 @@ export function checkHits(projectiles) {
         results.push({ target: t, hitDist, score, type: t.type });
         playTargetHit();
 
-        break; // 하나의 발사체는 하나의 과녁만
+        // 총알은 하나만, 화살은 관통하여 여러 과녁 맞춤
+        if (p.type !== 'arrow') break;
       }
     }
   }
@@ -215,11 +217,22 @@ export function checkHits(projectiles) {
  * 과녁 렌더링
  */
 export function drawTargets(ctx, aimX, aimY) {
-  // 장애물 먼저
+  // 장애물 먼저 (뒤에 과녁이 있으면 반투명)
   for (const obs of state.obstacles) {
     const scr = worldToScreen(obs.x, obs.y, obs.z, aimX, aimY);
     const w = obs.w * 300 * scr.scale;
     const h = obs.h * 300 * scr.scale;
+
+    // 장애물 뒤에 과녁이 있는지 체크
+    let hasTargetBehind = false;
+    for (const t of state.targets) {
+      if (t.z > obs.z && Math.abs(t.x - obs.x) < obs.w && Math.abs(t.y - obs.y) < obs.h * 1.5) {
+        hasTargetBehind = true;
+        break;
+      }
+    }
+
+    ctx.globalAlpha = hasTargetBehind ? 0.35 : 1;
 
     ctx.fillStyle = '#4a3520';
     ctx.fillRect(scr.sx - w / 2, scr.sy - h, w, h);
@@ -237,6 +250,8 @@ export function drawTargets(ctx, aimX, aimY) {
       ctx.lineTo(scr.sx + w / 2 - 2, ly);
       ctx.stroke();
     }
+
+    ctx.globalAlpha = 1;
   }
 
   // 과녁 (깊이순 정렬: 먼 것 먼저)
