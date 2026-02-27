@@ -42,6 +42,10 @@ export function initHUD() {
   registerZone(
     { x: 0, y: 0, w: W, h: H },
     {
+      onStart() {
+        // paused 상태가 아니면 이 핸들러를 건너뛰고 다음 핸들러로
+        if (state.screen !== 'paused') return false;
+      },
       onTap(x, y) {
         if (state.screen !== 'paused') return;
         const cx = W / 2;
