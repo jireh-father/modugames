@@ -30,8 +30,8 @@ export const state = {
 
   // 권총
   pistol: {
-    magazineBullets: 6,
-    magazineMax: 6,
+    magazineBullets: 8,
+    magazineMax: 8,
     reserveBullets: 0,
     chambered: true,
     magazineOut: false,
@@ -141,7 +141,7 @@ export function resetGame() {
   state.aimAngle = Math.PI / 2;
   state.currentWeapon = 'pistol';
   state.pistol = {
-    magazineBullets: 6, magazineMax: 6, reserveBullets: 54,
+    magazineBullets: 8, magazineMax: 8, reserveBullets: 52,
     chambered: false, magazineOut: false, slideBack: true, specialBullets: 0, reloadMode: false,
   };
   state.bow = {
