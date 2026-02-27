@@ -1,0 +1,157 @@
+// ── 게임 상수 ──
+export const W = 540, H = 960;
+export const HUD_H = 48;
+export const RANGE_TOP = HUD_H;
+export const RANGE_BOTTOM = Math.floor(H * 0.7); // 672
+export const CONTROLS_TOP = RANGE_BOTTOM;
+export const CONTROLS_BOTTOM = H;
+export const SLOT_H = 40; // 무기 슬롯 높이
+export const JOYSTICK_W = 110; // 조이스틱 영역 너비
+
+// ── 게임 상태 ──
+export const state = {
+  screen: 'title', // title | playing | paused | gameover
+  score: 0,
+  combo: 0,
+  maxCombo: 0,
+  bestScore: parseInt(localStorage.getItem('tr_best') || '0'),
+  bestWave: parseInt(localStorage.getItem('tr_best_wave') || '0'),
+  time: 0,
+  difficulty: 0, // 0~1
+
+  // 에이밍 (화면 중앙 기준 오프셋)
+  aimX: 0, // -1 ~ 1
+  aimY: 0, // -1 ~ 1
+
+  // 무기 선택
+  currentWeapon: 'pistol', // pistol | bow | sniper | mg | crossbow
+
+  // 권총
+  pistol: {
+    magazineBullets: 6,
+    magazineMax: 6,
+    reserveBullets: 0,
+    chambered: true,
+    magazineOut: false,
+    slideBack: false,
+    specialBullets: 0,
+    reloadMode: false,
+  },
+
+  // 활
+  bow: {
+    arrows: 3,
+    specialArrows: 0,
+    arrowNocked: false,
+    drawPower: 0,
+    drawing: false,
+  },
+
+  // 저격총
+  sniper: {
+    chambered: true,
+    boltOpen: false,
+    reserveRounds: 3,
+    scoping: false,
+    scopeZoom: 0, // 0~1
+  },
+
+  // 기관총
+  mg: {
+    ammo: 30,
+    reserveAmmo: 0,
+    heat: 0,       // 0~1 과열도
+    overheated: false,
+    firing: false,
+    fireTimer: 0,
+    cocked: true,
+  },
+
+  // 크로스보우
+  crossbow: {
+    bolts: 3,
+    loaded: false,
+    cranking: false,
+    crankProgress: 0, // 0~1
+    cocked: false,     // 크랭크 완료 여부
+  },
+
+  // 엔티티 배열
+  targets: [],
+  projectiles: [],
+  items: [],
+  particles: [],
+  obstacles: [],
+
+  // 웨이브
+  wave: 0,
+  waveTargetsLeft: 0, // 이번 웨이브에서 아직 안 맞춘 과녁 수
+  waveSpawnQueue: [],  // 순차 스폰 대기열
+  waveCleared: false,
+  wavePause: 0, // 웨이브 간 대기 시간
+  waveTimer: 0, // 웨이브 경과 시간
+  waveTimeLimit: 0, // 웨이브 제한 시간
+
+  // 슬로모션
+  slowMo: false,
+  slowMoTimer: 0,
+};
+
+export function resetGame() {
+  state.screen = 'playing';
+  state.score = 0;
+  state.combo = 0;
+  state.maxCombo = 0;
+  state.time = 0;
+  state.difficulty = 0;
+  state.aimX = 0;
+  state.aimY = 0;
+  state.currentWeapon = 'pistol';
+  state.pistol = {
+    magazineBullets: 6, magazineMax: 6, reserveBullets: 0,
+    chambered: false, magazineOut: false, slideBack: true, specialBullets: 0, reloadMode: false,
+  };
+  state.bow = {
+    arrows: 3, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,
+  };
+  state.sniper = {
+    chambered: true, boltOpen: false, reserveRounds: 3, scoping: false, scopeZoom: 0,
+  };
+  state.mg = {
+    ammo: 30, reserveAmmo: 0, heat: 0, overheated: false, firing: false, fireTimer: 0, cocked: true,
+  };
+  state.crossbow = {
+    bolts: 3, loaded: false, cranking: false, crankProgress: 0, cocked: false,
+  };
+  state.targets = [];
+  state.projectiles = [];
+  state.items = [];
+  state.particles = [];
+  state.obstacles = [];
+  state.wave = 0;
+  state.waveTargetsLeft = 0;
+  state.waveSpawnQueue = [];
+  state.waveCleared = false;
+  state.wavePause = 0;
+  state.waveTimer = 0;
+  state.waveTimeLimit = 0;
+  state.slowMo = false;
+  state.slowMoTimer = 0;
+}
+
+export function getTotalAmmo() {
+  const p = state.pistol;
+  const b = state.bow;
+  const s = state.sniper;
+  const m = state.mg;
+  const c = state.crossbow;
+  return p.magazineBullets + p.reserveBullets + p.specialBullets + (p.chambered ? 1 : 0)
+    + b.arrows + b.specialArrows + (b.arrowNocked ? 1 : 0)
+    + s.reserveRounds + (s.chambered ? 1 : 0)
+    + m.ammo + m.reserveAmmo
+    + c.bolts + (c.loaded ? 1 : 0);
+}
+
+export function isGameOver() {
+  return getTotalAmmo() <= 0;
+}
