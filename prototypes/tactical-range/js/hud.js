@@ -1,16 +1,77 @@
 // ── HUD + 무기 교체 + 게임 화면 ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=7';
-import { registerZone } from './input.js?v=7';
-import { playStart, playGameOver } from './audio.js?v=7';
-import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=7';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js?v=8';
+import { registerZone } from './input.js?v=8';
+import { playStart, playGameOver } from './audio.js?v=8';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js?v=8';
 
 let gameOverTriggered = false;
+let newBestScore = false;
+let newBestWave = false;
+let congratsTimer = 0;
+
+// 일시정지 메뉴 버튼 영역
+const PAUSE_BTN = { x: W - 44, y: 4, w: 40, h: 40 };
+const MENU_BTN_W = 200;
+const MENU_BTN_H = 50;
+const MENU_Y_START = H * 0.4;
+const MENU_GAP = 65;
 
 /**
  * 무기 슬롯 터치 등록
  */
 export function initHUD() {
   gameOverTriggered = false;
+  newBestScore = false;
+  newBestWave = false;
+  congratsTimer = 0;
+
+  // 일시정지 버튼 (HUD 영역)
+  registerZone(
+    PAUSE_BTN,
+    {
+      onTap() {
+        if (state.screen === 'playing') {
+          state.screen = 'paused';
+        }
+      },
+    },
+    20
+  );
+
+  // 일시정지 메뉴 버튼들 (priority 100 = paused에서도 동작)
+  registerZone(
+    { x: 0, y: 0, w: W, h: H },
+    {
+      onTap(x, y) {
+        if (state.screen !== 'paused') return;
+        const cx = W / 2;
+        // Resume 버튼
+        const resumeY = MENU_Y_START;
+        if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
+            y >= resumeY && y <= resumeY + MENU_BTN_H) {
+          state.screen = 'playing';
+          return;
+        }
+        // Restart 버튼
+        const restartY = MENU_Y_START + MENU_GAP;
+        if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
+            y >= restartY && y <= restartY + MENU_BTN_H) {
+          gameOverTriggered = false;
+          resetGame();
+          playStart();
+          return;
+        }
+        // Exit 버튼
+        const exitY = MENU_Y_START + MENU_GAP * 2;
+        if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
+            y >= exitY && y <= exitY + MENU_BTN_H) {
+          state.screen = 'title';
+          return;
+        }
+      },
+    },
+    100
+  );
 
   // 무기 슬롯 영역
   registerZone(
@@ -91,10 +152,10 @@ export function drawHUD(ctx) {
 
   ctx.fillText(`탄:${pistolTotal} 화살:${bowTotal}`, W - 10, 22);
 
-  // 하이스코어
+  // 하이스코어 (점수 + 웨이브)
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
-  ctx.fillText(`BEST: ${state.bestScore}`, W - 10, 38);
+  ctx.fillText(`BEST: ${state.bestScore} W${state.bestWave}`, W - 10, 38);
 
   // 자이로 상태
   if (isGyroEnabled()) {
@@ -102,6 +163,13 @@ export function drawHUD(ctx) {
     ctx.font = '9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('GYRO', W / 2, 12);
+  }
+
+  // 일시정지 버튼 (II 아이콘)
+  if (state.screen === 'playing') {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(PAUSE_BTN.x + 12, PAUSE_BTN.y + 10, 5, 20);
+    ctx.fillRect(PAUSE_BTN.x + 23, PAUSE_BTN.y + 10, 5, 20);
   }
 }
 
@@ -176,23 +244,78 @@ export function drawTitle(ctx) {
   ctx.font = 'bold 18px monospace';
   ctx.fillText('TAP TO START', W / 2, H * 0.6);
 
-  // 하이스코어
-  if (state.bestScore > 0) {
-    ctx.fillStyle = '#666';
+  // 기록 표시
+  if (state.bestScore > 0 || state.bestWave > 0) {
+    ctx.fillStyle = '#888';
     ctx.font = '14px monospace';
-    ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.7);
+    if (state.bestScore > 0) {
+      ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.68);
+    }
+    if (state.bestWave > 0) {
+      ctx.fillText(`BEST WAVE: ${state.bestWave}`, W / 2, H * 0.73);
+    }
   }
 
   // 무기 미리보기
   ctx.fillStyle = '#444';
   ctx.font = '12px monospace';
-  ctx.fillText('🔫 권총  ×  🏹 활', W / 2, H * 0.8);
+  ctx.fillText('🔫 권총  ×  🏹 활', W / 2, H * 0.82);
+}
+
+/**
+ * 일시정지 메뉴 그리기
+ */
+export function drawPauseMenu(ctx) {
+  // 반투명 오버레이
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(0, 0, W, H);
+
+  // PAUSED
+  ctx.fillStyle = '#c0a060';
+  ctx.font = 'bold 36px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('PAUSED', W / 2, H * 0.28);
+
+  // 현재 점수/웨이브 표시
+  ctx.fillStyle = '#888';
+  ctx.font = '14px monospace';
+  ctx.fillText(`SCORE: ${state.score}  |  WAVE ${state.wave}`, W / 2, H * 0.34);
+
+  // 메뉴 버튼들
+  const buttons = [
+    { label: 'RESUME', color: '#4a8' },
+    { label: 'RESTART', color: '#a84' },
+    { label: 'EXIT', color: '#844' },
+  ];
+
+  for (let i = 0; i < buttons.length; i++) {
+    const by = MENU_Y_START + i * MENU_GAP;
+    const bx = W / 2 - MENU_BTN_W / 2;
+
+    // 버튼 배경
+    ctx.fillStyle = buttons[i].color;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(bx, by, MENU_BTN_W, MENU_BTN_H, 8);
+    } else {
+      ctx.rect(bx, by, MENU_BTN_W, MENU_BTN_H);
+    }
+    ctx.fill();
+
+    // 버튼 텍스트
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText(buttons[i].label, W / 2, by + 33);
+  }
 }
 
 /**
  * 게임 오버 화면
  */
 export function drawGameOver(ctx) {
+  // 축하 타이머 갱신
+  congratsTimer += 0.016;
+
   // 반투명 오버레이
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(0, 0, W, H);
@@ -201,35 +324,60 @@ export function drawGameOver(ctx) {
   ctx.fillStyle = '#cc3333';
   ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('GAME OVER', W / 2, H * 0.3);
+  ctx.fillText('GAME OVER', W / 2, H * 0.25);
 
   // 점수
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 28px monospace';
-  ctx.fillText(`${state.score}`, W / 2, H * 0.42);
+  ctx.fillText(`${state.score}`, W / 2, H * 0.35);
   ctx.fillStyle = '#aaa';
   ctx.font = '14px monospace';
-  ctx.fillText('SCORE', W / 2, H * 0.42 + 24);
+  ctx.fillText('SCORE', W / 2, H * 0.35 + 22);
 
   // 웨이브 + 최대 콤보
   ctx.fillStyle = '#c0a060';
   ctx.font = 'bold 20px monospace';
-  ctx.fillText(`WAVE ${state.wave}`, W / 2, H * 0.52);
+  ctx.fillText(`WAVE ${state.wave}`, W / 2, H * 0.45);
 
   ctx.fillStyle = '#ffdd44';
   ctx.font = 'bold 16px monospace';
-  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.58);
+  ctx.fillText(`MAX COMBO: ${state.maxCombo}`, W / 2, H * 0.50);
 
-  // 하이스코어
-  const isNew = state.score > state.bestScore;
-  if (isNew) {
-    ctx.fillStyle = '#ff4444';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText('NEW BEST!', W / 2, H * 0.63);
+  // 기록 표시 (점수 기록 + 웨이브 기록 따로)
+  let recordY = H * 0.56;
+
+  // 점수 기록
+  if (newBestScore) {
+    const flash = 0.7 + Math.sin(congratsTimer * 6) * 0.3;
+    ctx.fillStyle = `rgba(255,68,68,${flash})`;
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('NEW BEST SCORE!', W / 2, recordY);
   } else {
     ctx.fillStyle = '#666';
     ctx.font = '14px monospace';
-    ctx.fillText(`BEST: ${state.bestScore}`, W / 2, H * 0.63);
+    ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, recordY);
+  }
+  recordY += 24;
+
+  // 웨이브 기록
+  if (newBestWave) {
+    const flash = 0.7 + Math.sin(congratsTimer * 6 + 1) * 0.3;
+    ctx.fillStyle = `rgba(255,170,68,${flash})`;
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('NEW BEST WAVE!', W / 2, recordY);
+  } else {
+    ctx.fillStyle = '#666';
+    ctx.font = '14px monospace';
+    ctx.fillText(`BEST WAVE: ${state.bestWave}`, W / 2, recordY);
+  }
+  recordY += 24;
+
+  // 둘 다 갱신 시 축하 메시지
+  if (newBestScore && newBestWave) {
+    const bigFlash = 0.6 + Math.sin(congratsTimer * 4) * 0.4;
+    ctx.fillStyle = `rgba(255,215,0,${bigFlash})`;
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('DOUBLE RECORD!', W / 2, recordY);
   }
 
   // 재시작
@@ -246,11 +394,21 @@ export function triggerGameOver() {
   if (gameOverTriggered) return;
   gameOverTriggered = true;
 
-  if (state.score > state.bestScore) {
+  // 점수 기록
+  newBestScore = state.score > state.bestScore;
+  if (newBestScore) {
     state.bestScore = state.score;
     localStorage.setItem('tr_best', String(state.score));
   }
 
+  // 웨이브 기록
+  newBestWave = state.wave > state.bestWave;
+  if (newBestWave) {
+    state.bestWave = state.wave;
+    localStorage.setItem('tr_best_wave', String(state.wave));
+  }
+
+  congratsTimer = 0;
   state.screen = 'gameover';
   playGameOver();
 }

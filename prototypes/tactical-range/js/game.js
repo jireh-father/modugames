@@ -10,11 +10,12 @@ export const JOYSTICK_W = 110; // 조이스틱 영역 너비
 
 // ── 게임 상태 ──
 export const state = {
-  screen: 'title', // title | playing | gameover
+  screen: 'title', // title | playing | paused | gameover
   score: 0,
   combo: 0,
   maxCombo: 0,
   bestScore: parseInt(localStorage.getItem('tr_best') || '0'),
+  bestWave: parseInt(localStorage.getItem('tr_best_wave') || '0'),
   time: 0,
   difficulty: 0, // 0~1
 

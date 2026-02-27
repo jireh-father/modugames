@@ -1,19 +1,19 @@
 // ── Tactical Range - 메인 게임 루프 ──
-import { W, H, state, isGameOver } from './game.js?v=7';
-import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=7';
-import { drawRange, drawCrosshair } from './renderer.js?v=7';
-import { initPistol, drawPistol } from './pistol.js?v=7';
-import { initBow, drawBow } from './bow.js?v=7';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=7';
-import { updateTargets, checkHits, drawTargets, drawWaveBanner, getWaveClearBonus } from './targets.js?v=7';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=7';
-import { updateParticles, drawParticles } from './particles.js?v=7';
+import { W, H, state, isGameOver } from './game.js?v=8';
+import { initJoystick, updateJoystick, drawJoystick } from './aiming.js?v=8';
+import { drawRange, drawCrosshair } from './renderer.js?v=8';
+import { initPistol, drawPistol } from './pistol.js?v=8';
+import { initBow, drawBow } from './bow.js?v=8';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=8';
+import { updateTargets, checkHits, drawTargets, drawWaveBanner, getWaveClearBonus } from './targets.js?v=8';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=8';
+import { updateParticles, drawParticles } from './particles.js?v=8';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
-  drawTitle, drawGameOver, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=7';
-import { playCombo } from './audio.js?v=7';
-import { spawnParticles } from './particles.js?v=7';
+  drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
+} from './hud.js?v=8';
+import { playCombo } from './audio.js?v=8';
+import { spawnParticles } from './particles.js?v=8';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -55,6 +55,7 @@ function loop(time) {
 
 function update(dt, realDt) {
   if (state.screen !== 'playing') return;
+  // paused 상태도 여기서 이미 걸러짐 (screen === 'paused')
 
   state.time += dt;
   state.difficulty = Math.min(state.wave / 20, 1);
@@ -193,6 +194,11 @@ function draw() {
   // 무기별 조작 UI
   drawPistol(ctx);
   drawBow(ctx);
+
+  // 일시정지 오버레이
+  if (state.screen === 'paused') {
+    drawPauseMenu(ctx);
+  }
 
   // 게임 오버 오버레이
   if (state.screen === 'gameover') {

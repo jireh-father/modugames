@@ -1,8 +1,8 @@
 // ── 과녁 시스템 (웨이브 기반 - 순차 스폰) ──
-import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=7';
-import { worldToScreen } from './renderer.js?v=7';
-import { playTargetHit, playSupplyDrop } from './audio.js?v=7';
-import { spawnParticles } from './particles.js?v=7';
+import { state, W, RANGE_TOP, RANGE_BOTTOM } from './game.js?v=8';
+import { worldToScreen } from './renderer.js?v=8';
+import { playTargetHit, playSupplyDrop } from './audio.js?v=8';
+import { spawnParticles } from './particles.js?v=8';
 
 // 거리별 배율
 const DIST_MULTIPLIER = [1, 2, 3]; // near, mid, far
@@ -94,27 +94,31 @@ function startWave() {
     spawnObstacle();
   }
 
-  // 스폰 대기열 생성 (타입 + 딜레이)
-  const queue = [];
-  const types = [];
-  for (let i = 0; i < config.normals; i++) types.push('normal');
-  for (let i = 0; i < config.fasts; i++) types.push('fast');
-  for (let i = 0; i < config.golds; i++) types.push('gold');
-  for (let i = 0; i < config.bonuses; i++) types.push('bonus');
-  for (let i = 0; i < config.supplies; i++) types.push('supply');
-
-  // 셔플
-  for (let i = types.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [types[i], types[j]] = [types[j], types[i]];
+  // 기본 과녁은 즉시 스폰
+  for (let i = 0; i < config.normals; i++) {
+    const pos = generateOnePosition();
+    spawnTarget('normal', pos, config);
   }
 
-  // 첫 과녁은 즉시, 이후 랜덤 간격 (0.5~2초)
-  let delay = 0;
-  for (const type of types) {
+  // 특수 과녁 + 보급품은 랜덤 딜레이로 대기열
+  const specials = [];
+  for (let i = 0; i < config.fasts; i++) specials.push('fast');
+  for (let i = 0; i < config.golds; i++) specials.push('gold');
+  for (let i = 0; i < config.bonuses; i++) specials.push('bonus');
+  for (let i = 0; i < config.supplies; i++) specials.push('supply');
+
+  // 셔플
+  for (let i = specials.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [specials[i], specials[j]] = [specials[j], specials[i]];
+  }
+
+  const queue = [];
+  let delay = 1.5 + Math.random() * 2; // 첫 특수는 1.5~3.5초 후
+  for (const type of specials) {
     const pos = generateOnePosition();
     queue.push({ type, pos, delay, config });
-    delay += 0.5 + Math.random() * 1.5;
+    delay += 1.0 + Math.random() * 2.5;
   }
 
   state.waveSpawnQueue = queue;
