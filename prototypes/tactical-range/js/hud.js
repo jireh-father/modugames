@@ -2,7 +2,7 @@
 import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, resetGame, getTotalAmmo } from './game.js';
 import { registerZone } from './input.js';
 import { playStart, playGameOver } from './audio.js';
-import { requestGyro, isGyroEnabled, isGyroSupported } from './gyro.js';
+import { requestGyro, resetGyroRef, isGyroEnabled, isGyroSupported } from './gyro.js';
 
 let gameOverTriggered = false;
 
@@ -240,11 +240,13 @@ export function initScreenHandlers() {
       onTap() {
         if (state.screen === 'title') {
           requestGyro(); // iOS 사용자 제스처 내에서 권한 요청
+          resetGyroRef();
           resetGame();
           playStart();
         } else if (state.screen === 'gameover') {
           gameOverTriggered = false;
           requestGyro();
+          resetGyroRef();
           resetGame();
           playStart();
         }

@@ -1,24 +1,27 @@
-// ── 자이로/가속도 센서 조준 시스템 ──
-// 기존 조이스틱과 병행 사용. 폰 기울기 방향+속도에 비례해 조준점 이동.
+// ── 자이로 조준 시스템 ──
+// DeviceOrientation 기반: 폰 기울기 각도 변화에 따라 조준점 이동
 import { state } from './game.js';
 
-const GYRO_SENS = 0.0015; // 회전 속도 → 조준 이동 감도
+const GYRO_SENS = 0.03; // 기울기 각도 변화 → 조준 이동 감도
 let enabled = false;
 let supported = false;
 let permissionDenied = false;
 
+// 이전 프레임 각도 (델타 계산용)
+let lastGamma = null; // 좌우 기울기 (-90~90)
+let lastBeta = null;  // 앞뒤 기울기 (-180~180)
+
 /**
  * 자이로 초기화: iOS 권한 요청 포함
- * 타이틀/게임오버 화면에서 사용자 터치 후 호출
  */
 export async function requestGyro() {
   if (enabled || permissionDenied) return;
 
-  // iOS 13+ 권한 요청 필요
-  if (typeof DeviceMotionEvent !== 'undefined' &&
-      typeof DeviceMotionEvent.requestPermission === 'function') {
+  // iOS 13+ 권한 요청
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
-      const perm = await DeviceMotionEvent.requestPermission();
+      const perm = await DeviceOrientationEvent.requestPermission();
       if (perm !== 'granted') {
         permissionDenied = true;
         return;
@@ -29,26 +32,41 @@ export async function requestGyro() {
     }
   }
 
-  if (typeof DeviceMotionEvent === 'undefined') return;
+  if (typeof DeviceOrientationEvent === 'undefined') return;
 
-  window.addEventListener('devicemotion', onDeviceMotion);
+  window.addEventListener('deviceorientation', onOrientation);
   enabled = true;
   supported = true;
 }
 
-function onDeviceMotion(e) {
-  const rate = e.rotationRate;
-  if (!rate) return;
+function onOrientation(e) {
+  const gamma = e.gamma; // 좌우 기울기: 오른쪽 기울임 = 양수
+  const beta = e.beta;   // 앞뒤 기울기: 위쪽(앞으로) 기울임 = 양수
 
-  // rotationRate (deg/s):
-  //   gamma = 좌우 회전 → aimX
-  //   beta  = 상하 회전 → aimY
-  const gx = rate.gamma || 0; // deg/s 좌우
-  const gy = rate.beta || 0;  // deg/s 상하
+  if (gamma === null || beta === null) return;
 
-  state.aimX = Math.max(-1, Math.min(1, state.aimX - gx * GYRO_SENS));
-  state.aimY = Math.max(-1, Math.min(1, state.aimY + gy * GYRO_SENS));
+  if (lastGamma !== null && lastBeta !== null) {
+    let dGamma = gamma - lastGamma;
+    let dBeta = beta - lastBeta;
+
+    // 급격한 점프 무시 (기기 회전 등)
+    if (Math.abs(dGamma) > 30) dGamma = 0;
+    if (Math.abs(dBeta) > 30) dBeta = 0;
+
+    // 오른쪽 기울기 → 조준점 오른쪽, 위로 기울기 → 조준점 위
+    state.aimX = Math.max(-1, Math.min(1, state.aimX + dGamma * GYRO_SENS));
+    state.aimY = Math.max(-1, Math.min(1, state.aimY - dBeta * GYRO_SENS));
+  }
+
+  lastGamma = gamma;
+  lastBeta = beta;
+}
+
+/** 게임 리셋 시 기준점 초기화 */
+export function resetGyroRef() {
+  lastGamma = null;
+  lastBeta = null;
 }
 
 export function isGyroEnabled() { return enabled; }
-export function isGyroSupported() { return supported || typeof DeviceMotionEvent !== 'undefined'; }
+export function isGyroSupported() { return supported || typeof DeviceOrientationEvent !== 'undefined'; }
