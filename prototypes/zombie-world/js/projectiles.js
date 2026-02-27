@@ -1,5 +1,5 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, TOWER_Y } from './game.js?v=4';
+import { state, W, TOWER_Y } from './game.js?v=5';
 
 const TOWER_X = W / 2;
 

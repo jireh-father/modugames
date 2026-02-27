@@ -141,20 +141,20 @@ export function resetGame() {
   state.aimAngle = Math.PI / 2;
   state.currentWeapon = 'pistol';
   state.pistol = {
-    magazineBullets: 6, magazineMax: 6, reserveBullets: 0,
+    magazineBullets: 6, magazineMax: 6, reserveBullets: 54,
     chambered: false, magazineOut: false, slideBack: true, specialBullets: 0, reloadMode: false,
   };
   state.bow = {
-    arrows: 3, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,
+    arrows: 30, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,
   };
   state.sniper = {
-    chambered: true, boltOpen: false, reserveRounds: 3, scoping: false, scopeZoom: 0,
+    chambered: true, boltOpen: false, reserveRounds: 30, scoping: false, scopeZoom: 0,
   };
   state.mg = {
-    ammo: 30, reserveAmmo: 0, heat: 0, overheated: false, firing: false, fireTimer: 0, cocked: true,
+    ammo: 30, reserveAmmo: 270, heat: 0, overheated: false, firing: false, fireTimer: 0, cocked: true,
   };
   state.crossbow = {
-    bolts: 3, loaded: false, cranking: false, crankProgress: 0, cocked: false,
+    bolts: 30, loaded: false, cranking: false, crankProgress: 0, cocked: false,
   };
   state.walls = [
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },

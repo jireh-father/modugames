@@ -1,19 +1,19 @@
 // ── 좀비 시스템 (8종 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y } from './game.js?v=4';
-import { getWallY, getWallSegments } from './wall.js?v=4';
+import { W, state, WALL_Y, TOWER_Y } from './game.js?v=5';
+import { getWallY, getWallSegments } from './wall.js?v=5';
 
 const WALL_SEGMENTS = getWallSegments();
 
 // ── 좀비 타입 설정 ──
 const ZOMBIE_TYPES = {
-  walker:      { color: '#66cc44', size: 14, hp: 2,  speed: 30,  wallDmg: 2,  score: 20  },
-  runner:      { color: '#ee3333', size: 10, hp: 1,  speed: 70,  wallDmg: 1,  score: 15  },
-  tank:        { color: '#9944cc', size: 20, hp: 8,  speed: 15,  wallDmg: 5,  score: 80  },
-  rammer:      { color: '#ee8822', size: 18, hp: 5,  speed: 40,  wallDmg: 2,  score: 60  },
-  necromancer: { color: '#440066', size: 14, hp: 4,  speed: 15,  wallDmg: 0,  score: 100 },
-  splitter:    { color: '#44cc22', size: 14, hp: 3,  speed: 30,  wallDmg: 2,  score: 40  },
-  bigone:      { color: '#990000', size: 30, hp: 20, speed: 10,  wallDmg: 8,  score: 300 },
-  spider:      { color: '#999999', size: 7,  hp: 1,  speed: 90,  wallDmg: 1,  score: 10  },
+  walker:      { color: '#66cc44', size: 14, hp: 2,  speed: 10,  wallDmg: 2,  score: 20  },
+  runner:      { color: '#ee3333', size: 10, hp: 1,  speed: 23,  wallDmg: 1,  score: 15  },
+  tank:        { color: '#9944cc', size: 20, hp: 8,  speed: 5,   wallDmg: 5,  score: 80  },
+  rammer:      { color: '#ee8822', size: 18, hp: 5,  speed: 13,  wallDmg: 2,  score: 60  },
+  necromancer: { color: '#440066', size: 14, hp: 4,  speed: 5,   wallDmg: 0,  score: 100 },
+  splitter:    { color: '#44cc22', size: 14, hp: 3,  speed: 10,  wallDmg: 2,  score: 40  },
+  bigone:      { color: '#990000', size: 30, hp: 20, speed: 3,   wallDmg: 8,  score: 300 },
+  spider:      { color: '#999999', size: 7,  hp: 1,  speed: 30,  wallDmg: 1,  score: 10  },
 };
 
 // ── 프로젝타일 데미지 테이블 ──
@@ -385,7 +385,7 @@ function startWave(waveNum) {
   function addToQueue(type, count, overrides = {}) {
     for (let i = 0; i < count; i++) {
       const x = 30 + Math.random() * (W - 60);
-      delayAccum += 0.5 + Math.random() * 1.5;
+      delayAccum += 0.15 + Math.random() * 0.35;
       queue.push({ type, x, hpMul, speedMul, delay: delayAccum, overrides });
     }
   }
@@ -395,34 +395,34 @@ function startWave(waveNum) {
 
   switch (waveInDay) {
     case 1: // Dawn - 워커 소수
-      addToQueue('walker', baseCount);
+      addToQueue('walker', baseCount * 10);
       break;
 
     case 2: // Day - 러너 + 워커
-      addToQueue('walker', baseCount);
-      addToQueue('runner', Math.floor(baseCount / 2));
+      addToQueue('walker', baseCount * 10);
+      addToQueue('runner', Math.floor(baseCount / 2) * 10);
       break;
 
     case 3: // Sunset - 워커 + 금색좀비
-      addToQueue('walker', Math.floor(baseCount / 2));
-      addToQueue('walker', 2, { gold: true }); // 금색 좀비
+      addToQueue('walker', Math.floor(baseCount / 2) * 10);
+      addToQueue('walker', 20, { gold: true }); // 금색 좀비
       break;
 
     case 4: // Night - 탱커 + 래머 + (네크로맨서)
-      addToQueue('tank', Math.floor(baseCount / 2));
-      addToQueue('rammer', 2);
-      if (day >= 5) addToQueue('necromancer', 1);
+      addToQueue('tank', Math.floor(baseCount / 2) * 10);
+      addToQueue('rammer', 20);
+      if (day >= 5) addToQueue('necromancer', 10);
       break;
 
     case 5: // Midnight - 혼합 + 보스
-      addToQueue('walker', Math.floor(baseCount / 3));
-      addToQueue('runner', Math.floor(baseCount / 3));
-      addToQueue('tank', 2);
-      addToQueue('rammer', 1);
-      addToQueue('spider', 5);
-      if (day >= 3) addToQueue('bigone', 1);
-      if (day >= 8) addToQueue('splitter', 2);
-      if (day >= 5) addToQueue('necromancer', 1);
+      addToQueue('walker', Math.floor(baseCount / 3) * 10);
+      addToQueue('runner', Math.floor(baseCount / 3) * 10);
+      addToQueue('tank', 20);
+      addToQueue('rammer', 10);
+      addToQueue('spider', 50);
+      if (day >= 3) addToQueue('bigone', 3);
+      if (day >= 8) addToQueue('splitter', 20);
+      if (day >= 5) addToQueue('necromancer', 10);
       break;
   }
 

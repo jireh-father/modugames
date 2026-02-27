@@ -1,27 +1,27 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=4';
-import { initDial, updateDial, drawDial } from './aiming.js?v=4';
-import { drawField, drawFiringLine } from './renderer.js?v=4';
-import { initPistol, drawPistol } from './pistol.js?v=4';
-import { initBow, drawBow } from './bow.js?v=4';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=4';
-import { initMG, updateMG, drawMG } from './mg.js?v=4';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=4';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=4';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=4';
-import { updateWalls, drawWalls } from './wall.js?v=4';
-import { drawTower } from './tower.js?v=4';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=4';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=4';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=4';
+import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=5';
+import { initDial, updateDial, drawDial } from './aiming.js?v=5';
+import { drawField, drawFiringLine } from './renderer.js?v=5';
+import { initPistol, drawPistol } from './pistol.js?v=5';
+import { initBow, drawBow } from './bow.js?v=5';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=5';
+import { initMG, updateMG, drawMG } from './mg.js?v=5';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=5';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=5';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=5';
+import { updateWalls, drawWalls } from './wall.js?v=5';
+import { drawTower } from './tower.js?v=5';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=5';
+import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=5';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=5';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=4';
-import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=4';
-import { initSettings, drawSettings } from './settings.js?v=4';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=4';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=4';
+} from './hud.js?v=5';
+import { playCombo, playSlowMo, playBulletMiss } from './audio.js?v=5';
+import { initSettings, drawSettings } from './settings.js?v=5';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=5';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=5';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
