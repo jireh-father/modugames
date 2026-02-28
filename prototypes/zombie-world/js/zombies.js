@@ -327,6 +327,11 @@ function checkZombieHits(projectiles) {
   for (const p of projectiles) {
     if (!p.alive) continue;
 
+    // 화살: 하강 중에만 타격 가능 (포물선 비행)
+    if (p.type === 'arrow' && p.arcTarget) {
+      if (!p.arcDescending) continue; // 상승 중엔 좀비 위를 날아감
+    }
+
     for (const z of state.zombies) {
       if (!z.alive) continue;
 
@@ -356,8 +361,15 @@ function checkZombieHits(projectiles) {
         const wp = wpName ? WEAPON_PROFILES[wpName] : null;
         if (wp && wp.impactSound > 0) emitSound(z.x, z.y, wp.impactSound, 0.5, 'impact');
 
-        // 관통
-        if (p.penetrateLeft !== undefined && p.penetrateLeft > 0) {
+        // 관통: 화살은 낙하지점 근처의 좀비에게만 관통 적용
+        if (p.type === 'arrow' && p.arcTarget) {
+          const distToTarget = Math.hypot(z.x - p.arcTarget.x, z.y - p.arcTarget.y);
+          if (distToTarget < p.arcLandRadius && p.penetrateLeft > 0) {
+            p.penetrateLeft--;
+          } else {
+            p.alive = false;
+          }
+        } else if (p.penetrateLeft !== undefined && p.penetrateLeft > 0) {
           p.penetrateLeft--;
         } else {
           p.alive = false;

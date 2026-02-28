@@ -16,6 +16,7 @@ const BELT_MAX = 30;   // 탄띠 최대 장탄수
 
 // 드래그 상태
 let ammoDrag = null; // { x, y } 총알 드래그 중 (오른쪽→왼쪽)
+let gunHeld = false; // 기관총 터치 중 (발사 활성화)
 
 export function initMG() {
   // ── 탄띠 영역 (왼쪽) ──
@@ -27,7 +28,7 @@ export function initMG() {
     5
   );
 
-  // ── 중앙: 총 몸체 (터치하면 좌우 드래그로 조준) ──
+  // ── 중앙: 총 몸체 (터치하면 발사 + 좌우 드래그로 조준) ──
   registerZone(
     { x: COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
@@ -35,6 +36,7 @@ export function initMG() {
       onStart(x, y) {
         if (state.currentWeapon !== 'mg') return false;
         this._lastX = x;
+        gunHeld = true;
       },
       onMove(x) {
         if (state.currentWeapon !== 'mg') return;
@@ -43,7 +45,10 @@ export function initMG() {
         const aimSens = 0.005;
         state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
       },
-      onEnd() {},
+      onEnd() {
+        gunHeld = false;
+        state.mg.firing = false;
+      },
     },
     5
   );
@@ -83,13 +88,14 @@ export function initMG() {
 export function updateMG(dt) {
   if (state.currentWeapon !== 'mg') {
     state.mg.firing = false;
+    gunHeld = false;
     return;
   }
 
   const m = state.mg;
 
-  // 탄띠에 탄약이 있으면 자동 연사
-  if (m.ammo > 0) {
+  // 기관총 터치 중 + 탄띠에 탄약 있으면 연사
+  if (gunHeld && m.ammo > 0) {
     m.firing = true;
     m.fireTimer += dt;
     const effectiveRate = state.buffs.speedTimer > 0 ? FIRE_RATE * 0.5 : FIRE_RATE;
@@ -105,6 +111,7 @@ export function updateMG(dt) {
       playMGBurstEnd();
     }
   } else {
+    if (m.firing && !gunHeld) playMGBurstEnd();
     m.firing = false;
     m.fireTimer = 0;
   }
@@ -240,7 +247,7 @@ export function drawMG(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('←→조준', gunCX, CONTROLS_BOTTOM - 8);
+  ctx.fillText('꾹:연사 ←→조준', gunCX, CONTROLS_BOTTOM - 8);
 
   // ── 오른쪽: 여분 총알 ──
   const spareCX = COL_W * 2.5;
