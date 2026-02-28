@@ -1,5 +1,5 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=14';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=14';
 import { findPath, drawPathDebug } from './pathfinding.js?v=14';
 import { collidesWithBuilding } from './buildings.js?v=14';
 import { registerZone } from './input.js?v=14';
@@ -45,18 +45,32 @@ export function initPlayer() {
         // 타워 위에 있으면 필드 탭 무시
         if (p.onTower >= 0) return;
 
-        // 타워 근처면 타워에 탑승
+        // 타워 클릭 체크 (탭 위치가 타워 근처인지)
         for (let i = 0; i < state.towers.length; i++) {
           const t = state.towers[i];
           if (t.hp <= 0) continue;
-          const dist = Math.hypot(x - t.x, y - TOWER_Y);
-          if (dist < 40) {
-            climbTower(i);
+          const tapDist = Math.hypot(x - t.x, y - TOWER_Y);
+          if (tapDist < 40) {
+            // 플레이어가 타워 근처면 즉시 탑승
+            const playerDist = Math.hypot(p.x - t.x, p.y - TOWER_Y);
+            if (playerDist < 40) {
+              climbTower(i);
+            } else {
+              // 멀리 있으면 타워까지 경로 이동 후 자동 탑승
+              p.targetTower = i;
+              const path = findPath(p.x, p.y, t.x, TOWER_Y);
+              if (path.length > 0) {
+                p.path = path;
+                p.pathIdx = 0;
+                p.moving = true;
+              }
+            }
             return;
           }
         }
 
-        // 경로 탐색 후 이동
+        // 일반 경로 탐색 후 이동
+        p.targetTower = -1;
         const path = findPath(p.x, p.y, x, y);
         if (path.length > 0) {
           p.path = path;
@@ -153,6 +167,41 @@ export function updatePlayer(dt) {
         p.moving = false;
         p.path = [];
         p.pathIdx = 0;
+      }
+    }
+  }
+
+  // ── 타워 자동 탑승 (경로 이동 완료 시) ──
+  if (p.targetTower >= 0 && !p.moving) {
+    const t = state.towers[p.targetTower];
+    if (t && t.hp > 0) {
+      const dist = Math.hypot(p.x - t.x, p.y - TOWER_Y);
+      if (dist < 40) {
+        p.onTower = p.targetTower;
+        p.x = t.x;
+        p.y = TOWER_Y;
+      }
+    }
+    p.targetTower = -1;
+  }
+
+  // ── 이동 소음 (지상 이동 시) ──
+  if (p.onTower < 0 && p.moving) {
+    p.moveNoiseTimer -= dt;
+    if (p.moveNoiseTimer <= 0) {
+      p.moveNoiseTimer = 0.5;
+      const noiseRange = p.shoeType === 'stealth' ? 0
+                       : p.shoeType === 'silent' ? 15
+                       : p.moveNoiseRange;
+      if (noiseRange > 0) {
+        emitSound(p.x, p.y, noiseRange, 0.3, 'footstep');
+      }
+    }
+    // 신발 타이머 감소
+    if (p.shoeTimer > 0) {
+      p.shoeTimer -= dt;
+      if (p.shoeTimer <= 0) {
+        p.shoeType = null;
       }
     }
   }
