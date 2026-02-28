@@ -1,9 +1,9 @@
 // ── 좀비 시스템 (소리-유인 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=13';
-import { getWallY, getWallSegments } from './wall.js?v=13';
+import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=14';
+import { getWallY, getWallSegments } from './wall.js?v=14';
 import { playZombieHit, playZombieDeath, playWallHit, playWallBreak, playTowerHit,
          playSplitterSplit, playRammerCharge, playChainLightning,
-         playFreezeApply, playPoisonApply } from './audio.js?v=13';
+         playFreezeApply, playPoisonApply } from './audio.js?v=14';
 
 const WALL_SEGMENTS = getWallSegments();
 

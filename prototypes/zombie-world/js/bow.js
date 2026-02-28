@@ -1,9 +1,9 @@
 // ── 활 시스템: 화살통 + 활 (좌우 조준 + 당기기=거리) ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y, getFireOrigin } from './game.js?v=13';
-import { registerZone } from './input.js?v=13';
-import { fireProjectile } from './projectiles.js?v=13';
-import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=13';
-import { spawnParticles } from './particles.js?v=13';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y, getFireOrigin } from './game.js?v=14';
+import { registerZone } from './input.js?v=14';
+import { fireProjectile } from './projectiles.js?v=14';
+import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=14';
+import { spawnParticles } from './particles.js?v=14';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;

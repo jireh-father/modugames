@@ -1,8 +1,8 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=13';
-import { findPath, drawPathDebug } from './pathfinding.js?v=13';
-import { collidesWithBuilding } from './buildings.js?v=13';
-import { registerZone } from './input.js?v=13';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=14';
+import { findPath, drawPathDebug } from './pathfinding.js?v=14';
+import { collidesWithBuilding } from './buildings.js?v=14';
+import { registerZone } from './input.js?v=14';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {

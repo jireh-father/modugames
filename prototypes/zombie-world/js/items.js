@@ -1,10 +1,10 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=13';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=14';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
-         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=13';
-import { spawnParticles } from './particles.js?v=13';
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=14';
+import { spawnParticles } from './particles.js?v=14';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([

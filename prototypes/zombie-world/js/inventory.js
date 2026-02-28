@@ -1,10 +1,10 @@
 // ── 인벤토리 바 UI + 드래그 사용 시스템 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y, getFireOrigin, getCurrentTower } from './game.js?v=13';
-import { registerZone } from './input.js?v=13';
-import { useInventoryItem } from './items.js?v=13';
-import { drawItemIcon } from './items.js?v=13';
-import { playItemPickup } from './audio.js?v=13';
-import { spawnParticles } from './particles.js?v=13';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y, getFireOrigin, getCurrentTower } from './game.js?v=14';
+import { registerZone } from './input.js?v=14';
+import { useInventoryItem } from './items.js?v=14';
+import { drawItemIcon } from './items.js?v=14';
+import { playItemPickup } from './audio.js?v=14';
+import { spawnParticles } from './particles.js?v=14';
 
 // ── 레이아웃 상수 ──
 const BAR_Y = CONTROLS_TOP + SLOT_H;       // 아이템 바 시작 Y (무기 슬롯 바로 아래)

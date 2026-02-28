@@ -1,31 +1,31 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=13';
-import { initDial, updateDial, drawDial } from './aiming.js?v=13';
-import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=13';
-import { initPistol, drawPistol } from './pistol.js?v=13';
-import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=13';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=13';
-import { initMG, updateMG, drawMG } from './mg.js?v=13';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=13';
-import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=13';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=13';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=13';
-import { updateWalls, drawWalls } from './wall.js?v=13';
-import { drawTowers, initTower } from './tower.js?v=13';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=13';
-import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=13';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=13';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=14';
+import { initDial, updateDial, drawDial } from './aiming.js?v=14';
+import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=14';
+import { initPistol, drawPistol } from './pistol.js?v=14';
+import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=14';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=14';
+import { initMG, updateMG, drawMG } from './mg.js?v=14';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=14';
+import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=14';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=14';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=14';
+import { updateWalls, drawWalls } from './wall.js?v=14';
+import { drawTowers, initTower } from './tower.js?v=14';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=14';
+import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=14';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=14';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=13';
-import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=13';
-import { initSettings, drawSettings } from './settings.js?v=13';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=13';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=13';
-import { generateBuildings, drawBuildings } from './buildings.js?v=13';
-import { buildGrid } from './pathfinding.js?v=13';
-import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=13';
+} from './hud.js?v=14';
+import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=14';
+import { initSettings, drawSettings } from './settings.js?v=14';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=14';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=14';
+import { generateBuildings, drawBuildings } from './buildings.js?v=14';
+import { buildGrid } from './pathfinding.js?v=14';
+import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=14';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
