@@ -70,7 +70,7 @@ export function fireProjectile(type, aimAngle, special = false, power = 1, targe
     proj.arcTarget = { x: targetPos.x, y: targetPos.y };
     proj.arcStartX = state.tower.x;
     proj.arcStartY = TOWER_Y;
-    const dist = Math.hypot(target.x - state.tower.x, target.y - TOWER_Y);
+    const dist = Math.hypot(targetPos.x - state.tower.x, targetPos.y - TOWER_Y);
     proj.arcDuration = Math.max(0.4, dist / (300 + power * 300)); // 비행 시간
     proj.arcTime = 0;
     proj.arcDescending = false; // 하강 중인지
