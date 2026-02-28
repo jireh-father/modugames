@@ -104,8 +104,38 @@ export const state = {
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
   ],
 
-  // 타워
-  tower: { hp: 200, maxHp: 200, x: W / 2 },
+  // 타워 3개 (좌/중/우 고정)
+  towers: [
+    { hp: 200, maxHp: 200, x: 90 },
+    { hp: 200, maxHp: 200, x: 270 },
+    { hp: 200, maxHp: 200, x: 450 },
+  ],
+  activeTower: 1, // 플레이어가 올라가 있는 타워 인덱스
+
+  // 플레이어
+  player: {
+    x: 270,
+    y: 590,
+    hp: 100,
+    maxHp: 100,
+    speed: 200,
+    size: 16,
+    onTower: 1,      // -1 = 지상, 0/1/2 = 타워 인덱스
+    path: [],
+    pathIdx: 0,
+    moving: false,
+    hitFlash: 0,
+  },
+
+  // 건물 (장애물)
+  buildings: [],
+
+  // 벽의 문 (3곳)
+  doors: [
+    { x: 135, open: false },
+    { x: 270, open: false },
+    { x: 405, open: false },
+  ],
 
   // 낮/밤
   day: 1,
@@ -186,7 +216,22 @@ export function resetGame() {
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
   ];
-  state.tower = { hp: 200, maxHp: 200, x: W / 2 };
+  state.towers = [
+    { hp: 200, maxHp: 200, x: 90 },
+    { hp: 200, maxHp: 200, x: 270 },
+    { hp: 200, maxHp: 200, x: 450 },
+  ];
+  state.activeTower = 1;
+  state.player = {
+    x: 270, y: 590, hp: 100, maxHp: 100, speed: 200, size: 16,
+    onTower: 1, path: [], pathIdx: 0, moving: false, hitFlash: 0,
+  };
+  state.buildings = [];
+  state.doors = [
+    { x: 135, open: false },
+    { x: 270, open: false },
+    { x: 405, open: false },
+  ];
   state.day = 1;
   state.isNight = false;
   state.nightDarkness = 0;
@@ -233,7 +278,29 @@ export function getTotalAmmo() {
 }
 
 export function isGameOver() {
-  return state.tower.hp <= 0;
+  return state.player.hp <= 0;
+}
+
+// 현재 플레이어가 올라가 있는 타워 (없으면 null)
+export function getCurrentTower() {
+  const idx = state.player.onTower;
+  if (idx < 0) return null;
+  return state.towers[idx];
+}
+
+// 타워 위치 상수
+export const TOWER_POSITIONS = [
+  { x: 90 },
+  { x: 270 },
+  { x: 450 },
+];
+
+// 발사 기준점 (타워 위 = 타워 좌표, 지상 = 플레이어 좌표)
+export function getFireOrigin() {
+  if (state.player.onTower >= 0) {
+    return { x: state.towers[state.player.onTower].x, y: TOWER_Y };
+  }
+  return { x: state.player.x, y: state.player.y };
 }
 
 // ── 소리 시스템 ──
