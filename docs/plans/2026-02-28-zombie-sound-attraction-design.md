@@ -1,113 +1,480 @@
-# Zombie World: Sound Attraction Redesign
+# Zombie World: 소리 유인 시스템 - 게임 설계 문서
 
-## Core Concept
-Zombies react only to sound. They wander randomly until they hear something, then move toward the sound source. They must reach the exact sound location before stopping. This creates tactical gameplay around noise management — every shot attracts zombies toward the tower.
+> **최종 업데이트:** 2026-02-28
+> **버전:** v11
+> **상태:** 구현 완료
 
-## Zombie AI State Machine
+---
 
-### States
-1. **Idle (서성거리기)**: Random slow wandering, direction changes every 2-4s
-2. **Attracted (유인됨)**: Moving toward a sound source at full speed
-3. **Arrived (도착)**: Reached sound location, pause 1-2s, then back to Idle
+## 1. 핵심 컨셉
 
-### Sound Reaction Rules
-- Zombies respond to the strongest sound within their hearing range
-- A new, stronger sound overrides current target
-- Zombies MUST reach the sound location — they don't stop early
-- If a zombie's path hits a wall, it pushes/damages the wall (not "attacking" — just pushing through)
-- When pushing through wall, wall takes continuous damage until zombie passes or wall breaks
+좀비는 **소리에만 반응**한다. 평소에는 맵 전체에 퍼져서 무작위로 서성거린다. 무기를 발사하거나 아이템을 사용하면 소리가 발생하고, 범위 내의 좀비들이 소리 발생 지점으로 모여든다. 소리가 난 정확한 위치까지 도착해야만 멈추며, 도착 후 잠시 대기했다가 다시 서성거린다.
 
-## Sound System
+**핵심 딜레마:** 좀비를 죽이려면 무기를 써야 하지만, 무기 소리가 더 많은 좀비를 끌어온다. 이 소음 관리가 게임의 전략적 핵심이다.
 
-### Sound Source Data Structure
+---
+
+## 2. 좀비 AI 상태 머신
+
+### 2.1 세 가지 상태
+
+| 상태 | 동작 | 전이 조건 |
+|------|------|-----------|
+| **Idle (서성거리기)** | 30% 속도로 무작위 방향 이동, 2~4초마다 방향 전환 | 청각 범위 내 소리 감지 → Attracted |
+| **Attracted (유인됨)** | 소리 발생 위치로 직선 이동 (풀 스피드) | 목표 15px 이내 도달 → Arrived |
+| **Arrived (도착)** | 1.5초간 정지 대기 | 타이머 종료 → Idle, 새 소리 감지 → Attracted |
+
+### 2.2 소리 반응 규칙
+- 청각 범위(기본 300px) 내의 **가장 가까운** 소리에 반응
+- 이동 중 더 가까운 새 소리가 나면 즉시 목표 변경
+- **반드시 소리 발생 지점까지 도달해야** 멈춤 (중간에 멈추지 않음)
+- Arrived 상태에서도 새 소리에 즉시 반응 가능
+
+### 2.3 벽 상호작용
+- 좀비는 벽을 "공격"하는 것이 아님
+- 소리 발생 지점(타워)으로 가려고 벽을 **몸으로 밀어** 통과하려 함
+- 벽에 접촉 중인 동안 `wallDmg × dt`만큼 지속 데미지
+- 벽이 부서지면 통과, 다른 소리로 유인하지 않는 한 계속 밀어붙임
+- 래머: 벽 접촉 시 1회 15 추가 데미지 (돌진)
+
+### 2.4 타워 상호작용
+- 타워 20px 이내 접근 시 `wallDmg × dt`만큼 타워 HP 지속 감소
+- 방어막(shield) 버프 활성 시 데미지 무효
+
+---
+
+## 3. 소리 시스템
+
+### 3.1 데이터 구조
 ```js
+// 소리 소스 (일시적, 시간이 지나면 사라짐)
 state.soundSources = [
   { x, y, intensity, range, timer, duration, type }
 ]
+
+// 소리 유인 아이템 (지속적으로 소리 재발생)
+state.soundLures = [
+  { x, y, timer, maxTimer, type, range, explodeOnEnd? }
+]
 ```
 
-### Weapon Sound Profiles (origin = tower position, impact = hit location)
+### 3.2 소리 발생 함수
+```js
+emitSound(x, y, range, duration, type)
+```
+- `range`: 이 범위 안의 좀비만 반응 (px)
+- `duration`: 소리 지속 시간 (초)
+- `intensity`: `timer/duration`으로 자동 감소 (0~1)
+- 매 프레임 `updateSounds(dt)`로 타이머 감소, 0 이하 시 제거
 
-| Weapon | Range(px) | Damage | Origin Sound | Impact Sound | Penetration |
-|--------|-----------|--------|-------------|-------------|-------------|
-| Pistol | 400 | 2 | 250px | 80px | None |
-| Bow | 500 | 3 | 0 (silent) | 50px | 1 zombie |
-| Sniper | Screen end | 5 | 400px | 150px | Full penetration |
-| MG | 350 | 1 | 350px | 60px | None |
-| Crossbow | 450 | 4 | 80px | 60px | 1 zombie |
+---
 
-- Firing creates sound at tower position (origin) and at impact point
-- Aim line renders only up to weapon range
-- Projectiles disappear at max range
-- Penetration: arrow/bolt pass through 1 zombie (damage deducted), sniper passes through all
+## 4. 무기 시스템
 
-### Sound Lure Items (New)
+### 4.1 무기 프로필
 
-| Item | Sound Range | Duration | Special |
-|------|------------|----------|---------|
-| Toy (장난감) | 150px | 5s | Pure sound lure, no damage |
-| Firecracker (폭죽) | 300px | 3s | Explodes at end, area damage |
-| Radio (라디오) | 200px | 10s | Long duration lure |
+| 무기 | 사정거리 | 데미지 | 발사 소리(원점) | 착탄 소리 | 관통 | 특징 |
+|------|----------|--------|----------------|-----------|------|------|
+| **권총** | 400px | 2 | 250px | 80px | 없음 | 범용, 탄창 8발 |
+| **활** | 500px | 3 | 0 (무음) | 50px | 1마리 관통 | 스텔스 무기 |
+| **저격총** | 무제한 | 5 | 400px | 150px | 완전 관통 | 최강 화력, 최대 소음 |
+| **기관총** | 350px | 1 | 350px | 60px | 없음 | 연사, 대량 소음 |
+| **석궁** | 450px | 4 | 80px (미약) | 60px | 1마리 관통 | 준스텔스 |
 
-- Thrown to field location (same as molotov/bomb mechanic)
-- Creates persistent sound source that attracts zombies
+### 4.2 소리 발생 메커니즘
+- **발사 시**: 타워 위치에서 `originSound` 범위로 소리 발생 (0.8초)
+- **착탄 시**: 좀비 피격 위치에서 `impactSound` 범위로 소리 발생 (0.5초)
+- 활은 발사음이 0이므로 **완전 무음 발사** (착탄음만 작게)
+- 저격총은 양쪽 다 최대 소음 → 대량 유인
 
-### Existing Items That Create Sound
-- Bomb: explosion sound (250px)
-- Molotov: fire crackle (100px, continuous while burning)
-- Mine: explosion sound (200px on detonation)
+### 4.3 사정거리 시스템
+- 조준선이 **무기 사정거리까지만** 표시됨
+- 사정거리 끝에 점 마커 표시
+- 발사체가 사정거리 초과 시 소멸
+- 주머니 탭 선택 시 조준선 표시 안 됨
 
-## Stage System
+### 4.4 관통 시스템
+- `penetrateLeft` 카운터: 좀비 1마리 관통 시 -1
+- 0 이하가 되면 발사체 소멸
+- 저격총(`penetrate: 99`): 사실상 무한 관통
+- 활/석궁(`penetrate: 1`): 1마리 관통 후 다음 좀비에서 소멸
 
-### Progression
-- No time limit, no speed bonus
-- Kill all zombies → stage clear
-- 5-second pause between stages
-- Next stage spawns more/tougher zombies
+### 4.5 초기 탄약
+| 무기 | 초기 탄약 |
+|------|-----------|
+| 권총 | 탄창 8 + 예비 52 |
+| 활 | 화살 30 |
+| 저격총 | 장전 1 + 예비 30 |
+| 기관총 | 탄창 30 + 예비 270 |
+| 석궁 | 볼트 30 |
 
-### Game Over Conditions
-- Tower HP reaches 0 (zombies pushed through walls to tower)
-- Zombies drop items on death, so complete ammo depletion is rare
+---
 
-### Day/Night Cycle
-- Independent of stages, runs on real-time clock
-- 60-second cycle: 40s day + 20s night
-- Night: screen darkens, flashlight cone in aim direction
-- Zombie red eyes visible in darkness
+## 5. 아이템 시스템
 
-## UI Changes
+### 5.1 아이템 분류
 
-### Item Window → Pouch Tab
-- Remove current inventory bar at bottom
-- Add 6th weapon tab with pouch/bag icon (주머니)
-- When pouch tab selected: show 2-column vertical grid
-- Each cell: item icon + name + quantity
-- Usage: drag item from grid to field (same as current drag-to-place)
+#### 자동 적용 (줍자마자 즉시)
+| 아이템 | 효과 | 드랍 가중치 |
+|--------|------|-------------|
+| 탄환x3 | 권총 예비탄 +3 | 25 |
+| 탄환x6 | 권총 예비탄 +6 | 12 |
+| 화살x2 | 활 화살 +2 | 25 |
+| 화살x5 | 활 화살 +5 | 12 |
+| 저격탄x2 | 저격총 예비탄 +2 | 8 |
+| 기관총탄x30 | 기관총 예비탄 +30 | 8 |
+| 볼트x2 | 석궁 볼트 +2 | 8 |
 
-### Aim Line Changes
-- Aim line extends only to weapon's max range
-- Dashed line with range indicator
-- Consistent across all weapons (currently only some have lines)
+#### 인벤토리 아이템 - 드래그 사용 (필드에 끌어놓기)
+| 아이템 | 효과 | 소리 발생 | 드랍 가중치 |
+|--------|------|-----------|-------------|
+| **벽돌** | 가장 가까운 벽 구간 HP +25 | 없음 | 20 |
+| **HP 키트** | 타워 HP +30 | 없음 | 10 |
+| **지뢰** | 좀비 접근 시 폭발 (반경 60px, 5뎀) | 폭발 시 200px | 8 |
+| **화염병** | 화염 지역 생성 (반경 50px, 2뎀/초, 3초) | 100px 3초 | 8 |
+| **폭탄** | 즉시 폭발 (반경 80px, 5뎀) | 250px | 2 |
+| **장난감** | 소리 유인 (150px, 5초) | 150px 5초 | 10 |
+| **폭죽** | 소리 유인 (300px, 3초) + 종료 시 폭발 | 300px 3초 | 8 |
+| **라디오** | 소리 유인 (200px, 10초) | 200px 10초 | 6 |
 
-### Wall Behavior
-- Walls still exist as physical barriers
-- Zombies don't "target" walls — they push through when heading to sound
-- Wall takes damage from zombie pushing
-- Wall can still be repaired with brick item
-- If no zombies pushing, walls auto-rebuild (existing behavior)
+#### 인벤토리 아이템 - 탭 사용 (즉시 적용)
+| 아이템 | 효과 | 드랍 가중치 |
+|--------|------|-------------|
+| 방어막 | 5초 동안 벽/타워 데미지 무효 | 3 |
+| 속도 부스트 | 10초 동안 발사 속도 2배 | 3 |
+| 냉동탄x3 | 다음 3발에 빙결 효과 (3초 50% 감속) | 6 |
+| 전기x3 | 다음 3발에 체인 라이트닝 (인접 2마리) | 5 |
+| 독x3 | 다음 3발에 독 효과 (5초 DOT) | 5 |
+| 탄창+2 | 권총 탄창 최대치 +2 (최대 12) | 4 |
+| 관통탄 | 권총 특수탄 +1 | 5 |
+| 폭발화살 | 활 특수화살 +1 | 5 |
 
-## Zombie Types (Kept, Behavior Adjusted)
-All zombie types remain but their movement is now sound-based:
-- **Walker**: Standard hearing range, normal speed
-- **Runner**: Fast, zigzag even while attracted
-- **Tank**: Slow but pushes through walls fast (high wall damage)
-- **Rammer**: Charges when close to sound source
-- **Necromancer**: Heals nearby zombies, follows sounds
-- **Splitter**: Splits on death, mini-zombies also react to sound
-- **Big One**: Boss, guaranteed drops
-- **Spider**: Fast, erratic, small
+### 5.2 소리 유인 아이템 상세
 
-## Buff System (Kept)
-- Freeze, chain lightning, poison shots still work
-- Shield, speed boost still work
-- These don't create sound (silent effects)
+#### 장난감 (Toy)
+- 분홍색 원 + ♪ 아이콘
+- 소리 범위: 150px, 지속: 5초
+- 순수 유인 목적, 데미지 없음
+- 좁은 범위로 정밀 유인에 적합
+
+#### 폭죽 (Firecracker)
+- 빨간 막대 + 불꽃 아이콘
+- 소리 범위: 300px, 지속: 3초
+- 최대 범위로 넓은 영역 유인
+- 종료 시 **폭발** (반경 80px, 5뎀) + 폭발 소리(250px)
+
+#### 라디오 (Radio)
+- 파란 박스 + 안테나 + ♫ 아이콘
+- 소리 범위: 200px, 지속: 10초
+- 최장 지속시간으로 장기 유인에 적합
+
+### 5.3 드랍 조건
+- **골드 좀비**: 확정 드랍
+- **빅원**: 확정 3~5개 동시 드랍
+- **콤보 보너스**: 3, 5, 10, 15... 콤보 시
+- **일반**: 15% 확률
+
+---
+
+## 6. 스테이지 시스템
+
+### 6.1 무한 스케일링 알고리즘
+
+```
+기본 마리 수 = 85 + (스테이지 × 15)
+HP 배율 = 1 + (스테이지 - 1) × 0.15
+속도 배율 = 1 + min((스테이지 - 1) × 0.04, 1.5)  // 최대 2.5배
+```
+
+### 6.2 스테이지별 좀비 구성
+
+| 스테이지 | 워커 | 러너 | 탱크 | 래머 | 스플리터 | 네크로 | 스파이더 | 빅원 | 골드 |
+|----------|------|------|------|------|----------|--------|----------|------|------|
+| 1 | 100 | - | - | - | - | - | - | - | - |
+| 2 | 115 | 34 | - | - | - | - | - | - | - |
+| 3 | 130 | 39 | 13 | - | - | - | - | - | - |
+| 4 | 145 | 43 | 14 | 14 | - | - | - | - | - |
+| 5 | 160 | 48 | 16 | 16 | 16 | - | - | - | 20 |
+| 6 | 175 | 52 | 17 | 17 | 17 | 8 | - | - | - |
+| 7 | 190 | 57 | 19 | 19 | 19 | 9 | 38 | - | - |
+| 8 | 205 | 61 | 20 | 20 | 20 | 10 | 41 | - | - |
+| 9 | 220 | 66 | 22 | 22 | 22 | 11 | 44 | 2 | - |
+| 10 | 235 | 70 | 23 | 23 | 23 | 11 | 47 | - | 30 |
+| 20 | 385 | 115 | 38 | 38 | 38 | 19 | 77 | 5 | 50 |
+
+- **빅원**: 스테이지 8부터 3스테이지마다 (`1 + floor(stage/5)` 마리)
+- **골드 워커**: 5스테이지마다 (`10 + stage×2` 마리, 확정 아이템 드랍)
+
+### 6.3 스테이지 전환
+- 시간 제한 없음, 점수 보너스 없음
+- 모든 좀비 처치 → 스테이지 클리어
+- **5초 대기** 후 다음 스테이지 시작
+- 대기 중 "Stage N" 배너 표시
+
+### 6.4 좀비 배치
+- 스테이지 시작 시 모든 좀비가 **맵 전체에 즉시 배치** (y: 60~500)
+- x: 30 ~ 510 랜덤
+- 서성거리는 상태(idle)로 시작
+- 스폰 딜레이 없음 (delay: 0)
+
+---
+
+## 7. 좀비 타입 상세
+
+| 타입 | 색상 | 크기 | HP | 속도 | 벽 데미지 | 점수 | 특수 능력 |
+|------|------|------|-----|------|-----------|------|-----------|
+| **워커** | 초록 | 14 | 2 | 10 | 2 | 20 | 없음 (기본) |
+| **러너** | 빨강 | 10 | 1 | 23 | 1 | 15 | 지그재그 이동 |
+| **탱크** | 보라 | 20 | 8 | 5 | 5 | 80 | 높은 체력+벽 데미지 |
+| **래머** | 주황 | 18 | 5 | 13 | 2 | 60 | 근접 시 2배속 돌진, 벽 1회 15뎀 |
+| **네크로맨서** | 짙은보라 | 14 | 4 | 5 | 0 | 100 | 80px 내 좀비 힐+버프 |
+| **스플리터** | 밝은초록 | 14 | 3 | 10 | 2 | 40 | 사망 시 스파이더 2마리 분열 |
+| **빅원** | 짙은빨강 | 30 | 20 | 3 | 8 | 300 | 보스급, 확정 3~5 아이템 드랍 |
+| **스파이더** | 회색 | 7 | 1 | 30 | 1 | 10 | 빠르고 작음, 불규칙 지그재그 |
+
+모든 좀비의 청각 범위: 기본 300px
+
+---
+
+## 8. 낮/밤 시스템
+
+### 8.1 사이클
+- **스테이지와 독립**, 실시간 60초 주기
+- 낮: 40초 (밝은 필드)
+- 밤: 20초 (어두운 필드)
+- 전환: 0.5초/dt 속도로 부드러운 페이드
+
+### 8.2 밤 효과
+- 화면에 어둠 오버레이 적용 (`nightDarkness` 0~1)
+- 조준 방향으로 **플래시라이트 원뿔형** 조명
+- 좀비의 **빨간 눈** 어둠 속에서 보임
+- HUD에 달 아이콘(🌙) 표시
+
+### 8.3 낮 표시
+- HUD에 태양 아이콘(☀) 표시
+
+---
+
+## 9. UI 레이아웃
+
+### 9.1 화면 구성 (540×960 캔버스)
+
+```
+┌─────────────────────────┐ 0
+│       HUD (48px)        │
+│  점수  Stage N ☀ x좀비수 │
+│          콤보 표시        │ 48
+├─────────────────────────┤
+│                         │
+│                         │
+│    게임 필드             │
+│  (좀비, 벽, 타워, 아이템) │
+│                         │
+│                         │ 640
+├─────────────────────────┤
+│                         │ 672 (CONTROLS_TOP)
+│  권총│활│저격│기관│석궁│주머니│
+│    무기 슬롯 (40px)     │ 712
+├─────────────────────────┤
+│   아이템 바 (35px)      │
+│  [일반모드: 아이콘 가로줄] │
+│  [주머니모드: 2열 그리드]  │ 747
+├─────────────────────────┤
+│   무기 컨트롤 영역       │
+│  (장전, 발사 등 조작 UI) │
+│                         │ 960
+└─────────────────────────┘
+```
+
+### 9.2 무기 슬롯 (6개)
+| 탭 | 이름 | 색상 |
+|-----|------|------|
+| 1 | 권총 | 금색 (#ffcc66) |
+| 2 | 활 | 초록 (#aaddaa) |
+| 3 | 저격 | 파랑 (#88bbff) |
+| 4 | 기관총 | 주황 (#ffaa66) |
+| 5 | 석궁 | 밝은초록 (#88ff88) |
+| 6 | **주머니** | 베이지 (#ccbbaa) |
+
+### 9.3 주머니 탭 (Pouch)
+- 6번째 무기 슬롯, 가방 모양 아이콘
+- 선택 시 아이템 바 + 무기 컨트롤 영역을 **2열 그리드**로 대체
+- 각 셀: 아이콘 + 아이템 이름 + 수량(×N)
+- 드래그 아이템: 그리드에서 필드로 끌어놓기
+- 즉시 사용 아이템: 탭으로 바로 사용
+- **무기가 발사되지 않음** (주머니 모드)
+- 아이템 없을 시 "아이템 없음" 메시지
+
+### 9.4 아이템 바 (일반 무기 탭)
+- 무기 슬롯 아래 35px 높이의 가로 바
+- 슬롯 너비 54px, 최대 10개
+- 아이콘(0.7배) + 수량 배지
+- 드래그 아이템은 위로 끌어서 필드에 놓기
+
+### 9.5 드래그 오버레이
+필드에 드래그 중일 때 대상 영역 하이라이트:
+- **벽돌**: 가장 가까운 벽 구간 점선 표시
+- **HP 키트**: 타워 주변 원형 표시
+- **전투 아이템**: 폭발/효과 반경 원형 + 크로스헤어
+- **소리 유인**: 소리 범위 원형 (toy: 150, firecracker: 300, radio: 200)
+
+---
+
+## 10. 성벽 시스템
+
+### 10.1 구성
+- 4개 벽 구간, 각각 폭 120px
+- 포물선 아크 형태 배치 (중앙이 약간 낮음)
+- 각 구간 독립적 HP (최대 100)
+
+### 10.2 파괴 및 재건
+- 좀비가 소리에 끌려 벽을 밀면 지속 데미지
+- HP 0 → 파괴 (잔해 표시)
+- **자동 재건**: 파괴된 벽 근처에 좀비가 없으면 5초 후 HP 50으로 재건
+- 벽돌 아이템으로 수동 수리 (+25 HP)
+- 방어막 버프: 벽 데미지 무효화
+
+### 10.3 벽 위치
+| 구간 | X 시작 | 너비 |
+|------|--------|------|
+| 0 (좌) | 20 | 120 |
+| 1 | 145 | 120 |
+| 2 | 275 | 120 |
+| 3 (우) | 400 | 120 |
+
+---
+
+## 11. 타워
+
+- 위치: 벽 뒤편 (y=590), 초기 x = 270 (중앙)
+- HP: 200 (최대 200)
+- **터치 드래그로 좌우 이동** 가능
+- 탭으로 이동 불가 (드래그만)
+- 모든 무기 발사의 원점
+
+---
+
+## 12. 게임 종료 조건
+
+### 12.1 게임 오버
+- **타워 HP 0**: 좀비가 벽을 부수고 타워까지 도달해 공격
+- 좀비가 아이템을 드랍하므로 탄약 고갈은 드묾
+
+### 12.2 기록 저장
+- 최고 점수 (`zw_best`)
+- 최고 스테이지 (`zw_best_wave`)
+- localStorage에 저장
+
+### 12.3 게임 오버 화면
+- "TOWER DESTROYED" 타이틀
+- 점수, 도달 스테이지, 최대 콤보 표시
+- 최고 기록 갱신 시 "NEW BEST SCORE!" / "NEW BEST STAGE!" 표시
+- 탭하여 재시작
+
+---
+
+## 13. 소리 시각화
+
+### 13.1 소리 소스 파동
+- 소리 발생 위치에 **확장되는 파동 원** 표시
+- 노란색 반투명 원, intensity에 비례하여 크기/투명도 변화
+- 내부/외부 이중 원 표시
+
+### 13.2 소리 유인 아이템 시각화
+- 타입별 색상: 장난감(분홍), 폭죽(빨강), 라디오(파랑)
+- 반복 파동 애니메이션
+- 내부 원 + 아이콘(♪ 또는 ♫)
+- 남은 시간 < 2초: 카운트다운 표시
+
+---
+
+## 14. 효과음 목록
+
+### 14.1 무기 관련
+- 권총 발사/장전/슬라이드/탄창 교체
+- 활 시위 당김/발사
+- 저격총 발사/볼트 조작/스코프
+- 기관총 연사/과열/장전
+- 석궁 크랭크/발사
+
+### 14.2 좀비 관련
+- 좀비 피격/사망
+- 스플리터 분열
+- 래머 돌진
+
+### 14.3 환경
+- 벽 피격/파괴/재건 완료
+- 타워 피격
+- 지뢰 폭발/화염 데미지
+
+### 14.4 아이템
+- 아이템 드랍/픽업
+- 벽돌 수리/HP 키트 사용
+- 폭탄/화염병/지뢰 배치
+- 장난감 활성/폭죽 투척/라디오 활성
+- 방어막/버프/냉동 활성
+
+### 14.5 시스템
+- 게임 시작/일시정지/재개
+- 웨이브 시작/클리어
+- 콤보/슬로모션
+- 탄환 빗나감/무기 전환
+- 게임 오버/신기록
+
+---
+
+## 15. 버프 시스템
+
+| 버프 | 효과 | 지속 |
+|------|------|------|
+| 방어막 (Shield) | 벽/타워 데미지 무효 | 5초 |
+| 속도 부스트 | 발사 속도 2배 | 10초 |
+| 냉동탄 | 피격 좀비 3초 50% 감속 | 3발 |
+| 전기 | 피격 좀비 인접 2마리에 연쇄 데미지 | 3발 |
+| 독 | 피격 좀비 5초 DOT | 3발 |
+
+버프는 **소리를 발생시키지 않음** (무음 효과).
+
+---
+
+## 16. 기술 스택
+
+- **렌더링**: HTML5 Canvas 2D (540×960)
+- **오디오**: Web Audio API 합성 (tone, noise, sweep 헬퍼)
+- **모듈**: ES Modules (`?v=11` 캐시 버스팅)
+- **입력**: 멀티터치 + 자이로스코프 (선택)
+- **배포**: GitHub Pages (`git push origin main:gh-pages --force`)
+- **저장**: localStorage (최고 점수/스테이지)
+
+---
+
+## 17. 파일 구조
+
+```
+prototypes/zombie-world/
+├── index.html          # 캔버스 + 모듈 로드
+└── js/
+    ├── main.js         # 메인 루프 (update + draw)
+    ├── game.js         # 상수, 상태, WEAPON_PROFILES, emitSound, updateSounds
+    ├── zombies.js      # 좀비 AI (idle/attracted/arrived), 스폰, 충돌, 웨이브
+    ├── projectiles.js  # 발사체 물리, 사정거리, 관통, 발사 소리
+    ├── wall.js         # 4구간 벽, 데미지, 자동재건
+    ├── tower.js        # 타워 드래그 이동
+    ├── daynight.js     # 실시간 60초 낮/밤 사이클
+    ├── renderer.js     # 필드, 조준선(사정거리), 소리 시각화
+    ├── items.js        # 아이템 정의, 드랍, 사용, 소리유인, drawItemIcon
+    ├── inventory.js    # 인벤토리 바 + 주머니 그리드 UI
+    ├── hazards.js      # 지뢰, 화염/독 지역
+    ├── hud.js          # HUD, 무기슬롯, 타이틀/일시정지/게임오버 화면
+    ├── aiming.js       # 반원 다이얼 조준
+    ├── input.js        # 터치 존 등록/디스패치
+    ├── audio.js        # Web Audio 합성 효과음 전체
+    ├── particles.js    # 파티클 시스템
+    ├── settings.js     # 설정 화면
+    ├── gyro.js         # 자이로스코프 입력
+    ├── pistol.js       # 권총 조작 UI
+    ├── bow.js          # 활 조작 UI
+    ├── sniper.js       # 저격총 조작 UI
+    ├── mg.js           # 기관총 조작 UI
+    └── crossbow.js     # 석궁 조작 UI
+```
