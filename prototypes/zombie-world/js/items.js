@@ -1,8 +1,10 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=9';
-import { registerZone } from './input.js?v=9';
-import { playItemPickup, playItemDrop } from './audio.js?v=9';
-import { spawnParticles } from './particles.js?v=9';
+import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=10';
+import { registerZone } from './input.js?v=10';
+import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
+         playBombThrow, playMolotovThrow, playMinePlaced,
+         playShieldActivate, playBuffActivate, playFreezeActivate } from './audio.js?v=10';
+import { spawnParticles } from './particles.js?v=10';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
@@ -112,10 +114,12 @@ export function useInventoryItem(itemId, targetX, targetY) {
         if (Math.abs(targetX - segCenters[i]) < Math.abs(targetX - segCenters[best])) best = i;
       }
       state.walls[best].hp = Math.min(state.walls[best].maxHp, state.walls[best].hp + 25);
+      playBrickRepair();
       break;
     }
     case 'medkit':
       state.tower.hp = Math.min(state.tower.maxHp, state.tower.hp + 30);
+      playMedkitUse();
       break;
     case 'mine':
       state.mines.push({
@@ -124,6 +128,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
         radius: 60,
         damage: 5,
       });
+      playMinePlaced();
       break;
     case 'molotov':
       state.hazards.push({
@@ -134,6 +139,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
         damage: 2,
         timer: 3,
       });
+      playMolotovThrow();
       break;
     case 'bomb':
       for (const z of state.zombies) {
@@ -143,30 +149,39 @@ export function useInventoryItem(itemId, targetX, targetY) {
         }
       }
       spawnParticles(targetX, targetY, 'explosion');
+      playBombThrow();
       break;
     case 'shield':
       state.buffs.shieldTimer = 5;
+      playShieldActivate();
       break;
     case 'speedBoost':
       state.buffs.speedTimer = 10;
+      playBuffActivate();
       break;
     case 'freeze':
       state.buffs.freezeShots += 3;
+      playFreezeActivate();
       break;
     case 'chain':
       state.buffs.chainShots += 3;
+      playBuffActivate();
       break;
     case 'poison':
       state.buffs.poisonShots += 3;
+      playBuffActivate();
       break;
     case 'magUpgrade':
       state.pistol.magazineMax = Math.min(12, state.pistol.magazineMax + 2);
+      playBuffActivate();
       break;
     case 'goldBullet':
       state.pistol.specialBullets += 1;
+      playBuffActivate();
       break;
     case 'explosiveArrow':
       state.bow.specialArrows += 1;
+      playBuffActivate();
       break;
     default:
       return false;

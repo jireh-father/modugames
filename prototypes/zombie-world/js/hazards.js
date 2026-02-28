@@ -1,7 +1,9 @@
 // ── 지뢰 & 위험 지역 (화염/독) 시스템 ──
-import { state } from './game.js?v=9';
-import { spawnParticles } from './particles.js?v=9';
-import { playMineExplosion } from './audio.js?v=9';
+import { state } from './game.js?v=10';
+import { spawnParticles } from './particles.js?v=10';
+import { playMineExplosion, playFireDamage } from './audio.js?v=10';
+
+let hazardSoundTimer = 0;
 
 /**
  * 지뢰 업데이트: 좀비와 접촉 시 폭발
@@ -42,6 +44,9 @@ export function updateMines(dt) {
  * 위험 지역 업데이트: 시간 감소, 범위 내 좀비에 지속 데미지
  */
 export function updateHazards(dt) {
+  hazardSoundTimer -= dt;
+  let anyHit = false;
+
   for (let i = state.hazards.length - 1; i >= 0; i--) {
     const h = state.hazards[i];
     h.timer -= dt;
@@ -53,12 +58,18 @@ export function updateHazards(dt) {
       if (dist < h.radius) {
         z.hp -= h.damage * dt;
         z.hitFlash = Math.max(z.hitFlash, 0.03);
+        anyHit = true;
       }
     }
 
     if (h.timer <= 0) {
       state.hazards.splice(i, 1);
     }
+  }
+
+  if (anyHit && hazardSoundTimer <= 0) {
+    playFireDamage();
+    hazardSoundTimer = 0.6;
   }
 }
 

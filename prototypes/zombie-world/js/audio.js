@@ -366,3 +366,111 @@ export function playDayComplete() {
   setTimeout(() => tone(659, 0.15, 'sine', 0.18), 150); // E5
   setTimeout(() => tone(784, 0.2, 'sine', 0.22), 300);  // G5
 }
+
+// ── 아이템 사용 사운드 ──
+export function playBrickRepair() {
+  // 돌 쌓는 소리
+  noise(0.08, 0.2, 1200);
+  tone(300, 0.06, 'square', 0.1);
+  setTimeout(() => { noise(0.06, 0.15, 1500); tone(400, 0.05, 'square', 0.08); }, 80);
+  setTimeout(() => { noise(0.05, 0.12, 1800); tone(500, 0.04, 'sine', 0.06); }, 160);
+}
+
+export function playMedkitUse() {
+  // 치유 상승음
+  sweep(400, 800, 0.3, 'sine', 0.15);
+  setTimeout(() => tone(1000, 0.15, 'sine', 0.1), 200);
+  setTimeout(() => tone(1200, 0.1, 'sine', 0.08), 350);
+}
+
+export function playBombThrow() {
+  // 던지는 휙 소리 + 폭발
+  sweep(300, 600, 0.15, 'sine', 0.1);
+  setTimeout(() => {
+    noise(0.5, 0.55, 1500);
+    sweep(200, 40, 0.5, 'sine', 0.4);
+    tone(35, 0.4, 'square', 0.3);
+  }, 200);
+}
+
+export function playMolotovThrow() {
+  // 던지는 소리 + 유리 깨지는 소리 + 불 붙는 소리
+  sweep(400, 700, 0.1, 'sine', 0.08);
+  setTimeout(() => { noise(0.1, 0.3, 5000); tone(2000, 0.05, 'sine', 0.1); }, 150);
+  setTimeout(() => { noise(0.4, 0.2, 1200); sweep(100, 300, 0.3, 'sawtooth', 0.08); }, 200);
+}
+
+export function playMinePlaced() {
+  // 설치 클릭음
+  tone(600, 0.04, 'square', 0.12);
+  setTimeout(() => tone(400, 0.06, 'square', 0.08), 40);
+  noise(0.04, 0.08, 2000);
+}
+
+// ── 버프 사운드 ──
+export function playBuffActivate() {
+  // 파워업 상승음
+  sweep(400, 1200, 0.2, 'sine', 0.15);
+  setTimeout(() => tone(1500, 0.1, 'sine', 0.1), 150);
+}
+
+export function playShieldActivate() {
+  // 방패 울림
+  tone(300, 0.15, 'triangle', 0.15);
+  tone(600, 0.2, 'sine', 0.12);
+  setTimeout(() => tone(900, 0.15, 'sine', 0.08), 100);
+}
+
+export function playFreezeActivate() {
+  // 얼음 결정 소리
+  tone(2000, 0.08, 'sine', 0.1);
+  setTimeout(() => tone(2500, 0.06, 'sine', 0.08), 60);
+  setTimeout(() => tone(3000, 0.05, 'sine', 0.06), 120);
+}
+
+// ── 벽 사운드 ──
+export function playWallRebuildComplete() {
+  // 복구 완료음
+  tone(500, 0.08, 'sine', 0.12);
+  setTimeout(() => tone(700, 0.08, 'sine', 0.12), 80);
+  noise(0.06, 0.1, 1500);
+}
+
+// ── 기타 효과 사운드 ──
+export function playSplitterSplit() {
+  // 분열 짤깍 소리
+  noise(0.08, 0.2, 2500);
+  tone(500, 0.06, 'square', 0.1);
+  setTimeout(() => { tone(800, 0.04, 'sine', 0.08); tone(300, 0.04, 'sine', 0.08); }, 50);
+}
+
+export function playRammerCharge() {
+  // 돌진 저음 울림
+  sweep(100, 200, 0.2, 'sawtooth', 0.12);
+  tone(50, 0.15, 'sine', 0.1);
+}
+
+export function playFireDamage() {
+  // 불 탄 소리 (짧은)
+  noise(0.06, 0.1, 3000);
+  tone(150, 0.04, 'sawtooth', 0.05);
+}
+
+export function playChainLightning() {
+  // 전기 지지직
+  noise(0.08, 0.2, 6000);
+  sweep(1000, 3000, 0.06, 'sawtooth', 0.12);
+  setTimeout(() => { noise(0.05, 0.12, 5000); sweep(800, 2500, 0.04, 'sawtooth', 0.08); }, 50);
+}
+
+export function playPoisonApply() {
+  // 독 거품 소리
+  noise(0.1, 0.08, 4000);
+  sweep(200, 400, 0.1, 'sine', 0.06);
+}
+
+export function playFreezeApply() {
+  // 얼리는 소리
+  tone(1500, 0.1, 'sine', 0.08);
+  sweep(2000, 3000, 0.08, 'sine', 0.06);
+}

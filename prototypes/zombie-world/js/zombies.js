@@ -1,6 +1,9 @@
 // ── 좀비 시스템 (8종 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y } from './game.js?v=9';
-import { getWallY, getWallSegments } from './wall.js?v=9';
+import { W, state, WALL_Y, TOWER_Y } from './game.js?v=10';
+import { getWallY, getWallSegments } from './wall.js?v=10';
+import { playZombieHit, playZombieDeath, playWallHit, playWallBreak, playTowerHit,
+         playSplitterSplit, playRammerCharge, playChainLightning,
+         playFreezeApply, playPoisonApply } from './audio.js?v=10';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -78,9 +81,15 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
   return z;
 }
 
+// 사운드 쓰로틀링 (초 단위)
+let wallHitSoundTimer = 0;
+let towerHitSoundTimer = 0;
+
 // ── 좀비 업데이트 ──
 function updateZombies(dt) {
   const TOWER_X = state.tower.x;
+  wallHitSoundTimer -= dt;
+  towerHitSoundTimer -= dt;
 
   for (let i = state.zombies.length - 1; i >= 0; i--) {
     const z = state.zombies[i];
@@ -142,6 +151,7 @@ function updateZombies(dt) {
           // 래머: 직진, 벽 100px 근처에서 속도 2배
           const distToWall = wallY - z.y;
           const ramSpeedMul = distToWall < 100 ? 2 : 1;
+          if (distToWall < 100 && distToWall > 95) playRammerCharge();
           z.y += z.speed * dt * speedMul * ramSpeedMul;
 
           // 벽 도달 체크
@@ -155,6 +165,7 @@ function updateZombies(dt) {
                 state.walls[z.targetWallIdx].hp -= 15;
                 if (state.walls[z.targetWallIdx].hp < 0) state.walls[z.targetWallIdx].hp = 0;
                 z.rammed = true;
+                playWallHit();
               }
             } else {
               z.pastWall = true;
@@ -179,8 +190,16 @@ function updateZombies(dt) {
         // --- 벽을 공격 중 ---
         if (state.walls[z.targetWallIdx].hp > 0) {
           if (state.buffs.shieldTimer <= 0) {
+            const prevHp = state.walls[z.targetWallIdx].hp;
             state.walls[z.targetWallIdx].hp -= z.type === 'necromancer' ? 0 : ZOMBIE_TYPES[z.type].wallDmg * dt;
             if (state.walls[z.targetWallIdx].hp < 0) state.walls[z.targetWallIdx].hp = 0;
+            // 벽 피격 사운드 (0.8초마다)
+            if (wallHitSoundTimer <= 0 && z.type !== 'necromancer') {
+              playWallHit();
+              wallHitSoundTimer = 0.8;
+            }
+            // 벽 파괴 순간 사운드
+            if (prevHp > 0 && state.walls[z.targetWallIdx].hp <= 0) playWallBreak();
           }
         } else {
           // 벽 파괴됨 → 침투
@@ -208,6 +227,11 @@ function updateZombies(dt) {
       if (state.buffs.shieldTimer <= 0) {
         state.tower.hp -= ZOMBIE_TYPES[z.type].wallDmg * dt;
         if (state.tower.hp < 0) state.tower.hp = 0;
+        // 타워 피격 사운드 (1초마다)
+        if (towerHitSoundTimer <= 0) {
+          playTowerHit();
+          towerHitSoundTimer = 1;
+        }
       }
     }
 
@@ -268,8 +292,11 @@ function updateZombies(dt) {
 
 // ── 좀비 사망 처리 ──
 function handleZombieDeath(z, _idx) {
+  playZombieDeath();
+
   // 스플리터: 미니좀비 2마리 분열
   if (z.type === 'splitter') {
+    playSplitterSplit();
     for (let j = 0; j < 2; j++) {
       const offsetX = (j === 0 ? -12 : 12);
       const mini = spawnZombie('spider', z.x + offsetX, 1, 1, {
@@ -315,9 +342,12 @@ function checkZombieHits(projectiles) {
         z.hp -= damage;
         z.hitFlash = 0.15;
 
+        // 좀비 피격 사운드
+        playZombieHit();
+
         // 상태이상 적용
-        if (p.freeze) z.statusEffects.frozen = 3;
-        if (p.poison) z.statusEffects.poisoned = 5;
+        if (p.freeze) { z.statusEffects.frozen = 3; playFreezeApply(); }
+        if (p.poison) { z.statusEffects.poisoned = 5; playPoisonApply(); }
 
         // 체인 라이트닝: 주변 2마리에 1 데미지
         if (p.chain) {
@@ -329,6 +359,7 @@ function checkZombieHits(projectiles) {
             oz.hp -= 1;
             oz.hitFlash = 0.15;
           }
+          if (nearby.length > 0) playChainLightning();
         }
 
         // 관통 여부
