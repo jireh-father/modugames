@@ -108,7 +108,7 @@ export function updateFlamethrower(dt) {
 
     // 소리 방출 (좀비 유인)
     const origin = getFireOrigin();
-    emitSound(origin.x, origin.y, 100, 0.3, 'weapon');
+    emitSound(origin.x, origin.y, 80, 0.3, 'weapon');
 
     // 화염 영역 내 좀비 데미지
     const angle = state.aimAngle;

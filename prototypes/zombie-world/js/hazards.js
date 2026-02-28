@@ -34,7 +34,7 @@ export function updateMines(dt) {
         }
       }
       spawnParticles(mine.x, mine.y, 'explosion', { count: 15 });
-      emitSound(mine.x, mine.y, 100, 1.0, 'explosion');
+      emitSound(mine.x, mine.y, 200, 1.0, 'explosion');
       playMineExplosion();
       state.mines.splice(i, 1);
     }

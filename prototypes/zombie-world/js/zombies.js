@@ -65,6 +65,8 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
     moveDir: null,       // 이동 방향 벡터 {x, y} — 타겟 통과 후에도 유지
     hearingRange: 300,
     noiseTimer: 0,
+    soundThreshold: 0,   // 현재 반응 중인 소리 크기 (이보다 작은 소리 무시)
+    soundCooldown: 0,    // threshold 유지 시간 (초)
   };
 
   state.zombies.push(z);
@@ -75,15 +77,19 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
 let wallHitSoundTimer = 0;
 let towerHitSoundTimer = 0;
 
-// ── 가장 가까운 소리 찾기 ──
-function findClosestSound(z) {
+// ── 가장 큰 소리 찾기 (범위 내에서 loudness 기준) ──
+function findLoudestSound(z, minLoudness = 0) {
   let best = null;
-  let bestDist = Infinity;
+  let bestLoudness = minLoudness;
   for (const s of state.soundSources) {
     const dist = Math.hypot(z.x - s.x, z.y - s.y);
-    if (dist < s.range && dist < z.hearingRange && dist < bestDist) {
-      bestDist = dist;
-      best = s;
+    if (dist < s.range && dist < z.hearingRange) {
+      // 유효 크기 = 원본 loudness × 거리 감쇠 (가까울수록 크게 느낌)
+      const effectiveLoudness = (s.loudness || s.range) * (1 - dist / s.range);
+      if (effectiveLoudness > bestLoudness) {
+        bestLoudness = effectiveLoudness;
+        best = s;
+      }
     }
   }
   return best;
@@ -169,8 +175,17 @@ function updateZombies(dt) {
         }
       }
 
-      // 소리 감지
-      const sound = findClosestSound(z);
+      // 소리 면역 쿨다운 감소
+      if (z.soundCooldown > 0) {
+        z.soundCooldown -= dt;
+        if (z.soundCooldown <= 0) {
+          z.soundThreshold = 0;
+          z.soundCooldown = 0;
+        }
+      }
+
+      // 소리 감지 (threshold 이상만 반응)
+      const sound = findLoudestSound(z, z.soundThreshold);
       if (sound) {
         z.targetX = sound.x;
         z.targetY = sound.y;
@@ -180,6 +195,10 @@ function updateZombies(dt) {
         if (ddist > 0) {
           z.moveDir = { x: ddx / ddist, y: ddy / ddist };
         }
+        // 반응한 소리 크기를 threshold로 설정 (3초간 이보다 작은 소리 무시)
+        const heardLoudness = (sound.loudness || sound.range) * (1 - Math.hypot(z.x - sound.x, z.y - sound.y) / sound.range);
+        z.soundThreshold = heardLoudness * 0.7; // 70% 이상의 소리에만 재반응
+        z.soundCooldown = 3;
         z.aiState = 'attracted';
       }
 
@@ -287,22 +306,30 @@ function updateZombies(dt) {
         }
       }
 
-      // 새 소리 감지 — 범위 내 소리가 있으면 타겟 갱신
-      const newSound = findClosestSound(z);
-      if (newSound) {
-        const newDist = Math.hypot(z.x - newSound.x, z.y - newSound.y);
-        // 새 소리가 현재 타겟보다 가까우면 방향 전환
-        const curTargetDist = Math.hypot(z.targetX - z.x, z.targetY - z.y);
-        if (newDist < curTargetDist) {
-          z.targetX = newSound.x;
-          z.targetY = newSound.y;
-          const sdx = newSound.x - z.x;
-          const sdy = newSound.y - z.y;
-          const sdist = Math.hypot(sdx, sdy);
-          if (sdist > 0) {
-            z.moveDir = { x: sdx / sdist, y: sdy / sdist };
-          }
+      // 소리 면역 쿨다운 감소
+      if (z.soundCooldown > 0) {
+        z.soundCooldown -= dt;
+        if (z.soundCooldown <= 0) {
+          z.soundThreshold = 0;
+          z.soundCooldown = 0;
         }
+      }
+
+      // 새 소리 감지 — threshold 이상이고 현재보다 큰 소리만 반응
+      const newSound = findLoudestSound(z, z.soundThreshold);
+      if (newSound) {
+        const newLoudness = (newSound.loudness || newSound.range) * (1 - Math.hypot(z.x - newSound.x, z.y - newSound.y) / newSound.range);
+        // 더 큰 소리면 방향 전환 + threshold 갱신
+        z.targetX = newSound.x;
+        z.targetY = newSound.y;
+        const sdx = newSound.x - z.x;
+        const sdy = newSound.y - z.y;
+        const sdist = Math.hypot(sdx, sdy);
+        if (sdist > 0) {
+          z.moveDir = { x: sdx / sdist, y: sdy / sdist };
+        }
+        z.soundThreshold = newLoudness * 0.7;
+        z.soundCooldown = 3;
       }
     }
 

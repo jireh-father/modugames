@@ -12,13 +12,15 @@ export const ITEM_BAR_H = 35;               // 인벤토리 바 높이
 export const DIAL_R = 80;                    // half-circle dial radius
 
 // ── 무기 프로필 (사정거리, 공격력, 소리 범위) ──
+// 소리 크기 등급: 0 무음 | 30 미미 | 50 작음 | 80 보통 | 120 큼 | 180 매우큼 | 250 폭발급
 export const WEAPON_PROFILES = {
-  pistol:   { range: 400, damage: 2, originSound: 125, impactSound: 40,  penetrate: 0 },
-  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 25,  penetrate: 1 },
-  sniper:   { range: 9999, damage: 5, originSound: 200, impactSound: 75,  penetrate: 99 },
-  mg:       { range: 350, damage: 1, originSound: 175, impactSound: 30,  penetrate: 0 },
-  crossbow: { range: 450, damage: 4, originSound: 40,  impactSound: 30,  penetrate: 1 },
-  flamethrower: { range: 180, damage: 3, originSound: 100, impactSound: 0, penetrate: 0 },
+  pistol:   { range: 400, damage: 2, originSound: 120, impactSound: 50,  penetrate: 0 },
+  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 30,  penetrate: 1 },
+  sniper:   { range: 9999, damage: 5, originSound: 250, impactSound: 80,  penetrate: 99 },
+  mg:       { range: 350, damage: 1, originSound: 180, impactSound: 30,  penetrate: 0 },
+  crossbow: { range: 450, damage: 4, originSound: 30,  impactSound: 30,  penetrate: 1 },
+  flamethrower: { range: 180, damage: 3, originSound: 80, impactSound: 0, penetrate: 0 },
+  flashlight: { range: 0, damage: 0, originSound: 0, impactSound: 0, penetrate: 0 },
 };
 
 // ── 게임 상태 ──
@@ -308,7 +310,8 @@ export function emitSound(x, y, range, duration = 1.0, type = 'generic') {
   if (range <= 0) return;
   // 밤에는 소리가 40% 더 멀리 퍼짐
   const actualRange = state.isNight ? range * 1.4 : range;
-  state.soundSources.push({ x, y, intensity: 1, range: actualRange, timer: duration, duration, type });
+  // loudness = 원본 range (밤 보정 전). 좀비가 소리 크기 비교에 사용
+  state.soundSources.push({ x, y, intensity: 1, range: actualRange, loudness: range, timer: duration, duration, type });
 }
 
 export function updateSounds(dt) {

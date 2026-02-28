@@ -170,22 +170,22 @@ export function useInventoryItem(itemId, targetX, targetY) {
         }
       }
       spawnParticles(targetX, targetY, 'explosion');
-      emitSound(targetX, targetY, 125, 1.0, 'explosion');
+      emitSound(targetX, targetY, 200, 1.0, 'explosion');
       playBombThrow();
       break;
     case 'toy':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 75 });
-      emitSound(targetX, targetY, 75, 5, 'toy');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 80 });
+      emitSound(targetX, targetY, 80, 5, 'toy');
       playToyActivate();
       break;
     case 'firecracker':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 150, explodeOnEnd: true });
-      emitSound(targetX, targetY, 150, 3, 'firecracker');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 180, explodeOnEnd: true });
+      emitSound(targetX, targetY, 180, 3, 'firecracker');
       playFirecrackerThrow();
       break;
     case 'radio':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 100 });
-      emitSound(targetX, targetY, 100, 10, 'radio');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 120 });
+      emitSound(targetX, targetY, 120, 10, 'radio');
       playRadioActivate();
       break;
     case 'shield':
@@ -254,7 +254,7 @@ export function updateSoundLures(dt) {
           }
         }
         spawnParticles(lure.x, lure.y, 'explosion', { count: 15 });
-        emitSound(lure.x, lure.y, 125, 1.0, 'explosion');
+        emitSound(lure.x, lure.y, 200, 1.0, 'explosion');
       }
       state.soundLures.splice(i, 1);
     }
