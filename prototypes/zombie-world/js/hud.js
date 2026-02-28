@@ -152,18 +152,39 @@ export function drawHUD(ctx) {
   ctx.font = '12px monospace';
   ctx.fillText(`AMMO:${totalAmmo}`, W - 10, 18);
 
-  // 타워 HP 미니바 (우측)
-  const hpRatio = Math.max(0, state.tower.hp / state.tower.maxHp);
-  const barX = W - 75;
-  const barW = 60;
+  // 플레이어 HP 바 (우측, 넓게)
+  const pHpRatio = Math.max(0, state.player.hp / state.player.maxHp);
+  const hpBarX = W - 95;
+  const hpBarW = 80;
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.fillRect(barX, 24, barW, 5);
-  ctx.fillStyle = hpRatio > 0.5 ? '#44ff44' : hpRatio > 0.25 ? '#ffff44' : '#ff4444';
-  ctx.fillRect(barX, 24, barW * hpRatio, 5);
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = '8px monospace';
+  ctx.fillRect(hpBarX, 22, hpBarW, 7);
+  ctx.fillStyle = pHpRatio > 0.5 ? '#44ff44' : pHpRatio > 0.25 ? '#ffff44' : '#ff4444';
+  ctx.fillRect(hpBarX, 22, hpBarW * pHpRatio, 7);
+  ctx.fillStyle = '#ccc';
+  ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('TOWER', W - 10, 38);
+  ctx.fillText('HP', hpBarX - 3, 30);
+
+  // 타워 상태 점 3개 (우측 HP 바 아래)
+  const dotY = 36;
+  const dotR = 4;
+  const dotSpacing = 14;
+  const dotStartX = W - 95 + (80 - dotSpacing * 2) / 2; // center 3 dots under HP bar
+  const labels = ['L', 'C', 'R'];
+  for (let i = 0; i < 3; i++) {
+    const t = state.towers[i];
+    const dx = dotStartX + i * dotSpacing;
+    const tHpRatio = t.hp / t.maxHp;
+    ctx.fillStyle = tHpRatio <= 0 ? '#ff4444' : tHpRatio > 0.5 ? '#44ff44' : '#ffff44';
+    ctx.beginPath();
+    ctx.arc(dx, dotY, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    // label
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i], dx, dotY + 11);
+  }
 
   // 자이로 상태
   if (isGyroEnabled()) {
@@ -553,12 +574,11 @@ export function drawGameOver(ctx) {
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(0, 0, W, H);
 
-  // TOWER DESTROYED
+  // 생존 실패
   ctx.fillStyle = '#cc3333';
-  ctx.font = 'bold 32px monospace';
+  ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('TOWER', W / 2, H * 0.22);
-  ctx.fillText('DESTROYED', W / 2, H * 0.22 + 38);
+  ctx.fillText('생존 실패', W / 2, H * 0.25);
 
   // 점수
   ctx.fillStyle = '#fff';
