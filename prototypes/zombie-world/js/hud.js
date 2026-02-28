@@ -4,6 +4,8 @@ import { registerZone } from './input.js?v=13';
 import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=13';
 import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=13';
 import { openSettings } from './settings.js?v=13';
+import { generateBuildings } from './buildings.js?v=13';
+import { buildGrid } from './pathfinding.js?v=13';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -64,6 +66,8 @@ export function initHUD() {
             y >= restartY && y <= restartY + MENU_BTN_H) {
           gameOverTriggered = false;
           resetGame();
+          generateBuildings();
+          buildGrid();
           playStart();
           return;
         }
@@ -685,12 +689,16 @@ export function initScreenHandlers() {
           requestGyro();
           resetGyroRef();
           resetGame();
+          generateBuildings();
+          buildGrid();
           playStart();
         } else if (state.screen === 'gameover') {
           gameOverTriggered = false;
           requestGyro();
           resetGyroRef();
           resetGame();
+          generateBuildings();
+          buildGrid();
           playStart();
         }
       },

@@ -23,6 +23,9 @@ import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } f
 import { initSettings, drawSettings } from './settings.js?v=13';
 import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=13';
 import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=13';
+import { generateBuildings, drawBuildings } from './buildings.js?v=13';
+import { buildGrid } from './pathfinding.js?v=13';
+import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=13';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -52,6 +55,10 @@ initItems();
 initInventory();
 initTower();
 initSettings();
+generateBuildings();
+buildGrid();
+initPlayer();
+initDescendButton();
 
 // ── 게임 루프 ──
 let lastTime = 0;
@@ -111,6 +118,9 @@ function update(dt, realDt) {
   updateProjectiles(dt);
   updateZombies(dt);
   updateWalls(dt);
+
+  // 플레이어 업데이트
+  updatePlayer(dt);
 
   // 지뢰 업데이트
   updateMines(dt);
@@ -175,8 +185,8 @@ function update(dt, realDt) {
     playBulletMiss();
   }
 
-  // 게임 오버 체크 (타워 HP 기반)
-  if (state.tower.hp <= 0) {
+  // 게임 오버 체크 (플레이어 HP 기반)
+  if (isGameOver()) {
     triggerGameOver();
   }
 }
@@ -199,11 +209,17 @@ function draw() {
   // 필드
   drawField(ctx);
 
+  // 건물 (장애물)
+  drawBuildings(ctx);
+
   // 성벽
   drawWalls(ctx);
 
   // 타워
   drawTowers(ctx);
+
+  // 내려가기 버튼 (타워 위일 때)
+  drawDescendButton(ctx);
 
   // 발사선
   drawFiringLine(ctx);
@@ -220,6 +236,9 @@ function draw() {
 
   // 좀비
   drawZombies(ctx);
+
+  // 플레이어
+  drawPlayer(ctx);
 
   // 지뢰 렌더링
   drawMines(ctx);
