@@ -102,6 +102,38 @@ export function collidesWithBuilding(x, y, size) {
   return false;
 }
 
+/**
+ * 건물과 겹쳐 있으면 밀어내어 겹치지 않는 좌표를 반환.
+ * 겹치지 않으면 원래 좌표 그대로 반환.
+ */
+export function pushOutOfBuildings(x, y, size) {
+  for (const b of state.buildings) {
+    const closestX = Math.max(b.x, Math.min(x, b.x + b.w));
+    const closestY = Math.max(b.y, Math.min(y, b.y + b.h));
+    let dx = x - closestX;
+    let dy = y - closestY;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < size * size && distSq > 0) {
+      const dist = Math.sqrt(distSq);
+      const push = size - dist + 1; // 1px 여유
+      x += (dx / dist) * push;
+      y += (dy / dist) * push;
+    } else if (distSq === 0) {
+      // 정확히 건물 안에 있을 때 → 가장 가까운 변으로 밀어냄
+      const toLeft = x - b.x;
+      const toRight = (b.x + b.w) - x;
+      const toTop = y - b.y;
+      const toBottom = (b.y + b.h) - y;
+      const minDist = Math.min(toLeft, toRight, toTop, toBottom);
+      if (minDist === toLeft) x = b.x - size - 1;
+      else if (minDist === toRight) x = b.x + b.w + size + 1;
+      else if (minDist === toTop) y = b.y - size - 1;
+      else y = b.y + b.h + size + 1;
+    }
+  }
+  return { x, y };
+}
+
 // ── 건물 렌더링 ──
 
 /**

@@ -1,7 +1,7 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
 import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=15';
 import { findPath, drawPathDebug } from './pathfinding.js?v=15';
-import { collidesWithBuilding } from './buildings.js?v=15';
+import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=15';
 import { registerZone } from './input.js?v=15';
 
 // ── 내부: 타워 탑승 ──
@@ -159,7 +159,7 @@ export function updatePlayer(dt) {
       let newX = p.x + nx * step;
       let newY = p.y + ny * step;
 
-      // 건물 충돌 체크 — 슬라이딩: 막히면 각 축 개별 시도
+      // 건물 충돌 체크 — 슬라이딩 + 모서리 밀어내기
       if (!collidesWithBuilding(newX, newY, p.size)) {
         p.x = newX;
         p.y = newY;
@@ -167,8 +167,12 @@ export function updatePlayer(dt) {
         p.x = newX; // X만 이동 (벽을 따라 수평 슬라이딩)
       } else if (!collidesWithBuilding(p.x, newY, p.size)) {
         p.y = newY; // Y만 이동 (벽을 따라 수직 슬라이딩)
+      } else {
+        // 모서리에 완전히 걸림 → 건물에서 밀어낸 후 이동
+        const pushed = pushOutOfBuildings(p.x, p.y, p.size);
+        p.x = pushed.x;
+        p.y = pushed.y;
       }
-      // 완전히 막혀도 이동 중단하지 않음 — 다음 웨이포인트로 계속 시도
     }
   }
 
