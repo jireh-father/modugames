@@ -83,7 +83,9 @@ export function initBow() {
         const frameDx = x - bowLastX;
         bowLastX = x;
         const aimSens = 0.005;
-        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+        state.aimAngle -= frameDx * aimSens;
+        while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
+        while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
 
         // 아래로 당기기 → drawPower (장전 상태일 때만)
         if (b.drawing) {

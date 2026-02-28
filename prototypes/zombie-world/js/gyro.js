@@ -57,7 +57,9 @@ function onOrientation(e) {
     if (Math.abs(dBeta) > 30) dBeta = 0;
 
     // 기울기 반전: 오른쪽 기울기 → 조준 각도 감소 (오른쪽), 왼쪽 기울기 → 증가 (왼쪽)
-    state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle + dGamma * settings.gyroSens * 0.02));
+    state.aimAngle += dGamma * settings.gyroSens * 0.02;
+    while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
+    while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
   }
 
   lastGamma = gamma;

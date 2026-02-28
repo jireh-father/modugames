@@ -66,7 +66,9 @@ export function initFlamethrower() {
         const frameDx = x - gunLastX;
         gunLastX = x;
         const aimSens = 0.005;
-        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+        state.aimAngle -= frameDx * aimSens;
+        while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
+        while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
       },
       onEnd() {
         gunHeld = false;
