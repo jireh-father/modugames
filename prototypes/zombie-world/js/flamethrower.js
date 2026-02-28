@@ -1,5 +1,5 @@
 // ── 화염방사기 시스템: 연료 + 지속 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound } from './game.js?v=13';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=13';
 import { registerZone } from './input.js?v=13';
 import { spawnParticles } from './particles.js?v=13';
 import { playFlameLoop, playFlameStop } from './audio.js?v=13';
@@ -105,7 +105,8 @@ export function updateFlamethrower(dt) {
     }
 
     // 소리 방출 (좀비 유인)
-    emitSound(state.tower.x, TOWER_Y, 100, 0.3, 'weapon');
+    const origin = getFireOrigin();
+    emitSound(origin.x, origin.y, 100, 0.3, 'weapon');
 
     // 화염 영역 내 좀비 데미지
     const angle = state.aimAngle;
@@ -114,8 +115,8 @@ export function updateFlamethrower(dt) {
 
     for (const z of state.zombies) {
       if (!z.alive) continue;
-      const dx = z.x - state.tower.x;
-      const dy = -(z.y - TOWER_Y); // canvas Y 반전
+      const dx = z.x - origin.x;
+      const dy = -(z.y - origin.y); // canvas Y 반전
       const dist = Math.hypot(dx, dy);
       if (dist > FLAME_RANGE || dist < 10) continue;
 
@@ -142,8 +143,8 @@ export function updateFlamethrower(dt) {
       f.flameTimer = 0;
       const pAngle = angle + (Math.random() - 0.5) * FLAME_SPREAD * 2;
       const pDist = 30 + Math.random() * (FLAME_RANGE - 30);
-      const px = state.tower.x + Math.cos(pAngle) * pDist;
-      const py = TOWER_Y - Math.sin(pAngle) * pDist;
+      const px = origin.x + Math.cos(pAngle) * pDist;
+      const py = origin.y - Math.sin(pAngle) * pDist;
       spawnParticles(px, py, 'fireSmall');
     }
   } else {
@@ -323,8 +324,9 @@ export function drawFlameOverlay(ctx) {
 
   ctx.save();
   const angle = state.aimAngle;
-  const tx = state.tower.x;
-  const ty = TOWER_Y;
+  const fo = getFireOrigin();
+  const tx = fo.x;
+  const ty = fo.y;
 
   // 화염 부채꼴 영역 표시
   const alpha = f.firing ? 0.15 : 0.06;

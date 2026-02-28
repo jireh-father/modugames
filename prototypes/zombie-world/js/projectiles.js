@@ -1,5 +1,5 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=13';
+import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=13';
 
 export const PROJ_TO_WEAPON = {
   bullet: 'pistol', arrow: 'bow', sniper: 'sniper', mgBullet: 'mg', bolt: 'crossbow'
@@ -44,11 +44,12 @@ export function fireProjectile(type, aimAngle, special = false, power = 1, targe
   const chain = isGun && state.buffs.chainShots > 0;
   const poison = isGun && state.buffs.poisonShots > 0;
 
+  const origin = getFireOrigin();
   const proj = {
     type,
     special,
-    x: state.tower.x,
-    y: TOWER_Y,
+    x: origin.x,
+    y: origin.y,
     dx: fdx,
     dy: fdy,
     speed,
@@ -68,9 +69,9 @@ export function fireProjectile(type, aimAngle, special = false, power = 1, targe
   // 화살: 포물선 비행 (타겟 지점으로 날아감)
   if (type === 'arrow' && targetPos) {
     proj.arcTarget = { x: targetPos.x, y: targetPos.y };
-    proj.arcStartX = state.tower.x;
-    proj.arcStartY = TOWER_Y;
-    const dist = Math.hypot(targetPos.x - state.tower.x, targetPos.y - TOWER_Y);
+    proj.arcStartX = origin.x;
+    proj.arcStartY = origin.y;
+    const dist = Math.hypot(targetPos.x - origin.x, targetPos.y - origin.y);
     proj.arcDuration = Math.max(0.4, dist / (300 + power * 300)); // 비행 시간
     proj.arcTime = 0;
     proj.arcDescending = false; // 하강 중인지
@@ -79,7 +80,7 @@ export function fireProjectile(type, aimAngle, special = false, power = 1, targe
 
   // Emit origin sound
   if (wp && wp.originSound > 0) {
-    emitSound(state.tower.x, TOWER_Y, wp.originSound, 0.8, 'weapon');
+    emitSound(origin.x, origin.y, wp.originSound, 0.8, 'weapon');
   }
 
   // Consume buff shots

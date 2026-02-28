@@ -1,5 +1,5 @@
 // ── 활 시스템: 화살통 + 활 (좌우 조준 + 당기기=거리) ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=13';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y, getFireOrigin } from './game.js?v=13';
 import { registerZone } from './input.js?v=13';
 import { fireProjectile } from './projectiles.js?v=13';
 import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=13';
@@ -129,18 +129,19 @@ function updateTargetFromAim() {
   const b = state.bow;
   const power = b.drawing ? b.drawPower : 0;
 
-  // 최소~최대 사거리 (타워로부터의 거리)
+  // 최소~최대 사거리 (발사 기준점으로부터의 거리)
+  const origin = getFireOrigin();
   const minDist = 80;
-  const maxDist = TOWER_Y - FIELD_TOP - 20;
+  const maxDist = origin.y - FIELD_TOP - 20;
   const dist = minDist + power * (maxDist - minDist);
 
   // aimAngle 방향으로 dist만큼 이동 (Y는 위쪽이 -)
-  targetX = state.tower.x + Math.cos(state.aimAngle) * dist;
-  targetY = TOWER_Y - Math.sin(state.aimAngle) * dist;
+  targetX = origin.x + Math.cos(state.aimAngle) * dist;
+  targetY = origin.y - Math.sin(state.aimAngle) * dist;
 
   // 필드 경계 클램핑
   targetX = Math.max(20, Math.min(W - 20, targetX));
-  targetY = Math.max(FIELD_TOP + 10, Math.min(TOWER_Y - 30, targetY));
+  targetY = Math.max(FIELD_TOP + 10, Math.min(origin.y - 30, targetY));
 }
 
 export function drawBow(ctx) {
