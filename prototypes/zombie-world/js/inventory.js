@@ -1,5 +1,5 @@
 // ── 인벤토리 바 UI + 드래그 사용 시스템 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=13';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y, getFireOrigin, getCurrentTower } from './game.js?v=13';
 import { registerZone } from './input.js?v=13';
 import { useInventoryItem } from './items.js?v=13';
 import { drawItemIcon } from './items.js?v=13';
@@ -104,14 +104,22 @@ export function initInventory() {
           switch (dragItem.id) {
             case 'brick':
               if (y >= 480 && y <= 560) {
+                // 벽 수리
                 used = useInventoryItem('brick', x, y);
+              } else if (y >= 560 && y <= 640) {
+                // 타워 수리 - 가장 가까운 타워 찾기
+                used = useInventoryItem('brick_tower', x, y);
               }
               break;
-            case 'medkit':
-              if (y >= 560 && y <= 620) {
+            case 'medkit': {
+              // 플레이어 위치 근처에 드랍하면 사용 (타워 위 또는 지상)
+              const origin = getFireOrigin();
+              const distToPlayer = Math.hypot(x - origin.x, y - origin.y);
+              if (distToPlayer < 80) {
                 used = useInventoryItem('medkit', x, y);
               }
               break;
+            }
             case 'mine':
             case 'molotov':
             case 'bomb':
@@ -331,47 +339,72 @@ export function drawInventoryDragOverlay(ctx) {
 
   switch (dragItem.id) {
     case 'brick': {
-      // 가장 가까운 벽 구간 하이라이트
-      const segCenters = [67, 202, 337, 472];
-      const segWidths = 135;
-      let best = 0;
-      for (let i = 1; i < 4; i++) {
-        if (Math.abs(dragX - segCenters[i]) < Math.abs(dragX - segCenters[best])) best = i;
+      if (dragY < 560) {
+        // 벽 구간 하이라이트 (벽 수리)
+        const segCenters = [67, 202, 337, 472];
+        const segWidths = 135;
+        let best = 0;
+        for (let i = 1; i < 4; i++) {
+          if (Math.abs(dragX - segCenters[i]) < Math.abs(dragX - segCenters[best])) best = i;
+        }
+        const sx = segCenters[best] - segWidths / 2;
+        ctx.strokeStyle = 'rgba(170,120,68,0.7)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(sx, WALL_Y - 20, segWidths, 40);
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(170,120,68,0.15)';
+        ctx.fillRect(sx, WALL_Y - 20, segWidths, 40);
+        ctx.fillStyle = 'rgba(170,120,68,0.8)';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('벽 수리', segCenters[best], WALL_Y - 25);
+      } else {
+        // 타워 영역 하이라이트 (타워 수리)
+        let bestTower = 0;
+        for (let i = 1; i < state.towers.length; i++) {
+          if (Math.abs(dragX - state.towers[i].x) < Math.abs(dragX - state.towers[bestTower].x)) bestTower = i;
+        }
+        const tw = state.towers[bestTower];
+        ctx.strokeStyle = 'rgba(170,120,68,0.7)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(tw.x, TOWER_Y, 35, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(170,120,68,0.15)';
+        ctx.beginPath();
+        ctx.arc(tw.x, TOWER_Y, 35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(170,120,68,0.8)';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('타워 수리', tw.x, TOWER_Y - 42);
       }
-      const sx = segCenters[best] - segWidths / 2;
-      ctx.strokeStyle = 'rgba(170,120,68,0.7)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(sx, WALL_Y - 20, segWidths, 40);
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(170,120,68,0.15)';
-      ctx.fillRect(sx, WALL_Y - 20, segWidths, 40);
-      // 라벨
-      ctx.fillStyle = 'rgba(170,120,68,0.8)';
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('벽 수리', segCenters[best], WALL_Y - 25);
       break;
     }
     case 'medkit': {
-      // 타워 영역 하이라이트
-      const towerX = state.tower.x;
+      // 플레이어 위치 하이라이트 (타워 위 또는 지상)
+      const origin = getFireOrigin();
+      const px = origin.x;
+      const py = origin.y;
       ctx.strokeStyle = 'rgba(255,68,68,0.7)';
       ctx.lineWidth = 3;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.arc(towerX, TOWER_Y, 40, 0, Math.PI * 2);
+      ctx.arc(px, py, 40, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(255,68,68,0.15)';
       ctx.beginPath();
-      ctx.arc(towerX, TOWER_Y, 40, 0, Math.PI * 2);
+      ctx.arc(px, py, 40, 0, Math.PI * 2);
       ctx.fill();
       // 라벨
       ctx.fillStyle = 'rgba(255,68,68,0.8)';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('HP 회복', towerX, TOWER_Y - 48);
+      ctx.fillText('HP 회복', px, py - 48);
       break;
     }
     case 'mine':

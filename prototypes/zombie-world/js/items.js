@@ -1,5 +1,5 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, emitSound } from './game.js?v=13';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=13';
 import { registerZone } from './input.js?v=13';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
@@ -110,7 +110,9 @@ function addToInventory(item) {
  * @returns {boolean} 사용 성공 여부
  */
 export function useInventoryItem(itemId, targetX, targetY) {
-  const inv = state.inventory.find(i => i.id === itemId);
+  // brick_tower는 brick 아이템을 사용하여 타워 수리
+  const invId = itemId === 'brick_tower' ? 'brick' : itemId;
+  const inv = state.inventory.find(i => i.id === invId);
   if (!inv || inv.count <= 0) return false;
 
   switch (itemId) {
@@ -125,8 +127,19 @@ export function useInventoryItem(itemId, targetX, targetY) {
       playBrickRepair();
       break;
     }
+    case 'brick_tower': {
+      // 가장 가까운 타워에 HP +25
+      let bestTower = 0;
+      for (let i = 1; i < state.towers.length; i++) {
+        if (Math.abs(targetX - state.towers[i].x) < Math.abs(targetX - state.towers[bestTower].x)) bestTower = i;
+      }
+      const tower = state.towers[bestTower];
+      tower.hp = Math.min(tower.maxHp, tower.hp + 25);
+      playBrickRepair();
+      break;
+    }
     case 'medkit':
-      state.tower.hp = Math.min(state.tower.maxHp, state.tower.hp + 30);
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 30);
       playMedkitUse();
       break;
     case 'mine':
@@ -350,8 +363,9 @@ export function initItems() {
     {
       onStart(x, y) {
         if (state.screen !== 'playing') return false;
-        // 타워 근처면 터치 캡처하지 않음 (타워 드래그 허용)
-        const dist = Math.hypot(x - state.tower.x, y - TOWER_Y);
+        // 플레이어 근처면 터치 캡처하지 않음 (타워/플레이어 드래그 허용)
+        const origin = getFireOrigin();
+        const dist = Math.hypot(x - origin.x, y - origin.y);
         if (dist < 50) return false;
       },
       onTap(x, y) {

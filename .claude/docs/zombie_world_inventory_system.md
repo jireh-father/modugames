@@ -1,4 +1,4 @@
-# Zombie World - Item & Inventory System (v11)
+# Zombie World - Item & Inventory System (v13 - Ground Player)
 
 ## Overview
 Items dropped from zombies are split into two categories:
@@ -28,8 +28,8 @@ Items dropped from zombies are split into two categories:
 - bullet3, bullet6, arrow2, arrow5, sniperAmmo, mgAmmo, bolt2
 
 ### Inventory - Drag items (drag to field target)
-- **brick**: Drag to wall area (y 480-560) to repair nearest wall segment +25 HP
-- **medkit**: Drag to tower area (y 560-620) to heal tower +30 HP
+- **brick**: Drag to wall area (y 480-560) to repair nearest wall segment +25 HP; drag to tower area (y 560-640) to repair nearest tower +25 HP
+- **medkit**: Drag near player (within 80px of player position) to heal player +30 HP (works on tower or ground)
 - **mine**: Drag to field to place mine (explosion sound 200px on detonation)
 - **molotov**: Drag to field to create fire zone (sound 100px, 3s)
 - **bomb**: Drag to field to damage zombies (sound 250px)
@@ -48,8 +48,8 @@ Items dropped from zombies are split into two categories:
 - Empty state: "아이템 없음" centered text
 
 ## Drag Overlay Highlights
-- brick: nearest wall segment dashed outline
-- medkit: tower area circle
+- brick: nearest wall segment dashed outline (when drag Y < 560); nearest tower circle (when drag Y >= 560)
+- medkit: circle around player position (uses getFireOrigin - tower when on tower, ground position when on ground)
 - mine/molotov/bomb: explosion radius circle + crosshair
 - toy/firecracker/radio: sound range circle + crosshair
 
