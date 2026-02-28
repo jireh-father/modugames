@@ -1,13 +1,13 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=11';
-import { playWallRebuildComplete } from './audio.js?v=11';
+import { W, state, WALL_Y } from './game.js?v=12';
+import { playWallRebuildComplete } from './audio.js?v=12';
 
 // 4 wall segments - positions along the arc
 const WALL_SEGMENTS = [
-  { x: 20, w: 120 },    // segment 0 (leftmost)
-  { x: 145, w: 120 },   // segment 1
-  { x: 275, w: 120 },   // segment 2
-  { x: 400, w: 120 },   // segment 3 (rightmost)
+  { x: 0, w: 135 },     // segment 0 (leftmost)
+  { x: 135, w: 135 },   // segment 1
+  { x: 270, w: 135 },   // segment 2
+  { x: 405, w: 135 },   // segment 3 (rightmost)
 ];
 const WALL_H = 20;       // wall thickness
 const WALL_ARC_DIP = 30; // elliptical curvature amount (center dips lower)

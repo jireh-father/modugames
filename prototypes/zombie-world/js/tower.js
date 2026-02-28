@@ -1,6 +1,6 @@
 // ── 타워 렌더링 + 이동 ──
-import { W, state, TOWER_Y, FIELD_BOTTOM } from './game.js?v=11';
-import { registerZone } from './input.js?v=11';
+import { W, state, TOWER_Y, FIELD_BOTTOM } from './game.js?v=12';
+import { registerZone } from './input.js?v=12';
 
 const TOWER_SIZE = 24;
 const TOWER_ZONE_H = FIELD_BOTTOM - TOWER_Y + TOWER_SIZE; // tower area height

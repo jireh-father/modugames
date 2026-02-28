@@ -1,134 +1,96 @@
-// ── 기관총 시스템: 연사 + 과열 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=11';
-import { registerZone } from './input.js?v=11';
-import { fireProjectile } from './projectiles.js?v=11';
-import { playMGShot, playMGBurstEnd, playMGCock, playMGOverheat, playMGCooldown } from './audio.js?v=11';
-import { spawnParticles } from './particles.js?v=11';
-
-const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
+// ── 기관총 시스템: 탄띠 + 자동 연사 ──
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=12';
+import { registerZone } from './input.js?v=12';
+import { fireProjectile } from './projectiles.js?v=12';
+import { playMGShot, playMGBurstEnd, playMGCock } from './audio.js?v=12';
+import { spawnParticles } from './particles.js?v=12';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
-const WEAPON_W = W - JOYSTICK_W;
+
+// 3-column layout: belt (left) | gun (center) | spare ammo (right)
+const COL_W = W / 3;
 
 const FIRE_RATE = 0.1; // 초당 10발
-const HEAT_PER_SHOT = 0.04; // 발당 과열 증가
-const COOL_RATE = 0.15; // 초당 과열 감소
-const OVERHEAT_THRESHOLD = 1.0;
-const COOLDOWN_TIME = 2.0; // 과열 후 강제 쿨다운
+const BELT_MAX = 30;   // 탄띠 최대 장탄수
 
-let triggerHeld = false;
-let fireLastX = 0;
-
-const LOAD_W = WEAPON_W * 0.25; // 왼쪽 25% 장전 영역
-const FIRE_W = WEAPON_W - LOAD_W; // 나머지 발사 영역
+// 드래그 상태
+let ammoDrag = null; // { x, y } 총알 드래그 중 (오른쪽→왼쪽)
 
 export function initMG() {
-  // ── 탄띠 장전 영역 (왼쪽 25%) - 아래로 드래그하면 예비탄에서 장전 ──
+  // ── 탄띠 영역 (왼쪽) ──
   registerZone(
-    { x: JOYSTICK_W, y: CTRL_Y, w: LOAD_W, h: CTRL_H },
+    { x: 0, y: CTRL_Y, w: COL_W, h: CTRL_H },
+    {
+      onStart() { return false; }, // 탄띠 영역은 드롭 대상일 뿐
+    },
+    5
+  );
+
+  // ── 중앙: 총 몸체 (터치하면 좌우 드래그로 조준) ──
+  registerZone(
+    { x: COL_W, y: CTRL_Y, w: COL_W, h: CTRL_H },
+    {
+      _lastX: 0,
+      onStart(x, y) {
+        if (state.currentWeapon !== 'mg') return false;
+        this._lastX = x;
+      },
+      onMove(x) {
+        if (state.currentWeapon !== 'mg') return;
+        const frameDx = x - this._lastX;
+        this._lastX = x;
+        const aimSens = 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+      },
+      onEnd() {},
+    },
+    5
+  );
+
+  // ── 여분 총알 영역 (오른쪽) - 드래그 시작 ──
+  registerZone(
+    { x: COL_W * 2, y: CTRL_Y, w: COL_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'mg') return false;
-        const m = state.mg;
-        if (m.reserveAmmo > 0 && m.ammo < 30) {
-          return; // 시작은 허용
-        }
-        return false;
+        if (state.mg.reserveAmmo <= 0) return false;
+        ammoDrag = { x, y };
       },
-      onMove() {},
-      onEnd(x, y, dx, dy) {
-        if (state.currentWeapon !== 'mg') return;
+      onMove(x, y) {
+        if (ammoDrag) {
+          ammoDrag.x = x;
+          ammoDrag.y = y;
+        }
+      },
+      onEnd(x, y) {
+        if (!ammoDrag) return;
         const m = state.mg;
-        // 아래로 드래그하면 탄띠 장전
-        if (dy > 30 && m.reserveAmmo > 0 && m.ammo < 30) {
-          const reload = Math.min(30 - m.ammo, m.reserveAmmo);
+        // 왼쪽 탄띠 영역에 드롭했으면 장전
+        if (x < COL_W && m.ammo < BELT_MAX && m.reserveAmmo > 0) {
+          const reload = Math.min(BELT_MAX - m.ammo, m.reserveAmmo, 10); // 한번에 최대 10발
           m.reserveAmmo -= reload;
           m.ammo += reload;
           playMGCock();
         }
+        ammoDrag = null;
       },
     },
     5
-  );
-
-  // ── 발사 영역 (오른쪽 75%): 누르고 있으면 연사, 좌우 드래그=조준 ──
-  registerZone(
-    { x: JOYSTICK_W + LOAD_W, y: CTRL_Y, w: FIRE_W, h: CTRL_H },
-    {
-      onStart(x, y) {
-        if (state.currentWeapon !== 'mg') return false;
-        const m = state.mg;
-        if (m.overheated || !m.cocked) return false;
-        triggerHeld = true;
-        m.firing = true;
-        fireLastX = x;
-      },
-      onMove(x, y) {
-        if (state.currentWeapon !== 'mg' || !triggerHeld) return;
-        // 좌우 드래그로 조준 이동
-        const frameDx = x - fireLastX;
-        fireLastX = x;
-        const aimSens = 0.005;
-        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
-      },
-      onEnd() {
-        if (state.currentWeapon !== 'mg') return;
-        triggerHeld = false;
-        state.mg.firing = false;
-        if (state.mg.fireTimer > 0) playMGBurstEnd();
-      },
-    },
-    5
-  );
-
-  // ── 코킹 핸들 (우측 상단 탭) ──
-  registerZone(
-    { x: JOYSTICK_W + WEAPON_W - 80, y: CTRL_Y, w: 80, h: 50 },
-    {
-      onTap() {
-        if (state.currentWeapon !== 'mg') return;
-        const m = state.mg;
-        if (!m.cocked && m.ammo > 0) {
-          m.cocked = true;
-          playMGCock();
-        }
-        // 과열 후 수동 코킹으로 재시작
-        if (m.overheated && m.heat <= 0.3) {
-          m.overheated = false;
-          m.cocked = true;
-          playMGCock();
-        }
-      },
-    },
-    6
   );
 }
 
 export function updateMG(dt) {
   if (state.currentWeapon !== 'mg') {
     state.mg.firing = false;
-    triggerHeld = false;
     return;
   }
 
   const m = state.mg;
 
-  // 과열 쿨다운
-  if (m.overheated) {
-    m.heat = Math.max(0, m.heat - COOL_RATE * 1.5 * dt);
-    if (m.heat <= 0.2) {
-      playMGCooldown();
-    }
-  } else {
-    // 일반 냉각
-    if (!m.firing) {
-      m.heat = Math.max(0, m.heat - COOL_RATE * dt);
-    }
-  }
-
-  // 연사 중
-  if (m.firing && !m.overheated && m.cocked && m.ammo > 0) {
+  // 탄띠에 탄약이 있으면 자동 연사
+  if (m.ammo > 0) {
+    m.firing = true;
     m.fireTimer += dt;
     const effectiveRate = state.buffs.speedTimer > 0 ? FIRE_RATE * 0.5 : FIRE_RATE;
     while (m.fireTimer >= effectiveRate && m.ammo > 0) {
@@ -137,23 +99,14 @@ export function updateMG(dt) {
       fireProjectile('mgBullet', state.aimAngle);
       playMGShot();
       spawnParticles(W / 2, CONTROLS_TOP - 10, 'muzzleFlash');
-
-      m.heat += HEAT_PER_SHOT;
-      if (m.heat >= OVERHEAT_THRESHOLD) {
-        m.overheated = true;
-        m.firing = false;
-        m.cocked = false;
-        triggerHeld = false;
-        playMGOverheat();
-        break;
-      }
     }
-
     if (m.ammo <= 0) {
       m.firing = false;
-      m.cocked = false;
-      triggerHeld = false;
+      playMGBurstEnd();
     }
+  } else {
+    m.firing = false;
+    m.fireTimer = 0;
   }
 }
 
@@ -161,7 +114,6 @@ export function drawMG(ctx) {
   if (state.currentWeapon !== 'mg') return;
 
   const m = state.mg;
-  const ox = JOYSTICK_W;
   const baseY = CTRL_Y + 20;
 
   ctx.save();
@@ -170,114 +122,117 @@ export function drawMG(ctx) {
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(ox, CTRL_Y);
-  ctx.lineTo(ox, CONTROLS_BOTTOM);
-  ctx.moveTo(ox + LOAD_W, CTRL_Y);
-  ctx.lineTo(ox + LOAD_W, CONTROLS_BOTTOM);
+  ctx.moveTo(COL_W, CTRL_Y);
+  ctx.lineTo(COL_W, CONTROLS_BOTTOM);
+  ctx.moveTo(COL_W * 2, CTRL_Y);
+  ctx.lineTo(COL_W * 2, CONTROLS_BOTTOM);
   ctx.stroke();
 
   // 레이블
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('탄띠', ox + LOAD_W / 2, CTRL_Y + 14);
-  ctx.fillText('기관총', ox + LOAD_W + FIRE_W / 2, CTRL_Y + 14);
+  ctx.fillText('탄띠', COL_W / 2, CTRL_Y + 14);
+  ctx.fillText('기관총', COL_W * 1.5, CTRL_Y + 14);
+  ctx.fillText('여분탄', COL_W * 2.5, CTRL_Y + 14);
 
-  // ── 왼쪽: 탄띠 장전 영역 ──
-  const loadCX = ox + LOAD_W / 2;
+  // ── 왼쪽: 탄띠 ──
+  const beltCX = COL_W / 2;
+  const beltBoxX = beltCX - 50;
+  const beltBoxY = baseY + 10;
+  const beltBoxW = 100;
+  const beltBoxH = 140;
+
   // 탄띠 상자
   ctx.fillStyle = '#3a3a2a';
-  ctx.fillRect(loadCX - 25, baseY + 20, 50, 100);
+  ctx.fillRect(beltBoxX, beltBoxY, beltBoxW, beltBoxH);
   ctx.strokeStyle = '#5a5a3a';
   ctx.lineWidth = 1;
-  ctx.strokeRect(loadCX - 25, baseY + 20, 50, 100);
-  // 탄띠 표시
-  const beltCount = Math.min(Math.ceil(m.reserveAmmo / 10), 8);
-  for (let i = 0; i < beltCount; i++) {
-    ctx.fillStyle = '#aa8844';
-    ctx.fillRect(loadCX - 18, baseY + 30 + i * 12, 36, 8);
-  }
-  // 예비탄 수
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 12px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${m.reserveAmmo}`, loadCX, baseY + 135);
+  ctx.strokeRect(beltBoxX, beltBoxY, beltBoxW, beltBoxH);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.font = '9px monospace';
-  ctx.fillText('↓드래그:장전', loadCX, CONTROLS_BOTTOM - 8);
-
-  // ── 오른쪽: 총 몸체 ──
-  const gunCX = ox + LOAD_W + FIRE_W / 2;
-  const gunCY = baseY + 60;
-
-  // 몸통
-  ctx.fillStyle = '#3a3a3a';
-  ctx.fillRect(gunCX - 80, gunCY - 15, 160, 30);
-  // 총열
-  ctx.fillStyle = m.heat > 0.5 ? `rgb(${140 + m.heat * 115}, ${60 - m.heat * 30}, ${30})` : '#555';
-  ctx.fillRect(gunCX - 100, gunCY - 8, 40, 16);
-  // 탄띠 구멍
-  ctx.fillStyle = '#222';
-  ctx.fillRect(gunCX + 50, gunCY - 5, 30, 10);
-  // 손잡이
-  ctx.fillStyle = '#4a3a2a';
-  ctx.fillRect(gunCX + 10, gunCY + 10, 20, 40);
-
-  // 코킹 핸들
-  const cockX = ox + WEAPON_W - 40;
-  const cockY = CTRL_Y + 25;
-  ctx.fillStyle = m.cocked ? '#666' : '#aa4';
-  ctx.fillRect(cockX - 25, cockY - 12, 50, 24);
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(cockX - 25, cockY - 12, 50, 24);
-  ctx.fillStyle = '#fff';
-  ctx.font = '9px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(m.cocked ? '코킹됨' : '코킹', cockX, cockY + 4);
-
-  // ── 과열 게이지 ──
-  const gaugeX = ox + LOAD_W + 15;
-  const gaugeY = baseY + 120;
-  const gaugeW = FIRE_W - 30;
-  const gaugeH = 16;
-
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(gaugeX, gaugeY, gaugeW, gaugeH);
-
-  // 과열 바
-  const heatW = m.heat * gaugeW;
-  const heatColor = m.overheated ? '#f44' : m.heat > 0.7 ? '#fa4' : m.heat > 0.4 ? '#ff4' : '#4f4';
-  ctx.fillStyle = heatColor;
-  ctx.fillRect(gaugeX, gaugeY, heatW, gaugeH);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(gaugeX, gaugeY, gaugeW, gaugeH);
-
-  // 과열 텍스트
-  if (m.overheated) {
-    const flash = Math.sin(Date.now() / 100) > 0;
-    if (flash) {
-      ctx.fillStyle = '#ff4444';
-      ctx.font = 'bold 12px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('OVERHEAT!', gunCX, gaugeY - 5);
+  // 탄띠 총알들 (2열 * 최대 15행)
+  const cols = 2;
+  const bulletW = 38;
+  const bulletH = 8;
+  const gapY = 1;
+  for (let i = 0; i < BELT_MAX; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const bx = beltBoxX + 8 + col * (bulletW + 8);
+    const by = beltBoxY + 5 + row * (bulletH + gapY);
+    if (by + bulletH > beltBoxY + beltBoxH) break;
+    if (i < m.ammo) {
+      // 총알 있음
+      ctx.fillStyle = '#cca040';
+      ctx.fillRect(bx, by, bulletW, bulletH);
+      ctx.fillStyle = '#aa7020';
+      ctx.fillRect(bx, by, bulletW * 0.3, bulletH); // 탄두 부분
+    } else {
+      // 빈 슬롯
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+      ctx.fillRect(bx, by, bulletW, bulletH);
     }
   }
 
-  // ── 탄약 수 ──
+  // 탄띠 수
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 16px monospace';
+  ctx.font = 'bold 14px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(`${m.ammo}`, gunCX, gaugeY + gaugeH + 25);
+  ctx.fillText(`${m.ammo}/${BELT_MAX}`, beltCX, beltBoxY + beltBoxH + 20);
 
-  // 머즐 플래시 효과 (연사 중)
+  // 발사 상태 표시
   if (m.firing && m.ammo > 0) {
-    ctx.fillStyle = `rgba(255,200,50,${0.3 + Math.random() * 0.3})`;
+    const flash = Math.sin(Date.now() / 80) > 0;
+    ctx.fillStyle = flash ? 'rgba(255,200,50,0.4)' : 'rgba(255,100,30,0.3)';
+    ctx.fillRect(beltBoxX, beltBoxY, beltBoxW, beltBoxH);
+    ctx.fillStyle = '#ff4';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('FIRING', beltCX, beltBoxY + beltBoxH + 36);
+  } else if (m.ammo === 0) {
+    ctx.fillStyle = '#f44';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('EMPTY', beltCX, beltBoxY + beltBoxH + 36);
+  }
+
+  // ── 가운데: 기관총 몸체 (총구 위를 향함) ──
+  const gunCX = COL_W * 1.5;
+  const gunCY = baseY + 70;
+
+  // 총열 (위로 향함)
+  ctx.fillStyle = '#555';
+  ctx.fillRect(gunCX - 5, gunCY - 60, 10, 50);
+  // 총열 홀
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(gunCX, gunCY - 60, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 총 몸체
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(gunCX - 30, gunCY - 15, 60, 50);
+  // 방열판 (좌측)
+  ctx.fillStyle = '#444';
+  ctx.fillRect(gunCX - 35, gunCY - 10, 8, 40);
+  // 탄띠 입구 (왼쪽)
+  ctx.fillStyle = '#222';
+  ctx.fillRect(gunCX - 30, gunCY, 12, 8);
+
+  // 손잡이
+  ctx.fillStyle = '#4a3a2a';
+  ctx.fillRect(gunCX - 8, gunCY + 30, 16, 50);
+  ctx.fillRect(gunCX + 10, gunCY + 40, 18, 30); // 피스톨 그립
+
+  // 머즐 플래시 (발사 중)
+  if (m.firing && m.ammo > 0) {
+    ctx.fillStyle = `rgba(255,200,50,${0.4 + Math.random() * 0.4})`;
     ctx.beginPath();
-    ctx.arc(gunCX - 100, gunCY, 8 + Math.random() * 5, 0, Math.PI * 2);
+    ctx.arc(gunCX, gunCY - 65, 6 + Math.random() * 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,200,${0.2 + Math.random() * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(gunCX, gunCY - 70, 3 + Math.random() * 3, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -285,7 +240,68 @@ export function drawMG(ctx) {
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('꾹:연사 ←→조준', ox + LOAD_W + FIRE_W / 2, CONTROLS_BOTTOM - 8);
+  ctx.fillText('←→조준', gunCX, CONTROLS_BOTTOM - 8);
+
+  // ── 오른쪽: 여분 총알 ──
+  const spareCX = COL_W * 2.5;
+  const spareBoxX = COL_W * 2 + 15;
+  const spareBoxY = baseY + 15;
+  const spareBoxW = COL_W - 30;
+  const spareBoxH = 120;
+
+  // 총알통 상자
+  ctx.fillStyle = '#4a3a2a';
+  ctx.fillRect(spareBoxX, spareBoxY, spareBoxW, spareBoxH);
+  ctx.strokeStyle = '#6a5a3a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(spareBoxX, spareBoxY, spareBoxW, spareBoxH);
+
+  // 여분 총알들
+  const spareCols = Math.floor(spareBoxW / 14);
+  const maxShow = spareCols * 8;
+  for (let i = 0; i < Math.min(m.reserveAmmo, maxShow); i++) {
+    const bx = spareBoxX + 5 + (i % spareCols) * 14;
+    const by = spareBoxY + 8 + Math.floor(i / spareCols) * 14;
+    ctx.fillStyle = '#cca040';
+    ctx.fillRect(bx, by, 10, 10);
+    ctx.fillStyle = '#aa7020';
+    ctx.fillRect(bx, by, 10, 4);
+  }
+  if (m.reserveAmmo > maxShow) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`+${m.reserveAmmo - maxShow}`, spareCX, spareBoxY + spareBoxH - 8);
+  }
+
+  // 여분 총알 수
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${m.reserveAmmo}`, spareCX, spareBoxY + spareBoxH + 20);
+
+  // 힌트
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('→탄띠로 드래그', spareCX, CONTROLS_BOTTOM - 8);
+
+  // ── 드래그 중인 총알 ──
+  if (ammoDrag) {
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#ffcc44';
+    ctx.fillRect(ammoDrag.x - 8, ammoDrag.y - 8, 16, 16);
+    ctx.fillStyle = '#aa7020';
+    ctx.fillRect(ammoDrag.x - 8, ammoDrag.y - 8, 16, 6);
+    ctx.globalAlpha = 1;
+
+    // 왼쪽 탄띠 위에 있으면 하이라이트
+    if (ammoDrag.x < COL_W && m.ammo < BELT_MAX) {
+      ctx.strokeStyle = 'rgba(255,200,100,0.6)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(beltBoxX - 2, beltBoxY - 2, beltBoxW + 4, beltBoxH + 4);
+    }
+  }
 
   ctx.restore();
 }

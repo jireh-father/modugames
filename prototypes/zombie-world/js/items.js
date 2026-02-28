@@ -1,11 +1,11 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=11';
-import { registerZone } from './input.js?v=11';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=12';
+import { registerZone } from './input.js?v=12';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
-         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=11';
-import { spawnParticles } from './particles.js?v=11';
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=12';
+import { spawnParticles } from './particles.js?v=12';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
@@ -114,7 +114,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
   switch (itemId) {
     case 'brick': {
       // 가장 가까운 벽 구간에 +25
-      const segCenters = [80, 205, 335, 460];
+      const segCenters = [67, 202, 337, 472];
       let best = 0;
       for (let i = 1; i < 4; i++) {
         if (Math.abs(targetX - segCenters[i]) < Math.abs(targetX - segCenters[best])) best = i;
@@ -145,7 +145,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
         damage: 2,
         timer: 3,
       });
-      emitSound(targetX, targetY, 100, 3, 'fire');
+      emitSound(targetX, targetY, 50, 3, 'fire');
       playMolotovThrow();
       break;
     case 'bomb':
@@ -156,22 +156,22 @@ export function useInventoryItem(itemId, targetX, targetY) {
         }
       }
       spawnParticles(targetX, targetY, 'explosion');
-      emitSound(targetX, targetY, 250, 1.0, 'explosion');
+      emitSound(targetX, targetY, 125, 1.0, 'explosion');
       playBombThrow();
       break;
     case 'toy':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 150 });
-      emitSound(targetX, targetY, 150, 5, 'toy');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 75 });
+      emitSound(targetX, targetY, 75, 5, 'toy');
       playToyActivate();
       break;
     case 'firecracker':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 300, explodeOnEnd: true });
-      emitSound(targetX, targetY, 300, 3, 'firecracker');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 150, explodeOnEnd: true });
+      emitSound(targetX, targetY, 150, 3, 'firecracker');
       playFirecrackerThrow();
       break;
     case 'radio':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 200 });
-      emitSound(targetX, targetY, 200, 10, 'radio');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 100 });
+      emitSound(targetX, targetY, 100, 10, 'radio');
       playRadioActivate();
       break;
     case 'shield':
@@ -240,7 +240,7 @@ export function updateSoundLures(dt) {
           }
         }
         spawnParticles(lure.x, lure.y, 'explosion', { count: 15 });
-        emitSound(lure.x, lure.y, 250, 1.0, 'explosion');
+        emitSound(lure.x, lure.y, 125, 1.0, 'explosion');
       }
       state.soundLures.splice(i, 1);
     }
@@ -348,7 +348,7 @@ export function initItems() {
     {
       onTap(x, y) {
         let closest = null;
-        let closestDist = 40;
+        let closestDist = 50;
 
         for (const item of state.items) {
           if (item.collected) continue;
@@ -371,7 +371,7 @@ export function initItems() {
         }
       },
     },
-    2
+    15  // 최상위 우선순위 (타워, 인벤토리보다 위)
   );
 }
 

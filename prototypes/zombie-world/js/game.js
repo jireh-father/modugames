@@ -13,11 +13,11 @@ export const DIAL_R = 80;                    // half-circle dial radius
 
 // ── 무기 프로필 (사정거리, 공격력, 소리 범위) ──
 export const WEAPON_PROFILES = {
-  pistol:   { range: 400, damage: 2, originSound: 250, impactSound: 80,  penetrate: 0 },
-  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 50,  penetrate: 1 },
-  sniper:   { range: 9999, damage: 5, originSound: 400, impactSound: 150, penetrate: 99 },
-  mg:       { range: 350, damage: 1, originSound: 350, impactSound: 60,  penetrate: 0 },
-  crossbow: { range: 450, damage: 4, originSound: 80,  impactSound: 60,  penetrate: 1 },
+  pistol:   { range: 400, damage: 2, originSound: 125, impactSound: 40,  penetrate: 0 },
+  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 25,  penetrate: 1 },
+  sniper:   { range: 9999, damage: 5, originSound: 200, impactSound: 75,  penetrate: 99 },
+  mg:       { range: 350, damage: 1, originSound: 175, impactSound: 30,  penetrate: 0 },
+  crossbow: { range: 450, damage: 4, originSound: 40,  impactSound: 30,  penetrate: 1 },
 };
 
 // ── 게임 상태 ──
@@ -39,8 +39,8 @@ export const state = {
 
   // 권총
   pistol: {
-    magazineBullets: 8,
-    magazineMax: 8,
+    magazineBullets: 10,
+    magazineMax: 10,
     reserveBullets: 0,
     chambered: true,
     magazineOut: false,
@@ -62,20 +62,19 @@ export const state = {
   sniper: {
     chambered: true,
     boltOpen: false,
-    reserveRounds: 3,
-    scoping: false,
-    scopeZoom: 0, // 0~1
+    magazineBullets: 10,
+    magazineMax: 10,
+    reserveRounds: 0,
+    magazineOut: false,
+    reloadMode: false,
   },
 
   // 기관총
   mg: {
     ammo: 30,
     reserveAmmo: 0,
-    heat: 0,       // 0~1 과열도
-    overheated: false,
     firing: false,
     fireTimer: 0,
-    cocked: true,
   },
 
   // 크로스보우
@@ -153,17 +152,17 @@ export function resetGame() {
   state.aimAngle = Math.PI / 2;
   state.currentWeapon = 'pistol';
   state.pistol = {
-    magazineBullets: 8, magazineMax: 8, reserveBullets: 52,
+    magazineBullets: 10, magazineMax: 10, reserveBullets: 52,
     chambered: false, magazineOut: false, slideBack: true, specialBullets: 0, reloadMode: false,
   };
   state.bow = {
     arrows: 30, specialArrows: 0, arrowNocked: false, drawPower: 0, drawing: false,
   };
   state.sniper = {
-    chambered: true, boltOpen: false, reserveRounds: 30, scoping: false, scopeZoom: 0,
+    chambered: true, boltOpen: false, magazineBullets: 10, magazineMax: 10, reserveRounds: 50, magazineOut: false, reloadMode: false,
   };
   state.mg = {
-    ammo: 30, reserveAmmo: 270, heat: 0, overheated: false, firing: false, fireTimer: 0, cocked: true,
+    ammo: 30, reserveAmmo: 270, firing: false, fireTimer: 0,
   };
   state.crossbow = {
     bolts: 30, loaded: false, cranking: false, crankProgress: 0, cocked: false,
@@ -213,7 +212,7 @@ export function getTotalAmmo() {
   const c = state.crossbow;
   return p.magazineBullets + p.reserveBullets + p.specialBullets + (p.chambered ? 1 : 0)
     + b.arrows + b.specialArrows + (b.arrowNocked ? 1 : 0)
-    + s.reserveRounds + (s.chambered ? 1 : 0)
+    + s.magazineBullets + s.reserveRounds + (s.chambered ? 1 : 0)
     + m.ammo + m.reserveAmmo
     + c.bolts + (c.loaded ? 1 : 0);
 }
@@ -225,7 +224,9 @@ export function isGameOver() {
 // ── 소리 시스템 ──
 export function emitSound(x, y, range, duration = 1.0, type = 'generic') {
   if (range <= 0) return;
-  state.soundSources.push({ x, y, intensity: 1, range, timer: duration, duration, type });
+  // 밤에는 소리가 40% 더 멀리 퍼짐
+  const actualRange = state.isNight ? range * 1.4 : range;
+  state.soundSources.push({ x, y, intensity: 1, range: actualRange, timer: duration, duration, type });
 }
 
 export function updateSounds(dt) {

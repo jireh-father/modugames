@@ -1,10 +1,10 @@
 // ── 인벤토리 바 UI + 드래그 사용 시스템 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=11';
-import { registerZone } from './input.js?v=11';
-import { useInventoryItem } from './items.js?v=11';
-import { drawItemIcon } from './items.js?v=11';
-import { playItemPickup } from './audio.js?v=11';
-import { spawnParticles } from './particles.js?v=11';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=12';
+import { registerZone } from './input.js?v=12';
+import { useInventoryItem } from './items.js?v=12';
+import { drawItemIcon } from './items.js?v=12';
+import { playItemPickup } from './audio.js?v=12';
+import { spawnParticles } from './particles.js?v=12';
 
 // ── 레이아웃 상수 ──
 const BAR_Y = CONTROLS_TOP + SLOT_H;       // 아이템 바 시작 Y (무기 슬롯 바로 아래)
@@ -332,8 +332,8 @@ export function drawInventoryDragOverlay(ctx) {
   switch (dragItem.id) {
     case 'brick': {
       // 가장 가까운 벽 구간 하이라이트
-      const segCenters = [80, 205, 335, 460];
-      const segWidths = 120;
+      const segCenters = [67, 202, 337, 472];
+      const segWidths = 135;
       let best = 0;
       for (let i = 1; i < 4; i++) {
         if (Math.abs(dragX - segCenters[i]) < Math.abs(dragX - segCenters[best])) best = i;
@@ -382,7 +382,7 @@ export function drawInventoryDragOverlay(ctx) {
     case 'radio': {
       // 필드 위 타겟 크로스헤어
       if (dragY >= FIELD_TOP && dragY <= FIELD_BOTTOM) {
-        const radiusMap = { bomb: 80, mine: 60, molotov: 50, toy: 150, firecracker: 300, radio: 200 };
+        const radiusMap = { bomb: 80, mine: 60, molotov: 50, toy: 75, firecracker: 150, radio: 100 };
         const radius = radiusMap[dragItem.id] || 50;
         ctx.strokeStyle = `rgba(255,100,50,0.6)`;
         ctx.lineWidth = 2;

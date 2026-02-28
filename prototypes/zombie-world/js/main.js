@@ -1,27 +1,27 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=11';
-import { initDial, updateDial, drawDial } from './aiming.js?v=11';
-import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=11';
-import { initPistol, drawPistol } from './pistol.js?v=11';
-import { initBow, drawBow } from './bow.js?v=11';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=11';
-import { initMG, updateMG, drawMG } from './mg.js?v=11';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=11';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=11';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=11';
-import { updateWalls, drawWalls } from './wall.js?v=11';
-import { drawTower, initTower } from './tower.js?v=11';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=11';
-import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=11';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=11';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=12';
+import { initDial, updateDial, drawDial } from './aiming.js?v=12';
+import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=12';
+import { initPistol, drawPistol } from './pistol.js?v=12';
+import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=12';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=12';
+import { initMG, updateMG, drawMG } from './mg.js?v=12';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=12';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=12';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=12';
+import { updateWalls, drawWalls } from './wall.js?v=12';
+import { drawTower, initTower } from './tower.js?v=12';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=12';
+import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=12';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=12';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=11';
-import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=11';
-import { initSettings, drawSettings } from './settings.js?v=11';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=11';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=11';
+} from './hud.js?v=12';
+import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=12';
+import { initSettings, drawSettings } from './settings.js?v=12';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=12';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=12';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -204,6 +204,9 @@ function draw() {
 
   // 발사선
   drawFiringLine(ctx);
+
+  // 활 타겟 X 마커
+  drawBowTargetOverlay(ctx);
 
   // 소리 시각화
   drawSoundSources(ctx);
