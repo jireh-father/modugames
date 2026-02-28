@@ -156,19 +156,19 @@ export function updatePlayer(dt) {
       const moveSpeed = p.speed * hpRatio;
       const step = moveSpeed * dt;
 
-      const newX = p.x + nx * step;
-      const newY = p.y + ny * step;
+      let newX = p.x + nx * step;
+      let newY = p.y + ny * step;
 
-      // 건물 충돌 체크
+      // 건물 충돌 체크 — 슬라이딩: 막히면 각 축 개별 시도
       if (!collidesWithBuilding(newX, newY, p.size)) {
         p.x = newX;
         p.y = newY;
-      } else {
-        // 충돌 시 이동 중단
-        p.moving = false;
-        p.path = [];
-        p.pathIdx = 0;
+      } else if (!collidesWithBuilding(newX, p.y, p.size)) {
+        p.x = newX; // X만 이동 (벽을 따라 수평 슬라이딩)
+      } else if (!collidesWithBuilding(p.x, newY, p.size)) {
+        p.y = newY; // Y만 이동 (벽을 따라 수직 슬라이딩)
       }
+      // 완전히 막혀도 이동 중단하지 않음 — 다음 웨이포인트로 계속 시도
     }
   }
 

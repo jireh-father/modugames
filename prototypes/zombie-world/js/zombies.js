@@ -166,6 +166,10 @@ function updateZombies(dt) {
       if (!zombieCollidesBuilding(newX, newY, z.size)) {
         z.x = newX;
         z.y = newY;
+      } else if (!zombieCollidesBuilding(newX, z.y, z.size)) {
+        z.x = newX;
+      } else if (!zombieCollidesBuilding(z.x, newY, z.size)) {
+        z.y = newY;
       }
 
       // idle 벽 충돌 체크
@@ -259,12 +263,15 @@ function updateZombies(dt) {
       newX = Math.max(5, Math.min(W - 5, newX));
       newY = Math.max(48, Math.min(640, newY));
 
-      // ── 건물 충돌 체크 — 충돌 시 제자리걸음 (위치 갱신 안 함) ──
+      // ── 건물 충돌 체크 — 슬라이딩: 막히면 각 축 개별 시도 ──
       if (!zombieCollidesBuilding(newX, newY, z.size)) {
         z.x = newX;
         z.y = newY;
+      } else if (!zombieCollidesBuilding(newX, z.y, z.size)) {
+        z.x = newX; // X만 이동 (벽을 따라 수평 슬라이딩)
+      } else if (!zombieCollidesBuilding(z.x, newY, z.size)) {
+        z.y = newY; // Y만 이동 (벽을 따라 수직 슬라이딩)
       }
-      // 건물에 막혀도 walkPhase는 계속 업데이트되어 제자리걸음 애니 유지
 
       // ── 벽 충돌 체크 ──
       const wallIdx = xToWallIdx(z.x);
