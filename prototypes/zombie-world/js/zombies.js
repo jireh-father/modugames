@@ -366,10 +366,13 @@ function checkZombieHits(projectiles) {
         const wp = wpName ? WEAPON_PROFILES[wpName] : null;
         if (wp && wp.impactSound > 0) emitSound(z.x, z.y, wp.impactSound, 0.5, 'impact');
 
-        // 관통: 화살은 낙하지점 근처의 좀비에게만 관통 적용
+        // 관통: 화살은 낙하지점 뒤쪽(타워에서 더 먼 쪽) 좀비에게만 관통
         if (p.type === 'arrow' && p.arcTarget) {
-          const distToTarget = Math.hypot(z.x - p.arcTarget.x, z.y - p.arcTarget.y);
-          if (distToTarget < p.arcLandRadius && p.penetrateLeft > 0) {
+          // 타워→타겟 거리 vs 타워→좀비 거리 비교
+          const towerToTarget = Math.hypot(p.arcTarget.x - state.tower.x, p.arcTarget.y - TOWER_Y);
+          const towerToZombie = Math.hypot(z.x - state.tower.x, z.y - TOWER_Y);
+          const isBehindTarget = towerToZombie >= towerToTarget - 5; // 타겟보다 뒤(멀리)에 있는지
+          if (isBehindTarget && p.penetrateLeft > 0) {
             p.penetrateLeft--;
           } else {
             p.alive = false;
