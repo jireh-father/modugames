@@ -1,5 +1,5 @@
 // ── 파티클 이펙트 시스템 ──
-import { state } from './game.js?v=12';
+import { state } from './game.js?v=13';
 
 /**
  * 파티클 생성
@@ -187,6 +187,22 @@ export function spawnParticles(x, y, type, opts = {}) {
           vy: -30 - Math.random() * 40,
           color: '#44ff66',
           life: 0.6 + Math.random() * 0.4,
+        });
+      }
+      break;
+    }
+    case 'fireSmall': {
+      // 화염방사기 불꽃 파티클
+      for (let i = 0; i < 2; i++) {
+        state.particles.push({
+          x: x + (Math.random() - 0.5) * 10,
+          y: y + (Math.random() - 0.5) * 10,
+          type: 'circle',
+          size: 3 + Math.random() * 5,
+          vx: (Math.random() - 0.5) * 20,
+          vy: -10 - Math.random() * 20,
+          color: `hsl(${Math.random() * 30}, 100%, ${50 + Math.random() * 30}%)`,
+          life: 0.2 + Math.random() * 0.2,
         });
       }
       break;

@@ -1,9 +1,9 @@
 // ── 좀비 시스템 (소리-유인 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=12';
-import { getWallY, getWallSegments } from './wall.js?v=12';
+import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=13';
+import { getWallY, getWallSegments } from './wall.js?v=13';
 import { playZombieHit, playZombieDeath, playWallHit, playWallBreak, playTowerHit,
          playSplitterSplit, playRammerCharge, playChainLightning,
-         playFreezeApply, playPoisonApply } from './audio.js?v=12';
+         playFreezeApply, playPoisonApply } from './audio.js?v=13';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -105,6 +105,11 @@ function updateZombies(dt) {
     if (z.statusEffects.poisoned > 0) {
       z.statusEffects.poisoned -= dt;
       z.hp -= 1 * dt;
+      z.hitFlash = Math.max(z.hitFlash, 0.05);
+    }
+    if (z.statusEffects.burning > 0) {
+      z.statusEffects.burning -= dt;
+      z.hp -= 1.5 * dt;
       z.hitFlash = Math.max(z.hitFlash, 0.05);
     }
     if (z.hitFlash > 0) z.hitFlash -= dt;
@@ -506,6 +511,15 @@ function drawZombies(ctx) {
       for (let d = 0; d < 3; d++) {
         const ddx = (d - 1) * 5; const ddy = Math.sin(z.walkPhase * 2 + d) * 3;
         ctx.beginPath(); ctx.arc(x + ddx, y + size * 0.3 + ddy, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    if (z.statusEffects.burning > 0) {
+      ctx.fillStyle = `rgba(255, 100, 0, ${0.3 + Math.random() * 0.2})`;
+      ctx.beginPath(); ctx.ellipse(x, y, size * 0.5, size * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff6600';
+      for (let d = 0; d < 3; d++) {
+        const fx = x + (d - 1) * 4; const fy = y - size * 0.3 - Math.random() * 6;
+        ctx.beginPath(); ctx.arc(fx, fy, 2 + Math.random() * 2, 0, Math.PI * 2); ctx.fill();
       }
     }
     if (z.hp < z.maxHp) {

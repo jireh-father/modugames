@@ -1,9 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=12';
-import { registerZone } from './input.js?v=12';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=12';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=12';
-import { openSettings } from './settings.js?v=12';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=13';
+import { registerZone } from './input.js?v=13';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=13';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=13';
+import { openSettings } from './settings.js?v=13';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -88,8 +88,8 @@ export function initHUD() {
     100
   );
 
-  // 무기 슬롯 영역 (5개 + 주머니)
-  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow', 'pouch'];
+  // 무기 슬롯 영역 (6개 + 주머니)
+  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow', 'flamethrower', 'pouch'];
   const slotW = W / WEAPONS.length;
   registerZone(
     { x: 0, y: CONTROLS_TOP, w: W, h: SLOT_H },
@@ -182,17 +182,18 @@ export function drawHUD(ctx) {
 }
 
 /**
- * 무기 슬롯 그리기
+ * 무기 슬롯 그리기 (아이콘)
  */
 export function drawWeaponSlots(ctx) {
   const y = CONTROLS_TOP;
   const weapons = [
-    { id: 'pistol', label: '권총', color: '#ffcc66', bg: 'rgba(255,200,100,0.3)' },
-    { id: 'bow', label: '활', color: '#aaddaa', bg: 'rgba(150,200,100,0.3)' },
-    { id: 'sniper', label: '저격', color: '#88bbff', bg: 'rgba(100,150,255,0.3)' },
-    { id: 'mg', label: '기관총', color: '#ffaa66', bg: 'rgba(255,150,80,0.3)' },
-    { id: 'crossbow', label: '석궁', color: '#88ff88', bg: 'rgba(100,255,100,0.3)' },
-    { id: 'pouch', label: '주머니', color: '#ccbbaa', bg: 'rgba(180,160,140,0.3)' },
+    { id: 'pistol', color: '#ffcc66', bg: 'rgba(255,200,100,0.3)' },
+    { id: 'bow', color: '#aaddaa', bg: 'rgba(150,200,100,0.3)' },
+    { id: 'sniper', color: '#88bbff', bg: 'rgba(100,150,255,0.3)' },
+    { id: 'mg', color: '#ffaa66', bg: 'rgba(255,150,80,0.3)' },
+    { id: 'crossbow', color: '#88ff88', bg: 'rgba(100,255,100,0.3)' },
+    { id: 'flamethrower', color: '#ff8844', bg: 'rgba(255,120,50,0.3)' },
+    { id: 'pouch', color: '#ccbbaa', bg: 'rgba(180,160,140,0.3)' },
   ];
   const slotW = W / weapons.length;
 
@@ -204,14 +205,14 @@ export function drawWeaponSlots(ctx) {
     const w = weapons[i];
     const active = state.currentWeapon === w.id;
     const sx = i * slotW;
+    const cx = sx + slotW / 2;
+    const cy = y + SLOT_H / 2;
 
     ctx.fillStyle = active ? w.bg : 'rgba(255,255,255,0.05)';
     ctx.fillRect(sx, y, slotW, SLOT_H);
 
-    ctx.fillStyle = active ? w.color : '#888';
-    ctx.font = `bold ${slotW > 100 ? 11 : 9}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(w.label, sx + slotW / 2, y + 26);
+    const c = active ? w.color : '#888';
+    drawWeaponIcon(ctx, w.id, cx, cy, c);
 
     // 구분선
     if (i > 0) {
@@ -223,6 +224,213 @@ export function drawWeaponSlots(ctx) {
       ctx.stroke();
     }
   }
+}
+
+/** 무기 아이콘 그리기 (캔버스 프리미티브) */
+function drawWeaponIcon(ctx, id, cx, cy, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  switch (id) {
+    case 'pistol': {
+      // 총열 (가로)
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy - 4);
+      ctx.lineTo(cx + 10, cy - 4);
+      ctx.lineTo(cx + 10, cy - 1);
+      ctx.lineTo(cx - 4, cy - 1);
+      ctx.closePath();
+      ctx.fill();
+      // 그립 (세로)
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 1);
+      ctx.lineTo(cx + 3, cy - 1);
+      ctx.lineTo(cx + 5, cy + 10);
+      ctx.lineTo(cx, cy + 10);
+      ctx.closePath();
+      ctx.fill();
+      // 트리거
+      ctx.beginPath();
+      ctx.moveTo(cx + 1, cy + 1);
+      ctx.lineTo(cx - 3, cy + 5);
+      ctx.stroke();
+      break;
+    }
+    case 'bow': {
+      // 활 몸체 (곡선)
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 12);
+      ctx.quadraticCurveTo(cx - 12, cy, cx - 2, cy + 12);
+      ctx.stroke();
+      // 시위 (직선)
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 12);
+      ctx.lineTo(cx - 2, cy + 12);
+      ctx.stroke();
+      // 화살
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy);
+      ctx.lineTo(cx + 12, cy);
+      ctx.stroke();
+      // 화살촉
+      ctx.beginPath();
+      ctx.moveTo(cx + 14, cy);
+      ctx.lineTo(cx + 10, cy - 3);
+      ctx.lineTo(cx + 10, cy + 3);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'sniper': {
+      // 긴 총열
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, cy - 3);
+      ctx.lineTo(cx + 12, cy - 3);
+      ctx.lineTo(cx + 12, cy);
+      ctx.lineTo(cx - 6, cy);
+      ctx.closePath();
+      ctx.fill();
+      // 스코프
+      ctx.beginPath();
+      ctx.arc(cx - 2, cy - 6, 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 3);
+      ctx.lineTo(cx - 2, cy - 3);
+      ctx.stroke();
+      // 그립
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, cy);
+      ctx.lineTo(cx + 5, cy + 10);
+      ctx.lineTo(cx + 8, cy + 10);
+      ctx.lineTo(cx + 6, cy);
+      ctx.closePath();
+      ctx.fill();
+      // 개머리판
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, cy - 4);
+      ctx.lineTo(cx - 14, cy + 2);
+      ctx.stroke();
+      break;
+    }
+    case 'mg': {
+      // 총열 (두꺼움)
+      ctx.beginPath();
+      ctx.moveTo(cx - 12, cy - 3);
+      ctx.lineTo(cx + 10, cy - 3);
+      ctx.lineTo(cx + 10, cy + 1);
+      ctx.lineTo(cx - 6, cy + 1);
+      ctx.closePath();
+      ctx.fill();
+      // 탄띠
+      ctx.lineWidth = 1;
+      for (let j = 0; j < 3; j++) {
+        ctx.fillRect(cx - 10 + j * 5, cy + 4, 3, 6);
+      }
+      // 손잡이
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, cy + 1);
+      ctx.lineTo(cx + 4, cy + 10);
+      ctx.stroke();
+      // 방열구
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy - 5);
+      ctx.lineTo(cx - 4, cy - 5);
+      ctx.stroke();
+      break;
+    }
+    case 'crossbow': {
+      // 몸체 (가로)
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy);
+      ctx.lineTo(cx + 12, cy);
+      ctx.stroke();
+      // 활 (가로 양쪽)
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 10);
+      ctx.quadraticCurveTo(cx - 8, cy, cx - 2, cy + 10);
+      ctx.stroke();
+      // 시위
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 10);
+      ctx.lineTo(cx + 4, cy);
+      ctx.lineTo(cx - 2, cy + 10);
+      ctx.stroke();
+      // 볼트
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx + 4, cy);
+      ctx.lineTo(cx + 14, cy);
+      ctx.stroke();
+      break;
+    }
+    case 'flamethrower': {
+      // 노즐
+      ctx.beginPath();
+      ctx.moveTo(cx - 3, cy - 2);
+      ctx.lineTo(cx + 8, cy - 2);
+      ctx.lineTo(cx + 10, cy - 5);
+      ctx.lineTo(cx + 12, cy - 2);
+      ctx.lineTo(cx + 12, cy + 2);
+      ctx.lineTo(cx + 10, cy + 5);
+      ctx.lineTo(cx + 8, cy + 2);
+      ctx.lineTo(cx - 3, cy + 2);
+      ctx.closePath();
+      ctx.fill();
+      // 탱크
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy - 5);
+      ctx.lineTo(cx - 3, cy - 5);
+      ctx.lineTo(cx - 3, cy + 5);
+      ctx.lineTo(cx - 5, cy + 5);
+      ctx.lineTo(cx - 8, cy + 8);
+      ctx.lineTo(cx - 10, cy + 8);
+      ctx.lineTo(cx - 10, cy - 8);
+      ctx.lineTo(cx - 8, cy - 8);
+      ctx.closePath();
+      ctx.fill();
+      // 불꽃
+      ctx.fillStyle = '#ff4400';
+      ctx.globalAlpha = 0.7 + Math.random() * 0.3;
+      ctx.beginPath();
+      ctx.arc(cx + 15, cy, 3 + Math.random() * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffaa00';
+      ctx.beginPath();
+      ctx.arc(cx + 14, cy, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case 'pouch': {
+      // 주머니 몸체
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy - 4);
+      ctx.quadraticCurveTo(cx - 10, cy + 8, cx, cy + 10);
+      ctx.quadraticCurveTo(cx + 10, cy + 8, cx + 8, cy - 4);
+      ctx.closePath();
+      ctx.fill();
+      // 끈
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy - 4);
+      ctx.lineTo(cx - 3, cy - 8);
+      ctx.lineTo(cx + 3, cy - 8);
+      ctx.lineTo(cx + 6, cy - 4);
+      ctx.stroke();
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 /**
@@ -279,7 +487,7 @@ export function drawTitle(ctx) {
   // 무기 미리보기
   ctx.fillStyle = '#555';
   ctx.font = '11px monospace';
-  ctx.fillText('\uAD8C\uCD1D | \uD65C | \uC800\uACA9\uCD1D | \uAE30\uAD00\uCD1D | \uC11D\uAD81', W / 2, H * 0.82);
+  ctx.fillText('\uAD8C\uCD1D | \uD65C | \uC800\uACA9 | MG | \uC11D\uAD81 | \uD654\uC5FC', W / 2, H * 0.82);
 
   // 설정 버튼
   ctx.fillStyle = '#555';

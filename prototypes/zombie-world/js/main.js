@@ -1,27 +1,28 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=12';
-import { initDial, updateDial, drawDial } from './aiming.js?v=12';
-import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=12';
-import { initPistol, drawPistol } from './pistol.js?v=12';
-import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=12';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=12';
-import { initMG, updateMG, drawMG } from './mg.js?v=12';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=12';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=12';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=12';
-import { updateWalls, drawWalls } from './wall.js?v=12';
-import { drawTower, initTower } from './tower.js?v=12';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=12';
-import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=12';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=12';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=13';
+import { initDial, updateDial, drawDial } from './aiming.js?v=13';
+import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=13';
+import { initPistol, drawPistol } from './pistol.js?v=13';
+import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=13';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=13';
+import { initMG, updateMG, drawMG } from './mg.js?v=13';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=13';
+import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=13';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=13';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=13';
+import { updateWalls, drawWalls } from './wall.js?v=13';
+import { drawTower, initTower } from './tower.js?v=13';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=13';
+import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=13';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=13';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=12';
-import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=12';
-import { initSettings, drawSettings } from './settings.js?v=12';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=12';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=12';
+} from './hud.js?v=13';
+import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=13';
+import { initSettings, drawSettings } from './settings.js?v=13';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=13';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=13';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -46,6 +47,7 @@ initBow();
 initSniper();
 initMG();
 initCrossbow();
+initFlamethrower();
 initItems();
 initInventory();
 initTower();
@@ -95,6 +97,7 @@ function update(dt, realDt) {
   // 무기별 업데이트
   updateSniper(dt);
   updateMG(dt);
+  updateFlamethrower(dt);
 
   // 버프 타이머
   if (state.buffs.shieldTimer > 0) state.buffs.shieldTimer -= dt;
@@ -208,6 +211,9 @@ function draw() {
   // 활 타겟 X 마커
   drawBowTargetOverlay(ctx);
 
+  // 화염방사기 범위 오버레이
+  drawFlameOverlay(ctx);
+
   // 소리 시각화
   drawSoundSources(ctx);
   drawSoundLures(ctx);
@@ -270,6 +276,7 @@ function draw() {
   drawSniper(ctx);
   drawMG(ctx);
   drawCrossbow(ctx);
+  drawFlamethrower(ctx);
 
   // 스코프 오버레이 (저격총)
   drawScopeOverlay(ctx);

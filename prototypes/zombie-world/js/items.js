@@ -1,16 +1,16 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=12';
-import { registerZone } from './input.js?v=12';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=13';
+import { registerZone } from './input.js?v=13';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
-         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=12';
-import { spawnParticles } from './particles.js?v=12';
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=13';
+import { spawnParticles } from './particles.js?v=13';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
   'bullet3', 'bullet6', 'arrow2', 'arrow5',
-  'sniperAmmo', 'mgAmmo', 'bolt2',
+  'sniperAmmo', 'mgAmmo', 'bolt2', 'fuelCan',
 ]);
 
 // 인벤토리 아이템 - 인벤토리에 저장 후 수동 사용
@@ -31,6 +31,7 @@ const ITEM_TYPES = [
   { id: 'sniperAmmo',    label: '저격탄x2',   weight: 8,  color: '#66aaff' },
   { id: 'mgAmmo',        label: '기관총탄x30', weight: 8,  color: '#ff8844' },
   { id: 'bolt2',         label: '볼트x2',     weight: 8,  color: '#88ff88' },
+  { id: 'fuelCan',       label: '연료x30',    weight: 8,  color: '#ff6600' },
   // 특수탄
   { id: 'magUpgrade',    label: '탄창+2',     weight: 4,  color: '#ffcc00' },
   { id: 'goldBullet',    label: '관통탄',     weight: 5,  color: '#ffcc00' },
@@ -80,6 +81,7 @@ function applyItem(item) {
     case 'sniperAmmo': state.sniper.reserveRounds += 2; break;
     case 'mgAmmo':  state.mg.reserveAmmo += 30; break;
     case 'bolt2':   state.crossbow.bolts += 2; break;
+    case 'fuelCan': state.flamethrower.reserveFuel += 30; break;
   }
 }
 

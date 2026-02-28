@@ -18,6 +18,7 @@ export const WEAPON_PROFILES = {
   sniper:   { range: 9999, damage: 5, originSound: 200, impactSound: 75,  penetrate: 99 },
   mg:       { range: 350, damage: 1, originSound: 175, impactSound: 30,  penetrate: 0 },
   crossbow: { range: 450, damage: 4, originSound: 40,  impactSound: 30,  penetrate: 1 },
+  flamethrower: { range: 180, damage: 3, originSound: 100, impactSound: 0, penetrate: 0 },
 };
 
 // ── 게임 상태 ──
@@ -35,7 +36,7 @@ export const state = {
   aimAngle: Math.PI / 2,
 
   // 무기 선택
-  currentWeapon: 'pistol', // pistol | bow | sniper | mg | crossbow
+  currentWeapon: 'pistol', // pistol | bow | sniper | mg | crossbow | flamethrower
 
   // 권총
   pistol: {
@@ -84,6 +85,15 @@ export const state = {
     cranking: false,
     crankProgress: 0, // 0~1
     cocked: false,     // 크랭크 완료 여부
+  },
+
+  // 화염방사기
+  flamethrower: {
+    fuel: 100,
+    fuelMax: 100,
+    reserveFuel: 0,
+    firing: false,
+    flameTimer: 0,
   },
 
   // 성벽 (4구간)
@@ -167,6 +177,9 @@ export function resetGame() {
   state.crossbow = {
     bolts: 30, loaded: false, cranking: false, crankProgress: 0, cocked: false,
   };
+  state.flamethrower = {
+    fuel: 100, fuelMax: 100, reserveFuel: 200, firing: false, flameTimer: 0,
+  };
   state.walls = [
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
@@ -210,11 +223,13 @@ export function getTotalAmmo() {
   const s = state.sniper;
   const m = state.mg;
   const c = state.crossbow;
+  const f = state.flamethrower;
   return p.magazineBullets + p.reserveBullets + p.specialBullets + (p.chambered ? 1 : 0)
     + b.arrows + b.specialArrows + (b.arrowNocked ? 1 : 0)
     + s.magazineBullets + s.reserveRounds + (s.chambered ? 1 : 0)
     + m.ammo + m.reserveAmmo
-    + c.bolts + (c.loaded ? 1 : 0);
+    + c.bolts + (c.loaded ? 1 : 0)
+    + Math.floor(f.fuel) + f.reserveFuel;
 }
 
 export function isGameOver() {

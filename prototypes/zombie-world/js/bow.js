@@ -1,36 +1,31 @@
-// ── 활 시스템: 화살통 + 활 + 조이스틱 조준 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=12';
-import { registerZone } from './input.js?v=12';
-import { fireProjectile } from './projectiles.js?v=12';
-import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=12';
-import { spawnParticles } from './particles.js?v=12';
+// ── 활 시스템: 화살통 + 활 (좌우 조준 + 당기기=거리) ──
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=13';
+import { registerZone } from './input.js?v=13';
+import { fireProjectile } from './projectiles.js?v=13';
+import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=13';
+import { spawnParticles } from './particles.js?v=13';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
 
-// 3-column layout: quiver (left 20%) | bow (center 50%) | joystick (right 30%)
-const QUIVER_W = Math.floor(W * 0.20);
-const JOY_W = Math.floor(W * 0.30);
-const BOW_W = W - QUIVER_W - JOY_W;
-
-// 조이스틱 상수
-const JOY_CX = QUIVER_W + BOW_W + JOY_W / 2;
-const JOY_CY = CTRL_Y + CTRL_H / 2;
-const JOY_R = Math.min(JOY_W, CTRL_H) * 0.30; // 작은 조이스틱
-
-// 조이스틱 상태
-let joyActive = false;
-let joyDx = 0, joyDy = 0; // -1~1 정규화
+// 2-column layout: quiver (left 25%) | bow (right 75%)
+const QUIVER_W = Math.floor(W * 0.25);
+const BOW_W = W - QUIVER_W;
 
 // 타겟 위치 (필드 위)
 let targetX = W / 2;
-let targetY = 200;
+let targetY = 300;
 
 // 화살 드래그 상태
 let arrowDrag = null; // { x, y }
 
+// 활 터치 상태
+let bowTouchActive = false;
+let bowStartY = 0;     // 터치 시작 Y (당기기 계산용)
+let bowLastX = 0;       // 이전 X (좌우 이동 delta용)
+
 export function initBow() {
-  // ── 화살통 영역 (왼쪽 20%) ──
+  // ── 화살통 영역 (왼쪽 25%) ──
   registerZone(
     { x: 0, y: CTRL_Y, w: QUIVER_W, h: CTRL_H },
     {
@@ -51,11 +46,8 @@ export function initBow() {
       onEnd(x, y) {
         if (!arrowDrag || state.currentWeapon !== 'bow') { arrowDrag = null; return; }
         const b = state.bow;
-        // 활 중앙 영역에 드롭 → 장전
-        const bowCenterX = QUIVER_W + BOW_W / 2;
-        const bowCenterY = CTRL_Y + CTRL_H * 0.4;
-        const dist = Math.hypot(x - bowCenterX, y - bowCenterY);
-        if (dist < 70) {
+        // 활 영역에 드롭 → 장전
+        if (x >= QUIVER_W) {
           b.arrowNocked = true;
           if (b.arrows > 0) b.arrows--;
           else if (b.specialArrows > 0) { b.specialArrows--; b._specialNocked = true; }
@@ -67,86 +59,88 @@ export function initBow() {
     5
   );
 
-  // ── 활 영역 (가운데 50%) - 시위 당기기 + 발사 ──
+  // ── 활 영역 (오른쪽 75%) - 좌우 조준 + 시위 당기기 + 발사 ──
   registerZone(
     { x: QUIVER_W, y: CTRL_Y, w: BOW_W, h: CTRL_H },
     {
       onStart(x, y) {
         if (state.currentWeapon !== 'bow') return false;
+        bowTouchActive = true;
+        bowLastX = x;
+        bowStartY = y;
         const b = state.bow;
-        if (!b.arrowNocked) return false;
-        b.drawing = true;
-        b.drawPower = 0;
-        playBowDraw();
-      },
-      onMove(x, y, dx, dy) {
-        if (state.currentWeapon !== 'bow' || !state.bow.drawing) return;
-        state.bow.drawPower = Math.min(1, Math.max(0, dy / 100));
-      },
-      onEnd(x, y, dx, dy) {
-        if (state.currentWeapon !== 'bow') return;
-        const b = state.bow;
-        if (!b.drawing) return;
-        b.drawing = false;
-
-        if (b.drawPower > 0.15 && b.arrowNocked) {
-          const isSpecial = b._specialNocked || false;
-          fireProjectile('arrow', state.aimAngle, isSpecial, b.drawPower, { x: targetX, y: targetY });
-          playBowRelease();
-          const bowCX = QUIVER_W + BOW_W / 2;
-          spawnParticles(bowCX, CTRL_Y + CTRL_H * 0.35, 'bowString');
-          b.arrowNocked = false;
-          b._specialNocked = false;
+        if (b.arrowNocked && !b.drawing) {
+          b.drawing = true;
+          b.drawPower = 0;
+          playBowDraw();
         }
-        b.drawPower = 0;
-      },
-    },
-    5
-  );
-
-  // ── 조이스틱 영역 (오른쪽 30%) ──
-  registerZone(
-    { x: QUIVER_W + BOW_W, y: CTRL_Y, w: JOY_W, h: CTRL_H },
-    {
-      onStart(x, y) {
-        if (state.currentWeapon !== 'bow') return false;
-        joyActive = true;
-        updateJoystick(x, y);
       },
       onMove(x, y) {
-        if (!joyActive || state.currentWeapon !== 'bow') return;
-        updateJoystick(x, y);
+        if (state.currentWeapon !== 'bow' || !bowTouchActive) return;
+        const b = state.bow;
+
+        // 좌우 드래그 → 항상 조준 각도 조절 (장전/미장전/당기는 중 모두)
+        const frameDx = x - bowLastX;
+        bowLastX = x;
+        const aimSens = 0.005;
+        state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle - frameDx * aimSens));
+
+        // 아래로 당기기 → drawPower (장전 상태일 때만)
+        if (b.drawing) {
+          const dy = y - bowStartY;
+          b.drawPower = Math.min(1, Math.max(0, dy / 120));
+        }
+
+        // 타겟 위치 계산 (aimAngle + drawPower로 거리 결정)
+        updateTargetFromAim();
       },
-      onEnd() {
-        joyActive = false;
-        joyDx = 0;
-        joyDy = 0;
+      onEnd(x, y) {
+        if (state.currentWeapon !== 'bow') return;
+        const b = state.bow;
+        bowTouchActive = false;
+
+        if (b.drawing && b.arrowNocked) {
+          if (b.drawPower > 0.15) {
+            const isSpecial = b._specialNocked || false;
+            fireProjectile('arrow', state.aimAngle, isSpecial, b.drawPower, { x: targetX, y: targetY });
+            playBowRelease();
+            const bowCX = QUIVER_W + BOW_W / 2;
+            spawnParticles(bowCX, CTRL_Y + CTRL_H * 0.35, 'bowString');
+            b.arrowNocked = false;
+            b._specialNocked = false;
+          }
+          b.drawing = false;
+          b.drawPower = 0;
+        }
       },
     },
     5
   );
+
+  // 초기 타겟 위치 설정
+  updateTargetFromAim();
 }
 
-function updateJoystick(x, y) {
-  const dx = (x - JOY_CX) / JOY_R;
-  const dy = (y - JOY_CY) / JOY_R;
-  const dist = Math.hypot(dx, dy);
-  if (dist > 1) {
-    joyDx = dx / dist;
-    joyDy = dy / dist;
-  } else {
-    joyDx = dx;
-    joyDy = dy;
-  }
-  targetX = W / 2 + joyDx * (W / 2 - 30);
-  // 조이스틱 위로 올리면 가까이(타워 쪽), 아래로 내리면 멀리(필드 상단)
-  targetY = TOWER_Y - 100 + joyDy * (TOWER_Y - FIELD_TOP - 50);
-  targetY = Math.max(FIELD_TOP + 10, Math.min(TOWER_Y - 30, targetY));
+/**
+ * aimAngle + drawPower → 타겟 좌표 계산
+ * drawPower가 높을수록 멀리 (타워에서 FIELD_TOP 쪽으로)
+ */
+function updateTargetFromAim() {
+  const b = state.bow;
+  const power = b.drawing ? b.drawPower : 0;
 
-  const aimDx = targetX - state.tower.x;
-  const aimDy = -(targetY - TOWER_Y);
-  state.aimAngle = Math.atan2(aimDy, aimDx);
-  state.aimAngle = Math.max(0.15, Math.min(Math.PI - 0.15, state.aimAngle));
+  // 최소~최대 사거리 (타워로부터의 거리)
+  const minDist = 80;
+  const maxDist = TOWER_Y - FIELD_TOP - 20;
+  const dist = minDist + power * (maxDist - minDist);
+
+  // aimAngle 방향으로 dist만큼 이동 (Y는 위쪽이 -)
+  targetX = state.tower.x + Math.cos(state.aimAngle) * dist;
+  targetY = TOWER_Y - Math.sin(state.aimAngle) * dist;
+
+  // 필드 경계 클램핑
+  targetX = Math.max(20, Math.min(W - 20, targetX));
+  targetY = Math.max(FIELD_TOP + 10, Math.min(TOWER_Y - 30, targetY));
 }
 
 export function drawBow(ctx) {
@@ -163,8 +157,6 @@ export function drawBow(ctx) {
   ctx.beginPath();
   ctx.moveTo(QUIVER_W, CTRL_Y);
   ctx.lineTo(QUIVER_W, CONTROLS_BOTTOM);
-  ctx.moveTo(QUIVER_W + BOW_W, CTRL_Y);
-  ctx.lineTo(QUIVER_W + BOW_W, CONTROLS_BOTTOM);
   ctx.stroke();
 
   // 레이블
@@ -173,7 +165,6 @@ export function drawBow(ctx) {
   ctx.textAlign = 'center';
   ctx.fillText('화살통', QUIVER_W / 2, CTRL_Y + 14);
   ctx.fillText('활', QUIVER_W + BOW_W / 2, CTRL_Y + 14);
-  ctx.fillText('조준', JOY_CX, CTRL_Y + 14);
 
   // ── 왼쪽: 화살통 ──
   const qx = QUIVER_W / 2 - 18;
@@ -215,10 +206,10 @@ export function drawBow(ctx) {
     ctx.fillText(`+${b.specialArrows}`, QUIVER_W / 2 + 12, CONTROLS_BOTTOM - 10);
   }
 
-  // ── 가운데: 활 ──
+  // ── 오른쪽: 활 ──
   const bowCX = QUIVER_W + BOW_W / 2;
   const bowCY = CTRL_Y + CTRL_H * 0.4;
-  const bowLen = BOW_W * 0.7;
+  const bowLen = BOW_W * 0.55;
 
   // 활 몸체
   ctx.strokeStyle = '#8B5E3C';
@@ -236,7 +227,7 @@ export function drawBow(ctx) {
   ctx.stroke();
 
   // 시위
-  const stringPull = b.drawing ? b.drawPower * 40 : 0;
+  const stringPull = b.drawing ? b.drawPower * 50 : 0;
   ctx.strokeStyle = '#c0a060';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -278,9 +269,9 @@ export function drawBow(ctx) {
     ctx.fill();
   }
 
-  // 파워 게이지
+  // 파워 게이지 (당기는 중)
   if (b.drawing && b.drawPower > 0) {
-    const gaugeX = QUIVER_W + 5;
+    const gaugeX = QUIVER_W + 8;
     const gaugeH = CTRL_H * 0.6;
     const gaugeY = CTRL_Y + (CTRL_H - gaugeH) / 2;
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -297,6 +288,22 @@ export function drawBow(ctx) {
     ctx.fillText(Math.floor(b.drawPower * 100) + '%', gaugeX + 5, gaugeY - 5);
   }
 
+  // 조준 방향 표시 (활 위에 화살표)
+  const aimIndicatorR = 30;
+  const aimIX = bowCX + Math.cos(state.aimAngle) * aimIndicatorR;
+  const aimIY = bowCY - Math.sin(state.aimAngle) * aimIndicatorR - 50;
+  ctx.strokeStyle = 'rgba(255,150,80,0.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bowCX, bowCY - 50);
+  ctx.lineTo(aimIX, aimIY);
+  ctx.stroke();
+  // 화살표 끝
+  ctx.fillStyle = 'rgba(255,150,80,0.6)';
+  ctx.beginPath();
+  ctx.arc(aimIX, aimIY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
   // 힌트
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.font = '9px monospace';
@@ -306,54 +313,10 @@ export function drawBow(ctx) {
   } else if (!b.arrowNocked) {
     ctx.fillText('화살통→활: 장전', bowCX, CONTROLS_BOTTOM - 8);
   } else if (!b.drawing) {
-    ctx.fillText('↓당기고 놓기: 발사', bowCX, CONTROLS_BOTTOM - 8);
+    ctx.fillText('←→조준  ↓당기기', bowCX, CONTROLS_BOTTOM - 8);
   } else {
-    ctx.fillText('놓으면 발사!', bowCX, CONTROLS_BOTTOM - 8);
+    ctx.fillText('놓으면 발사! ←→조준', bowCX, CONTROLS_BOTTOM - 8);
   }
-
-  // ── 오른쪽: 조이스틱 ──
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(JOY_CX, JOY_CY, JOY_R, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 십자선
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(JOY_CX - JOY_R, JOY_CY);
-  ctx.lineTo(JOY_CX + JOY_R, JOY_CY);
-  ctx.moveTo(JOY_CX, JOY_CY - JOY_R);
-  ctx.lineTo(JOY_CX, JOY_CY + JOY_R);
-  ctx.stroke();
-
-  // 핸들
-  const handleX = JOY_CX + joyDx * JOY_R;
-  const handleY = JOY_CY + joyDy * JOY_R;
-  const handleR = 14;
-
-  if (joyActive) {
-    ctx.strokeStyle = 'rgba(200,160,96,0.3)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(JOY_CX, JOY_CY);
-    ctx.lineTo(handleX, handleY);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = joyActive ? 'rgba(200,160,96,0.6)' : 'rgba(150,130,100,0.3)';
-  ctx.beginPath();
-  ctx.arc(handleX, handleY, handleR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = joyActive ? '#c0a060' : 'rgba(150,130,100,0.5)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.font = '9px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('조준', JOY_CX, CONTROLS_BOTTOM - 8);
 
   // ── 드래그 중인 화살 ──
   if (arrowDrag) {
@@ -370,6 +333,15 @@ export function drawBow(ctx) {
     ctx.lineTo(arrowDrag.x + 3, arrowDrag.y - 22);
     ctx.closePath();
     ctx.fill();
+
+    // 활 영역 위에 있으면 하이라이트
+    if (arrowDrag.x >= QUIVER_W) {
+      ctx.strokeStyle = 'rgba(192,160,96,0.5)';
+      ctx.lineWidth = 3;
+      const bx = bowCX - bowLen / 2 - 10;
+      const by = bowCY - 30;
+      ctx.strokeRect(bx, by, bowLen + 20, 80);
+    }
   }
 
   ctx.restore();
@@ -381,9 +353,13 @@ export function drawBow(ctx) {
 export function drawBowTargetOverlay(ctx) {
   if (state.currentWeapon !== 'bow') return;
 
+  // 활 영역을 터치 중이거나 당기는 중일 때 타겟 표시
+  updateTargetFromAim();
+
   ctx.save();
 
-  const alpha = joyActive ? 0.8 : 0.4;
+  const b = state.bow;
+  const alpha = b.drawing ? 0.8 : (bowTouchActive ? 0.5 : 0.3);
 
   // X 마커
   const size = 12;
@@ -402,10 +378,11 @@ export function drawBowTargetOverlay(ctx) {
   ctx.arc(targetX, targetY, 3, 0, Math.PI * 2);
   ctx.fill();
 
-  if (joyActive) {
-    ctx.fillStyle = `rgba(255,100,50,0.1)`;
+  // 거리 원 (당기는 중)
+  if (b.drawing && b.drawPower > 0) {
+    ctx.fillStyle = `rgba(255,100,50,0.08)`;
     ctx.beginPath();
-    ctx.arc(targetX, targetY, 25, 0, Math.PI * 2);
+    ctx.arc(targetX, targetY, 25 + b.drawPower * 10, 0, Math.PI * 2);
     ctx.fill();
   }
 

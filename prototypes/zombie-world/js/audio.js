@@ -312,6 +312,18 @@ export function playCrossbowLoad() {
   setTimeout(() => tone(1000, 0.02, 'sine', 0.06), 20);
 }
 
+// ── 화염방사기 사운드 ──
+export function playFlameLoop() {
+  noise(0.2, 0.2, 1200);
+  sweep(100, 300, 0.15, 'sawtooth', 0.08);
+  tone(60, 0.15, 'sine', 0.06);
+}
+
+export function playFlameStop() {
+  sweep(300, 80, 0.2, 'sawtooth', 0.06);
+  noise(0.15, 0.08, 600);
+}
+
 // ── UI 사운드 ──
 export function playUIClick() {
   tone(800, 0.03, 'square', 0.1);
