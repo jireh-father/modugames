@@ -376,31 +376,54 @@ function checkZombieHits(projectiles) {
   return hits;
 }
 
-// ── 웨이브 시작 (스테이지 기반) ──
+// ── 웨이브 시작 (무한 스테이지 스케일링) ──
 function startWave(stageNum) {
-  const baseCount = 4 + stageNum * 2;
-  const hpMul = 1 + (stageNum - 1) * 0.1;
-  const speedMul = 1 + (stageNum - 1) * 0.05;
+  // 스테이지 1 = 워커 100마리, 이후 스테이지당 +15
+  const baseCount = 85 + stageNum * 15;
+  // HP/속도 무한 스케일: 로그 곡선으로 천천히 증가
+  const hpMul = 1 + (stageNum - 1) * 0.15;
+  const speedMul = 1 + Math.min((stageNum - 1) * 0.04, 1.5); // 최대 2.5배속 캡
   const queue = [];
 
   // 좀비를 맵 전체에 퍼뜨림 (y: 60 ~ 500, 벽 위 영역)
   function addToQueue(type, count, overrides = {}) {
     for (let i = 0; i < count; i++) {
       const x = 30 + Math.random() * (W - 60);
-      const y = 60 + Math.random() * 440; // FIELD_TOP+12 ~ WALL_Y-20
+      const y = 60 + Math.random() * 440;
       queue.push({ type, x, hpMul, speedMul, delay: 0, overrides: { ...overrides, y } });
     }
   }
 
+  // 워커: 항상 메인 비중
   addToQueue('walker', baseCount);
-  if (stageNum >= 2) addToQueue('runner', Math.floor(baseCount * 0.4));
-  if (stageNum >= 3) addToQueue('tank', Math.floor(baseCount * 0.2));
-  if (stageNum >= 4) addToQueue('rammer', Math.floor(baseCount * 0.2));
-  if (stageNum >= 5) addToQueue('splitter', Math.floor(baseCount * 0.2));
-  if (stageNum >= 6) addToQueue('necromancer', Math.floor(baseCount * 0.1));
-  if (stageNum >= 7) addToQueue('spider', Math.floor(baseCount * 0.3));
-  if (stageNum >= 8 && stageNum % 3 === 0) addToQueue('bigone', 1 + Math.floor(stageNum / 10));
-  if (stageNum % 5 === 0) addToQueue('walker', 10, { gold: true });
+
+  // 스테이지 2+: 러너 (빠른 좀비)
+  if (stageNum >= 2) addToQueue('runner', Math.floor(baseCount * 0.3));
+
+  // 스테이지 3+: 탱크 (체력 높음)
+  if (stageNum >= 3) addToQueue('tank', Math.floor(baseCount * 0.1));
+
+  // 스테이지 4+: 래머 (돌진)
+  if (stageNum >= 4) addToQueue('rammer', Math.floor(baseCount * 0.1));
+
+  // 스테이지 5+: 스플리터 (분열)
+  if (stageNum >= 5) addToQueue('splitter', Math.floor(baseCount * 0.1));
+
+  // 스테이지 6+: 네크로맨서 (힐러)
+  if (stageNum >= 6) addToQueue('necromancer', Math.floor(baseCount * 0.05));
+
+  // 스테이지 7+: 스파이더 (빠르고 작음)
+  if (stageNum >= 7) addToQueue('spider', Math.floor(baseCount * 0.2));
+
+  // 스테이지 8+: 3스테이지마다 빅원 보스급
+  if (stageNum >= 8 && stageNum % 3 === 0) {
+    addToQueue('bigone', 1 + Math.floor(stageNum / 5));
+  }
+
+  // 5스테이지마다 골드 보너스 무리 (스테이지 비례)
+  if (stageNum % 5 === 0) {
+    addToQueue('walker', 10 + stageNum * 2, { gold: true });
+  }
 
   state.waveSpawnQueue = queue;
   state.wave = stageNum;
