@@ -107,4 +107,29 @@ export function drawWalls(ctx) {
     ctx.fillStyle = hpRatio > 0.6 ? '#44ff44' : hpRatio > 0.3 ? '#ffff44' : '#ff4444';
     ctx.fillRect(seg.x, wy - 6, seg.w * hpRatio, 4);
   }
+
+  // ── Draw doors between wall segments ──
+  const DOOR_W = 30;
+  const DOOR_H = WALL_H;
+  for (const door of state.doors) {
+    const dx = door.x - DOOR_W / 2; // left edge, centered on door.x
+    const dy = WALL_Y;
+
+    // Door frame (brown stroke)
+    ctx.strokeStyle = '#8b7355';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(dx, dy, DOOR_W, DOOR_H);
+
+    // Door panel (dark brown fill)
+    ctx.fillStyle = '#6b5335';
+    ctx.fillRect(dx + 1, dy + 1, DOOR_W - 2, DOOR_H - 2);
+
+    // Door handle (small gold circle)
+    const handleX = door.open ? dx + 5 : dx + DOOR_W - 7;
+    const handleY = dy + DOOR_H / 2;
+    ctx.beginPath();
+    ctx.arc(handleX, handleY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffcc44';
+    ctx.fill();
+  }
 }
