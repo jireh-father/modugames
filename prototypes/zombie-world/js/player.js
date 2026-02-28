@@ -137,7 +137,9 @@ export function updatePlayer(dt) {
       // 웨이포인트를 향해 이동
       const nx = dx / dist;
       const ny = dy / dist;
-      const step = p.speed * dt;
+      const hpRatio = Math.max(0.3, state.player.hp / state.player.maxHp);
+      const moveSpeed = state.player.speed * hpRatio;
+      const step = moveSpeed * dt;
 
       const newX = p.x + nx * step;
       const newY = p.y + ny * step;
