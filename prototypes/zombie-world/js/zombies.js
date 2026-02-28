@@ -78,14 +78,18 @@ let wallHitSoundTimer = 0;
 let towerHitSoundTimer = 0;
 
 // ── 가장 큰 소리 찾기 (범위 내에서 loudness 기준) ──
+// zombie_shuffle 소리는 가장 익숙한 소리이므로 loudness를 1/4로 취급
 function findLoudestSound(z, minLoudness = 0) {
   let best = null;
   let bestLoudness = minLoudness;
   for (const s of state.soundSources) {
     const dist = Math.hypot(z.x - s.x, z.y - s.y);
     if (dist < s.range && dist < z.hearingRange) {
-      // 유효 크기 = 원본 loudness × 거리 감쇠 (가까울수록 크게 느낌)
-      const effectiveLoudness = (s.loudness || s.range) * (1 - dist / s.range);
+      // 좀비 소리는 가장 익숙 → loudness 1/4 감쇄
+      const baseLoudness = s.type === 'zombie_shuffle' ? (s.loudness || s.range) * 0.25
+                                                       : (s.loudness || s.range);
+      // 유효 크기 = baseLoudness × 거리 감쇠 (가까울수록 크게 느낌)
+      const effectiveLoudness = baseLoudness * (1 - dist / s.range);
       if (effectiveLoudness > bestLoudness) {
         bestLoudness = effectiveLoudness;
         best = s;
@@ -187,10 +191,12 @@ function updateZombies(dt) {
       // 소리 감지 (threshold 이상만 반응)
       const sound = findLoudestSound(z, z.soundThreshold);
       if (sound) {
-        z.targetX = sound.x;
-        z.targetY = sound.y;
-        const ddx = sound.x - z.x;
-        const ddy = sound.y - z.y;
+        // 소리에 원래 목적지가 있으면 그곳으로, 없으면 소리 발생 위치로
+        const dest = sound.target || { x: sound.x, y: sound.y };
+        z.targetX = dest.x;
+        z.targetY = dest.y;
+        const ddx = dest.x - z.x;
+        const ddy = dest.y - z.y;
         const ddist = Math.hypot(ddx, ddy);
         if (ddist > 0) {
           z.moveDir = { x: ddx / ddist, y: ddy / ddist };
@@ -203,11 +209,13 @@ function updateZombies(dt) {
       }
 
     } else if (z.aiState === 'attracted') {
-      // 끌린 좀비 셔플 소음 (체인 전파용)
+      // 끌린 좀비 셔플 소음 (체인 전파용 — 원래 목적지 좌표 전달)
       z.noiseTimer -= dt;
       if (z.noiseTimer <= 0) {
         z.noiseTimer = 0.5;
-        emitSound(z.x, z.y, 60, 0.3, 'zombie_shuffle');
+        const shuffleTarget = (z.targetX != null && z.targetY != null)
+          ? { x: z.targetX, y: z.targetY } : null;
+        emitSound(z.x, z.y, 60, 0.3, 'zombie_shuffle', shuffleTarget);
       }
 
       // 타겟 방향으로 직선 이동 (타겟 지나쳐도 계속 진행)
@@ -317,11 +325,12 @@ function updateZombies(dt) {
       const newSound = findLoudestSound(z, z.soundThreshold);
       if (newSound) {
         const newLoudness = (newSound.loudness || newSound.range) * (1 - Math.hypot(z.x - newSound.x, z.y - newSound.y) / newSound.range);
-        // 더 큰 소리면 방향 전환 + threshold 갱신
-        z.targetX = newSound.x;
-        z.targetY = newSound.y;
-        const sdx = newSound.x - z.x;
-        const sdy = newSound.y - z.y;
+        // 더 큰 소리면 방향 전환 + threshold 갱신 (원래 목적지 좌표 사용)
+        const dest = newSound.target || { x: newSound.x, y: newSound.y };
+        z.targetX = dest.x;
+        z.targetY = dest.y;
+        const sdx = dest.x - z.x;
+        const sdy = dest.y - z.y;
         const sdist = Math.hypot(sdx, sdy);
         if (sdist > 0) {
           z.moveDir = { x: sdx / sdist, y: sdy / sdist };
