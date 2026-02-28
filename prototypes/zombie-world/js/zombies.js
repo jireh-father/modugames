@@ -140,17 +140,39 @@ function updateZombies(dt) {
     const frozen = z.statusEffects.frozen > 0;
     const speedMul = (frozen ? 0.5 : 1) * (z.buffed ? 1.3 : 1);
 
-    // ── AI 상태 머신 (idle / attracted only) ──
+    // ── AI 상태 머신 (idle / attracted) ──
     if (z.aiState === 'idle') {
-      // 완전 정지 — 소리만 대기
-      // (walkPhase는 계속 업데이트되어 제자리걸음 애니 가능)
+      // 주변을 랜덤으로 느리게 배회 (기본 속도의 30%)
+      const wanderSpeed = z.speed * 0.3 * speedMul;
+      z.zigzagPhase += dt * 1.2;
+      const wanderAngle = z.zigzagPhase * 0.7 + Math.sin(z.zigzagPhase * 0.3) * 2;
+      let newX = z.x + Math.cos(wanderAngle) * wanderSpeed * dt;
+      let newY = z.y + Math.sin(wanderAngle) * wanderSpeed * dt;
+
+      newX = Math.max(5, Math.min(W - 5, newX));
+      newY = Math.max(48, Math.min(640, newY));
+
+      if (!zombieCollidesBuilding(newX, newY, z.size)) {
+        z.x = newX;
+        z.y = newY;
+      }
+
+      // idle 벽 충돌 체크
+      const idleWallIdx = xToWallIdx(z.x);
+      const idleWallY = getWallY(idleWallIdx);
+      const idleWallSeg = WALL_SEGMENTS[idleWallIdx];
+      if (z.y >= idleWallY && z.y <= idleWallY + 20 &&
+          z.x >= idleWallSeg.x && z.x <= idleWallSeg.x + idleWallSeg.w) {
+        if (state.walls[idleWallIdx].hp > 0) {
+          z.y = idleWallY;
+        }
+      }
 
       // 소리 감지
       const sound = findClosestSound(z);
       if (sound) {
         z.targetX = sound.x;
         z.targetY = sound.y;
-        // 이동 방향 저장 (타겟 지나쳐도 계속 이 방향으로 진행)
         const ddx = sound.x - z.x;
         const ddy = sound.y - z.y;
         const ddist = Math.hypot(ddx, ddy);
