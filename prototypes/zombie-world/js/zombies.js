@@ -64,6 +64,7 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
     targetY: null,
     moveDir: null,       // 이동 방향 벡터 {x, y} — 타겟 통과 후에도 유지
     hearingRange: 300,
+    noiseTimer: 0,
   };
 
   state.zombies.push(z);
@@ -183,6 +184,13 @@ function updateZombies(dt) {
       }
 
     } else if (z.aiState === 'attracted') {
+      // Attracted zombies emit shuffling noise for chain propagation
+      z.noiseTimer -= dt;
+      if (z.noiseTimer <= 0) {
+        z.noiseTimer = 0.5;
+        emitSound(z.x, z.y, 60, 0.3, 'zombie_shuffle');
+      }
+
       // 타겟 방향으로 직선 이동 (타겟 지나쳐도 계속 진행)
       const dx = z.targetX - z.x;
       const dy = z.targetY - z.y;
@@ -201,7 +209,7 @@ function updateZombies(dt) {
         ny = z.moveDir ? z.moveDir.y : 1;
       }
 
-      let moveSpeed = z.speed * speedMul;
+      let moveSpeed = z.speed * speedMul * 1.5;
 
       // 러너/스파이더: 지그재그
       let newX = z.x, newY = z.y;
