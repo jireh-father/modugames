@@ -44,7 +44,7 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
   const z = {
     type,
     x,
-    y: -20,
+    y: overrides.y !== undefined ? overrides.y : -20,
     hp,
     maxHp: hp,
     speed: cfg.speed * speedMul,
@@ -382,13 +382,13 @@ function startWave(stageNum) {
   const hpMul = 1 + (stageNum - 1) * 0.1;
   const speedMul = 1 + (stageNum - 1) * 0.05;
   const queue = [];
-  let delayAccum = 0;
 
+  // 좀비를 맵 전체에 퍼뜨림 (y: 60 ~ 500, 벽 위 영역)
   function addToQueue(type, count, overrides = {}) {
     for (let i = 0; i < count; i++) {
       const x = 30 + Math.random() * (W - 60);
-      delayAccum += 0.3 + Math.random() * 0.5;
-      queue.push({ type, x, hpMul, speedMul, delay: delayAccum, overrides });
+      const y = 60 + Math.random() * 440; // FIELD_TOP+12 ~ WALL_Y-20
+      queue.push({ type, x, hpMul, speedMul, delay: 0, overrides: { ...overrides, y } });
     }
   }
 
