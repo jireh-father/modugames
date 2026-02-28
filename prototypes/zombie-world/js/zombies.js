@@ -496,10 +496,16 @@ function startWave(stageNum) {
   const queue = [];
 
   // 좀비를 맵 전체에 퍼뜨림 (y: 60 ~ 500, 벽 위 영역)
+  // 건물과 겹치지 않는 위치에 배치
   function addToQueue(type, count, overrides = {}) {
+    const sz = ZOMBIE_TYPES[type] ? ZOMBIE_TYPES[type].size : 14;
     for (let i = 0; i < count; i++) {
-      const x = 30 + Math.random() * (W - 60);
-      const y = 60 + Math.random() * 440;
+      let x, y, tries = 0;
+      do {
+        x = 30 + Math.random() * (W - 60);
+        y = 60 + Math.random() * 440;
+        tries++;
+      } while (tries < 20 && zombieCollidesBuilding(x, y, sz));
       queue.push({ type, x, hpMul, speedMul, delay: 0, overrides: { ...overrides, y } });
     }
   }
