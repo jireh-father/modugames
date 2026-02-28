@@ -1,8 +1,8 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=14';
-import { findPath, drawPathDebug } from './pathfinding.js?v=14';
-import { collidesWithBuilding } from './buildings.js?v=14';
-import { registerZone } from './input.js?v=14';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=15';
+import { findPath, drawPathDebug } from './pathfinding.js?v=15';
+import { collidesWithBuilding } from './buildings.js?v=15';
+import { registerZone } from './input.js?v=15';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -45,7 +45,7 @@ export function initPlayer() {
         // 타워 위에 있으면 필드 탭 무시
         if (p.onTower >= 0) return;
 
-        // 타워 클릭 체크 (탭 위치가 타워 근처인지)
+        // 타워 클릭 체크
         for (let i = 0; i < state.towers.length; i++) {
           const t = state.towers[i];
           if (t.hp <= 0) continue;
@@ -151,8 +151,9 @@ export function updatePlayer(dt) {
       // 웨이포인트를 향해 이동
       const nx = dx / dist;
       const ny = dy / dist;
-      const hpRatio = Math.max(0.3, state.player.hp / state.player.maxHp);
-      const moveSpeed = state.player.speed * hpRatio;
+      // HP 비례 이동속도 (최소 30%)
+      const hpRatio = Math.max(0.3, p.hp / p.maxHp);
+      const moveSpeed = p.speed * hpRatio;
       const step = moveSpeed * dt;
 
       const newX = p.x + nx * step;
@@ -175,11 +176,9 @@ export function updatePlayer(dt) {
   if (p.targetTower >= 0 && !p.moving) {
     const t = state.towers[p.targetTower];
     if (t && t.hp > 0) {
-      const dist = Math.hypot(p.x - t.x, p.y - TOWER_Y);
-      if (dist < 40) {
-        p.onTower = p.targetTower;
-        p.x = t.x;
-        p.y = TOWER_Y;
+      const tdist = Math.hypot(p.x - t.x, p.y - TOWER_Y);
+      if (tdist < 40) {
+        climbTower(p.targetTower);
       }
     }
     p.targetTower = -1;

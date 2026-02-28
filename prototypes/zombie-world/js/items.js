@@ -1,15 +1,15 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=14';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=15';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
-         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=14';
-import { spawnParticles } from './particles.js?v=14';
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=15';
+import { spawnParticles } from './particles.js?v=15';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
   'bullet3', 'bullet6', 'arrow2', 'arrow5',
-  'sniperAmmo', 'mgAmmo', 'bolt2', 'fuelCan',
+  'sniperAmmo', 'mgAmmo', 'bolt2', 'fuelCan', 'battery',
 ]);
 
 // 인벤토리 아이템 - 인벤토리에 저장 후 수동 사용
@@ -18,6 +18,7 @@ const INVENTORY_IDS = new Set([
   'shield', 'speedBoost', 'freeze', 'chain', 'poison',
   'magUpgrade', 'goldBullet', 'explosiveArrow',
   'toy', 'firecracker', 'radio',
+  'food', 'meat', 'silent_shoes', 'stealth_shoes',
 ]);
 
 // ── 아이템 정의 ──
@@ -50,6 +51,12 @@ const ITEM_TYPES = [
   { id: 'toy',           label: '장난감',     weight: 10, color: '#ff88cc' },
   { id: 'firecracker',   label: '폭죽',       weight: 8,  color: '#ff4400' },
   { id: 'radio',         label: '라디오',     weight: 6,  color: '#44aaff' },
+  // v2.1 신규
+  { id: 'battery',       label: '배터리',     weight: 5,  color: '#ffee88' },
+  { id: 'food',          label: '음식',       weight: 8,  color: '#ff9944' },
+  { id: 'meat',          label: '고기',       weight: 0,  color: '#cc6633' }, // weight 0 = 드롭 테이블에서 안 나옴 (동물 전용)
+  { id: 'silent_shoes',  label: '조용한신발', weight: 3,  color: '#8888cc' },
+  { id: 'stealth_shoes', label: '무음신발',   weight: 1,  color: '#4444aa' },
 ];
 
 function pickWeightedItem() {
@@ -81,6 +88,7 @@ function applyItem(item) {
     case 'mgAmmo':  state.mg.reserveAmmo += 30; break;
     case 'bolt2':   state.crossbow.bolts += 2; break;
     case 'fuelCan': state.flamethrower.reserveFuel += 30; break;
+    case 'battery': state.flashlight.battery = Math.min(state.flashlight.batteryMax, state.flashlight.battery + 100); break;
   }
 }
 
@@ -140,6 +148,20 @@ export function useInventoryItem(itemId, targetX, targetY) {
     case 'medkit':
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + 30);
       playMedkitUse();
+      break;
+    case 'food':
+      state.hunger = Math.min(state.hungerMax, state.hunger + 30);
+      break;
+    case 'meat':
+      state.hunger = Math.min(state.hungerMax, state.hunger + 25);
+      break;
+    case 'silent_shoes':
+      state.player.shoeType = 'silent';
+      state.player.shoeTimer = 60;
+      break;
+    case 'stealth_shoes':
+      state.player.shoeType = 'stealth';
+      state.player.shoeTimer = 30;
       break;
     case 'mine':
       state.mines.push({

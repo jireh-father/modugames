@@ -1,8 +1,8 @@
 // ── 화염방사기 시스템: 연료 + 지속 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=14';
-import { registerZone } from './input.js?v=14';
-import { spawnParticles } from './particles.js?v=14';
-import { playFlameLoop, playFlameStop } from './audio.js?v=14';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=15';
+import { registerZone } from './input.js?v=15';
+import { spawnParticles } from './particles.js?v=15';
+import { playFlameLoop, playFlameStop } from './audio.js?v=15';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -66,9 +66,7 @@ export function initFlamethrower() {
         const frameDx = x - gunLastX;
         gunLastX = x;
         const aimSens = 0.005;
-        state.aimAngle -= frameDx * aimSens;
-        while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
-        while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
+        state.aimAngle -= frameDx * aimSens; while (state.aimAngle < 0) state.aimAngle += Math.PI * 2; while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
       },
       onEnd() {
         gunHeld = false;

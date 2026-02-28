@@ -1,7 +1,7 @@
 // ── 지뢰 & 위험 지역 (화염/독) 시스템 ──
-import { state, emitSound } from './game.js?v=14';
-import { spawnParticles } from './particles.js?v=14';
-import { playMineExplosion, playFireDamage } from './audio.js?v=14';
+import { state, emitSound } from './game.js?v=15';
+import { spawnParticles } from './particles.js?v=15';
+import { playMineExplosion, playFireDamage } from './audio.js?v=15';
 
 let hazardSoundTimer = 0;
 

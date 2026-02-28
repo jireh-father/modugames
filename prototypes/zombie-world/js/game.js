@@ -98,6 +98,14 @@ export const state = {
     flameTimer: 0,
   },
 
+  // 손전등
+  flashlight: {
+    on: false,
+    battery: 0,
+    batteryMax: 100,
+    drainRate: 100 / 30, // 30초에 소진
+  },
+
   // 성벽 (4구간)
   walls: [
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
@@ -127,7 +135,20 @@ export const state = {
     pathIdx: 0,
     moving: false,
     hitFlash: 0,
+    targetTower: -1,     // pathfind 목표 타워
+    moveNoiseRange: 40,  // 이동 소음 범위
+    moveNoiseTimer: 0,
+    shoeType: null,      // null | 'silent' | 'stealth'
+    shoeTimer: 0,
   },
+
+  // 배고픔
+  hunger: 100,
+  hungerMax: 100,
+  hungerRate: 100 / 180, // 180초(3분)에 소진
+
+  // 동물
+  animals: [],
 
   // 건물 (장애물)
   buildings: [],
@@ -212,6 +233,7 @@ export function resetGame() {
   state.flamethrower = {
     fuel: 100, fuelMax: 100, reserveFuel: 200, firing: false, flameTimer: 0,
   };
+  state.flashlight = { on: false, battery: 0, batteryMax: 100, drainRate: 100 / 30 };
   state.walls = [
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
@@ -227,7 +249,10 @@ export function resetGame() {
   state.player = {
     x: 270, y: 590, hp: 100, maxHp: 100, speed: 200, size: 16,
     onTower: 1, path: [], pathIdx: 0, moving: false, hitFlash: 0,
+    targetTower: -1, moveNoiseRange: 40, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
   };
+  state.hunger = 100;
+  state.animals = [];
   state.buildings = [];
   state.doors = [
     { x: 135, open: false },

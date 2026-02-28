@@ -1,9 +1,9 @@
 // ── 권총 시스템: 렌더링 + 조작 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=14';
-import { registerZone } from './input.js?v=14';
-import { fireProjectile } from './projectiles.js?v=14';
-import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=14';
-import { spawnParticles } from './particles.js?v=14';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=15';
+import { registerZone } from './input.js?v=15';
+import { fireProjectile } from './projectiles.js?v=15';
+import { playGunshot, playSlideRack, playMagOut, playMagIn, playBulletLoad } from './audio.js?v=15';
+import { spawnParticles } from './particles.js?v=15';
 
 const JOYSTICK_W = 0; // 다이얼 기반 조준으로 조이스틱 오프셋 불필요
 
@@ -89,9 +89,7 @@ export function initPistol() {
         triggerTotalDragX += Math.abs(frameDx);
         triggerLastX = x;
         const aimSens = 0.005;
-        state.aimAngle -= frameDx * aimSens;
-        while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
-        while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
+        state.aimAngle -= frameDx * aimSens; while (state.aimAngle < 0) state.aimAngle += Math.PI * 2; while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
       },
       onEnd() {
         if (!triggerDragging || state.currentWeapon !== 'pistol') { triggerDragging = false; return; }

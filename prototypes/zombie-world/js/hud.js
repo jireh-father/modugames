@@ -1,11 +1,11 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=14';
-import { registerZone } from './input.js?v=14';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=14';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=14';
-import { openSettings } from './settings.js?v=14';
-import { generateBuildings } from './buildings.js?v=14';
-import { buildGrid } from './pathfinding.js?v=14';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=15';
+import { registerZone } from './input.js?v=15';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=15';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=15';
+import { openSettings } from './settings.js?v=15';
+import { generateBuildings } from './buildings.js?v=15';
+import { buildGrid } from './pathfinding.js?v=15';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -92,8 +92,8 @@ export function initHUD() {
     100
   );
 
-  // 무기 슬롯 영역 (6개 + 주머니)
-  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow', 'flamethrower', 'pouch'];
+  // 무기 슬롯 영역 (7개 + 주머니)
+  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow', 'flamethrower', 'flashlight', 'pouch'];
   const slotW = W / WEAPONS.length;
   registerZone(
     { x: 0, y: CONTROLS_TOP, w: W, h: SLOT_H },
@@ -169,8 +169,20 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'right';
   ctx.fillText('HP', hpBarX - 3, 30);
 
-  // 타워 상태 점 3개 (우측 HP 바 아래)
-  const dotY = 36;
+  // 배고픔 바 (HP 바 아래)
+  const hungerRatio = Math.max(0, state.hunger / state.hungerMax);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(hpBarX, 32, hpBarW, 5);
+  const hungerFlash = hungerRatio < 0.3 && Math.sin(state.time * 8) > 0;
+  ctx.fillStyle = hungerFlash ? '#ff4444' : hungerRatio > 0.5 ? '#ffaa44' : hungerRatio > 0.25 ? '#ffff44' : '#ff6644';
+  ctx.fillRect(hpBarX, 32, hpBarW * hungerRatio, 5);
+  ctx.fillStyle = '#ccc';
+  ctx.font = 'bold 7px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('🍖', hpBarX - 3, 37);
+
+  // 타워 상태 점 3개 (우측 배고픔 바 아래)
+  const dotY = 43;
   const dotR = 4;
   const dotSpacing = 14;
   const dotStartX = W - 95 + (80 - dotSpacing * 2) / 2; // center 3 dots under HP bar
@@ -218,6 +230,7 @@ export function drawWeaponSlots(ctx) {
     { id: 'mg', color: '#ffaa66', bg: 'rgba(255,150,80,0.3)' },
     { id: 'crossbow', color: '#88ff88', bg: 'rgba(100,255,100,0.3)' },
     { id: 'flamethrower', color: '#ff8844', bg: 'rgba(255,120,50,0.3)' },
+    { id: 'flashlight', color: '#ffee88', bg: 'rgba(255,238,136,0.3)' },
     { id: 'pouch', color: '#ccbbaa', bg: 'rgba(180,160,140,0.3)' },
   ];
   const slotW = W / weapons.length;
@@ -434,6 +447,27 @@ function drawWeaponIcon(ctx, id, cx, cy, color) {
       ctx.arc(cx + 14, cy, 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+      break;
+    }
+    case 'flashlight': {
+      // 몸체 (원통)
+      ctx.fillRect(cx - 4, cy - 8, 8, 14);
+      // 헤드 (넓은 부분)
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy - 8);
+      ctx.lineTo(cx - 7, cy - 14);
+      ctx.lineTo(cx + 7, cy - 14);
+      ctx.lineTo(cx + 4, cy - 8);
+      ctx.closePath();
+      ctx.fill();
+      // 빛 (위로 삼각형)
+      ctx.fillStyle = state.flashlight.on ? 'rgba(255,238,136,0.5)' : 'rgba(255,238,136,0.15)';
+      ctx.beginPath();
+      ctx.moveTo(cx - 3, cy - 14);
+      ctx.lineTo(cx, cy - 22);
+      ctx.lineTo(cx + 3, cy - 14);
+      ctx.closePath();
+      ctx.fill();
       break;
     }
     case 'pouch': {

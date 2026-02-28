@@ -1,9 +1,9 @@
 // ── 좀비 시스템 (소리-유인 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=14';
-import { getWallY, getWallSegments } from './wall.js?v=14';
+import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=15';
+import { getWallY, getWallSegments } from './wall.js?v=15';
 import { playZombieHit, playZombieDeath, playWallHit, playWallBreak, playTowerHit,
          playSplitterSplit, playRammerCharge, playChainLightning,
-         playFreezeApply, playPoisonApply } from './audio.js?v=14';
+         playFreezeApply, playPoisonApply } from './audio.js?v=15';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -203,7 +203,7 @@ function updateZombies(dt) {
       }
 
     } else if (z.aiState === 'attracted') {
-      // Attracted zombies emit shuffling noise for chain propagation
+      // 끌린 좀비 셔플 소음 (체인 전파용)
       z.noiseTimer -= dt;
       if (z.noiseTimer <= 0) {
         z.noiseTimer = 0.5;
@@ -220,15 +220,13 @@ function updateZombies(dt) {
       if (dist > 5) {
         nx = dx / dist;
         ny = dy / dist;
-        // 이동 방향 갱신
         z.moveDir = { x: nx, y: ny };
       } else {
-        // 타겟 도달/통과 — 저장된 방향으로 계속 진행
         nx = z.moveDir ? z.moveDir.x : 0;
         ny = z.moveDir ? z.moveDir.y : 1;
       }
 
-      let moveSpeed = z.speed * speedMul * 1.5;
+      let moveSpeed = z.speed * speedMul * 1.5; // 끌린 좀비 1.5배속
 
       // 러너/스파이더: 지그재그
       let newX = z.x, newY = z.y;

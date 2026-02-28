@@ -1,9 +1,9 @@
 // ── 저격총 시스템: 볼트액션 + 권총식 탄창 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=14';
-import { registerZone } from './input.js?v=14';
-import { fireProjectile } from './projectiles.js?v=14';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=14';
-import { spawnParticles } from './particles.js?v=14';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=15';
+import { registerZone } from './input.js?v=15';
+import { fireProjectile } from './projectiles.js?v=15';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=15';
+import { spawnParticles } from './particles.js?v=15';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -94,9 +94,7 @@ export function initSniper() {
         triggerTotalDragX += Math.abs(frameDx);
         triggerLastX = x;
         const aimSens = 0.005;
-        state.aimAngle -= frameDx * aimSens;
-        while (state.aimAngle < 0) state.aimAngle += Math.PI * 2;
-        while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
+        state.aimAngle -= frameDx * aimSens; while (state.aimAngle < 0) state.aimAngle += Math.PI * 2; while (state.aimAngle >= Math.PI * 2) state.aimAngle -= Math.PI * 2;
       },
       onEnd() {
         if (!triggerDragging || state.currentWeapon !== 'sniper') { triggerDragging = false; return; }

@@ -1,6 +1,6 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=14';
-import { playWallRebuildComplete } from './audio.js?v=14';
+import { W, state, WALL_Y } from './game.js?v=15';
+import { playWallRebuildComplete } from './audio.js?v=15';
 
 // 4 wall segments - positions along the arc
 const WALL_SEGMENTS = [
