@@ -1,5 +1,5 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y } from './game.js?v=10';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES } from './game.js?v=11';
 
 /**
  * 필드 배경 그리기 (탑다운 2D)
@@ -68,10 +68,14 @@ export function drawField(ctx) {
  * 발사선 그리기 (타워에서 조준 방향으로 점선)
  */
 export function drawFiringLine(ctx) {
+  if (state.currentWeapon === 'pouch') return;
+
   const tx = state.tower.x, ty = TOWER_Y;
   const dx = Math.cos(state.aimAngle);
-  const dy = -Math.sin(state.aimAngle); // canvas Y is down
-  const lineLen = 600; // extends past top of screen
+  const dy = -Math.sin(state.aimAngle);
+
+  const wp = WEAPON_PROFILES[state.currentWeapon];
+  const lineLen = wp ? Math.min(wp.range, 600) : 600;
 
   ctx.save();
   ctx.setLineDash([8, 8]);
@@ -82,5 +86,34 @@ export function drawFiringLine(ctx) {
   ctx.lineTo(tx + dx * lineLen, ty + dy * lineLen);
   ctx.stroke();
   ctx.setLineDash([]);
+
+  // 사정거리 끝 표시
+  const endX = tx + dx * lineLen;
+  const endY = ty + dy * lineLen;
+  ctx.fillStyle = 'rgba(255,80,80,0.6)';
+  ctx.beginPath();
+  ctx.arc(endX, endY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
+}
+
+/**
+ * 소리 소스 시각화 (파동)
+ */
+export function drawSoundSources(ctx) {
+  for (const s of state.soundSources) {
+    const alpha = s.intensity * 0.25;
+    const pulse = Math.sin(Date.now() / 200) * 0.08;
+    ctx.strokeStyle = `rgba(255,255,100,${alpha + pulse})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.range * s.intensity, 0, Math.PI * 2);
+    ctx.stroke();
+    // 내부 파동
+    ctx.strokeStyle = `rgba(255,200,50,${alpha * 1.5})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.range * s.intensity * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }

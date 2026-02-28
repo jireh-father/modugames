@@ -11,6 +11,15 @@ export const SLOT_H = 40;                    // 무기 슬롯 높이
 export const ITEM_BAR_H = 35;               // 인벤토리 바 높이
 export const DIAL_R = 80;                    // half-circle dial radius
 
+// ── 무기 프로필 (사정거리, 공격력, 소리 범위) ──
+export const WEAPON_PROFILES = {
+  pistol:   { range: 400, damage: 2, originSound: 250, impactSound: 80,  penetrate: 0 },
+  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 50,  penetrate: 1 },
+  sniper:   { range: 9999, damage: 5, originSound: 400, impactSound: 150, penetrate: 99 },
+  mg:       { range: 350, damage: 1, originSound: 350, impactSound: 60,  penetrate: 0 },
+  crossbow: { range: 450, damage: 4, originSound: 80,  impactSound: 60,  penetrate: 1 },
+};
+
 // ── 게임 상태 ──
 export const state = {
   screen: 'title', // title | playing | paused | gameover
@@ -101,6 +110,8 @@ export const state = {
   zombies: [],
   mines: [],             // placed mines on field
   hazards: [],           // fire/poison areas
+  soundSources: [],      // { x, y, intensity, range, timer, duration, type }
+  soundLures: [],        // persistent sound emitters (toy/firecracker/radio)
   projectiles: [],
   items: [],
   particles: [],
@@ -117,14 +128,15 @@ export const state = {
   // 내부 침투 좀비 수
   zombiesInside: 0,
 
-  // 웨이브
+  // 낮/밤 타이머 (실시간 60초 주기)
+  dayNightTimer: 0,
+
+  // 웨이브 (스테이지)
   wave: 0,
   waveZombiesLeft: 0,    // 이번 웨이브에서 남은 좀비 수
   waveSpawnQueue: [],    // 순차 스폰 대기열
   waveCleared: false,
   wavePause: 0,          // 웨이브 간 대기 시간
-  waveTimer: 0,          // 웨이브 경과 시간
-  waveTimeLimit: 0,      // 웨이브 제한 시간
 
   // 슬로모션
   slowMo: false,
@@ -170,6 +182,8 @@ export function resetGame() {
   state.zombies = [];
   state.mines = [];
   state.hazards = [];
+  state.soundSources = [];
+  state.soundLures = [];
   state.projectiles = [];
   state.items = [];
   state.particles = [];
@@ -186,8 +200,7 @@ export function resetGame() {
   state.waveSpawnQueue = [];
   state.waveCleared = false;
   state.wavePause = 0;
-  state.waveTimer = 0;
-  state.waveTimeLimit = 0;
+  state.dayNightTimer = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
 }
@@ -207,4 +220,21 @@ export function getTotalAmmo() {
 
 export function isGameOver() {
   return state.tower.hp <= 0;
+}
+
+// ── 소리 시스템 ──
+export function emitSound(x, y, range, duration = 1.0, type = 'generic') {
+  if (range <= 0) return;
+  state.soundSources.push({ x, y, intensity: 1, range, timer: duration, duration, type });
+}
+
+export function updateSounds(dt) {
+  for (let i = state.soundSources.length - 1; i >= 0; i--) {
+    const s = state.soundSources[i];
+    s.timer -= dt;
+    s.intensity = Math.max(0, s.timer / s.duration);
+    if (s.timer <= 0) {
+      state.soundSources.splice(i, 1);
+    }
+  }
 }

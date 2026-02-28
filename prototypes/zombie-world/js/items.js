@@ -1,10 +1,11 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=10';
-import { registerZone } from './input.js?v=10';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=11';
+import { registerZone } from './input.js?v=11';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
-         playShieldActivate, playBuffActivate, playFreezeActivate } from './audio.js?v=10';
-import { spawnParticles } from './particles.js?v=10';
+         playShieldActivate, playBuffActivate, playFreezeActivate,
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=11';
+import { spawnParticles } from './particles.js?v=11';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
@@ -17,6 +18,7 @@ const INVENTORY_IDS = new Set([
   'brick', 'medkit', 'mine', 'molotov', 'bomb',
   'shield', 'speedBoost', 'freeze', 'chain', 'poison',
   'magUpgrade', 'goldBullet', 'explosiveArrow',
+  'toy', 'firecracker', 'radio',
 ]);
 
 // ── 아이템 정의 ──
@@ -44,6 +46,10 @@ const ITEM_TYPES = [
   { id: 'shield',        label: '방어막5초',   weight: 3,  color: '#4488ff' },
   { id: 'speedBoost',    label: '속도2배',    weight: 3,  color: '#ff44ff' },
   { id: 'bomb',          label: '폭탄',       weight: 2,  color: '#ff0000' },
+  // 소리 유인 아이템
+  { id: 'toy',           label: '장난감',     weight: 10, color: '#ff88cc' },
+  { id: 'firecracker',   label: '폭죽',       weight: 8,  color: '#ff4400' },
+  { id: 'radio',         label: '라디오',     weight: 6,  color: '#44aaff' },
 ];
 
 function pickWeightedItem() {
@@ -139,6 +145,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
         damage: 2,
         timer: 3,
       });
+      emitSound(targetX, targetY, 100, 3, 'fire');
       playMolotovThrow();
       break;
     case 'bomb':
@@ -149,7 +156,23 @@ export function useInventoryItem(itemId, targetX, targetY) {
         }
       }
       spawnParticles(targetX, targetY, 'explosion');
+      emitSound(targetX, targetY, 250, 1.0, 'explosion');
       playBombThrow();
+      break;
+    case 'toy':
+      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 150 });
+      emitSound(targetX, targetY, 150, 5, 'toy');
+      playToyActivate();
+      break;
+    case 'firecracker':
+      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 300, explodeOnEnd: true });
+      emitSound(targetX, targetY, 300, 3, 'firecracker');
+      playFirecrackerThrow();
+      break;
+    case 'radio':
+      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 200 });
+      emitSound(targetX, targetY, 200, 10, 'radio');
+      playRadioActivate();
       break;
     case 'shield':
       state.buffs.shieldTimer = 5;
@@ -192,6 +215,78 @@ export function useInventoryItem(itemId, targetX, targetY) {
     state.inventory.splice(state.inventory.indexOf(inv), 1);
   }
   return true;
+}
+
+/**
+ * 소리 유인 아이템 업데이트
+ */
+export function updateSoundLures(dt) {
+  for (let i = state.soundLures.length - 1; i >= 0; i--) {
+    const lure = state.soundLures[i];
+    lure.timer -= dt;
+
+    // 지속적으로 소리 재방출 (기존 soundSource가 만료되므로)
+    if (lure.timer > 0 && lure.timer % 0.5 < dt) {
+      emitSound(lure.x, lure.y, lure.range, 0.6, lure.type);
+    }
+
+    if (lure.timer <= 0) {
+      // 폭죽: 끝나면 폭발
+      if (lure.explodeOnEnd) {
+        for (const z of state.zombies) {
+          if (Math.hypot(z.x - lure.x, z.y - lure.y) < 80) {
+            z.hp -= 5;
+            z.hitFlash = 0.15;
+          }
+        }
+        spawnParticles(lure.x, lure.y, 'explosion', { count: 15 });
+        emitSound(lure.x, lure.y, 250, 1.0, 'explosion');
+      }
+      state.soundLures.splice(i, 1);
+    }
+  }
+}
+
+/**
+ * 소리 유인 아이템 렌더링
+ */
+export function drawSoundLures(ctx) {
+  for (const lure of state.soundLures) {
+    const alpha = 0.2 + Math.sin(Date.now() / 200) * 0.1;
+    const pulse = (Date.now() / 300) % 1;
+
+    // 타입별 색상
+    let color;
+    if (lure.type === 'toy') color = '255,136,204';
+    else if (lure.type === 'firecracker') color = '255,68,0';
+    else color = '68,170,255';
+
+    // 파동 원
+    ctx.strokeStyle = `rgba(${color},${alpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(lure.x, lure.y, lure.range * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 내부 원
+    ctx.fillStyle = `rgba(${color},0.15)`;
+    ctx.beginPath();
+    ctx.arc(lure.x, lure.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 아이콘
+    ctx.fillStyle = `rgba(${color},0.8)`;
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(lure.type === 'radio' ? '♫' : '♪', lure.x, lure.y + 4);
+
+    // 남은 시간
+    if (lure.timer < 2) {
+      ctx.fillStyle = `rgba(255,255,255,${lure.timer / 2})`;
+      ctx.font = '8px monospace';
+      ctx.fillText(`${lure.timer.toFixed(1)}s`, lure.x, lure.y - 16);
+    }
+  }
 }
 
 /**
@@ -514,6 +609,42 @@ export function drawItemIcon(ctx, item, x, y) {
     ctx.beginPath();
     ctx.arc(x + 6, y - 10, 2, 0, Math.PI * 2);
     ctx.fill();
+  } else if (id === 'toy') {
+    // 장난감 - 원 + 별
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('♪', x, y + 4);
+  } else if (id === 'firecracker') {
+    // 폭죽 - 빨간 막대 + 불꽃
+    ctx.fillStyle = c;
+    ctx.fillRect(x - 3, y - 8, 6, 16);
+    ctx.fillStyle = '#ffcc00';
+    ctx.beginPath();
+    ctx.arc(x, y - 10, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath();
+    ctx.arc(x, y - 12, 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (id === 'radio') {
+    // 라디오 - 박스 + 안테나
+    ctx.fillStyle = c;
+    ctx.fillRect(x - 7, y - 5, 14, 10);
+    ctx.strokeStyle = '#88ccff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y - 5);
+    ctx.lineTo(x + 7, y - 12);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('♫', x, y + 3);
   } else {
     // 기본 (알 수 없는 아이템)
     ctx.fillStyle = c;

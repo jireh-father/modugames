@@ -1,13 +1,17 @@
 // ── 낮/밤 사이클 & 손전등 효과 ──
-import { W, H, state, TOWER_Y } from './game.js?v=10';
+import { W, H, state, TOWER_Y } from './game.js?v=11';
 
 /**
  * 낮/밤 상태 업데이트
  * 웨이브 4,5 → 밤 (nightDarkness → 1), 나머지 → 낮 (nightDarkness → 0)
  */
 export function updateDayNight(dt) {
-  const waveInDay = ((state.wave - 1) % 5) + 1;
-  const targetNight = waveInDay >= 4 ? 1 : 0;
+  state.dayNightTimer += dt;
+  const CYCLE = 60;        // 60초 풀 사이클
+  const DAY_RATIO = 40/60; // 40초 낮, 20초 밤
+
+  const phase = (state.dayNightTimer % CYCLE) / CYCLE;
+  const targetNight = phase >= DAY_RATIO ? 1 : 0;
 
   // 부드러운 전환 (0.5/s)
   const transSpeed = 0.5;

@@ -1,10 +1,10 @@
 // ── 인벤토리 바 UI + 드래그 사용 시스템 ──
-import { state, W, CONTROLS_TOP, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=10';
-import { registerZone } from './input.js?v=10';
-import { useInventoryItem } from './items.js?v=10';
-import { drawItemIcon } from './items.js?v=10';
-import { playItemPickup } from './audio.js?v=10';
-import { spawnParticles } from './particles.js?v=10';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, FIELD_BOTTOM, WALL_Y, TOWER_Y } from './game.js?v=11';
+import { registerZone } from './input.js?v=11';
+import { useInventoryItem } from './items.js?v=11';
+import { drawItemIcon } from './items.js?v=11';
+import { playItemPickup } from './audio.js?v=11';
+import { spawnParticles } from './particles.js?v=11';
 
 // ── 레이아웃 상수 ──
 const BAR_Y = CONTROLS_TOP + SLOT_H;       // 아이템 바 시작 Y (무기 슬롯 바로 아래)
@@ -13,7 +13,7 @@ const SLOT_W = 54;                          // 각 아이템 슬롯 너비
 const MAX_SLOTS = Math.floor(W / SLOT_W);   // ~10
 
 // 드래그 대상 아이템 (필드 위치 지정 필요)
-const DRAG_ITEMS = new Set(['brick', 'medkit', 'mine', 'molotov', 'bomb']);
+const DRAG_ITEMS = new Set(['brick', 'medkit', 'mine', 'molotov', 'bomb', 'toy', 'firecracker', 'radio']);
 
 // ── 드래그 상태 ──
 let dragItem = null;     // { id, label, color } 드래그 중인 아이템
@@ -23,32 +23,68 @@ let dragX = 0, dragY = 0;
  * 인벤토리 바 입력 등록
  */
 export function initInventory() {
+  // 인벤토리 바 (일반 모드) + 주머니 그리드 전체 영역
   registerZone(
-    { x: 0, y: BAR_Y, w: W, h: BAR_H },
+    { x: 0, y: BAR_Y, w: W, h: CONTROLS_BOTTOM - BAR_Y },
     {
       onStart(x, y) {
         if (state.screen !== 'playing') return false;
-        const slotIdx = Math.floor(x / SLOT_W);
+
+        const isPouch = state.currentWeapon === 'pouch';
         const inv = state.inventory;
-        if (slotIdx < 0 || slotIdx >= inv.length) return false;
 
-        const item = inv[slotIdx];
-        if (!item || item.count <= 0) return false;
+        if (isPouch) {
+          // 주머니 그리드에서 아이템 선택
+          const cols = 2;
+          const cellW = W / cols;
+          const cellH = 42;
+          const startY = BAR_Y + 4;
 
-        if (DRAG_ITEMS.has(item.id)) {
-          // 드래그 아이템: 드래그 시작
-          dragItem = { id: item.id, label: item.label, color: item.color };
-          dragX = x;
-          dragY = y;
+          const col = Math.floor(x / cellW);
+          const row = Math.floor((y - startY) / cellH);
+          const idx = row * cols + col;
+
+          if (idx < 0 || idx >= inv.length) return false;
+          const item = inv[idx];
+          if (!item || item.count <= 0) return false;
+
+          if (DRAG_ITEMS.has(item.id)) {
+            dragItem = { id: item.id, label: item.label, color: item.color };
+            dragX = x;
+            dragY = y;
+          } else {
+            if (useInventoryItem(item.id, 0, 0)) {
+              playItemPickup();
+              spawnParticles(x, y, 'scoreText', {
+                text: item.label,
+                color: '#44ff44',
+                fontSize: 12,
+              });
+            }
+          }
         } else {
-          // 즉시 사용 아이템: 탭으로 바로 사용
-          if (useInventoryItem(item.id, 0, 0)) {
-            playItemPickup();
-            spawnParticles(x, y, 'scoreText', {
-              text: item.label,
-              color: '#44ff44',
-              fontSize: 12,
-            });
+          // 일반 바 모드 (BAR_H 높이만)
+          if (y > BAR_Y + BAR_H) return false;
+
+          const slotIdx = Math.floor(x / SLOT_W);
+          if (slotIdx < 0 || slotIdx >= inv.length) return false;
+
+          const item = inv[slotIdx];
+          if (!item || item.count <= 0) return false;
+
+          if (DRAG_ITEMS.has(item.id)) {
+            dragItem = { id: item.id, label: item.label, color: item.color };
+            dragX = x;
+            dragY = y;
+          } else {
+            if (useInventoryItem(item.id, 0, 0)) {
+              playItemPickup();
+              spawnParticles(x, y, 'scoreText', {
+                text: item.label,
+                color: '#44ff44',
+                fontSize: 12,
+              });
+            }
           }
         }
       },
@@ -67,13 +103,11 @@ export function initInventory() {
 
           switch (dragItem.id) {
             case 'brick':
-              // 벽 영역 근처 (y 480~560)
               if (y >= 480 && y <= 560) {
                 used = useInventoryItem('brick', x, y);
               }
               break;
             case 'medkit':
-              // 타워 영역 근처 (y 560~620)
               if (y >= 560 && y <= 620) {
                 used = useInventoryItem('medkit', x, y);
               }
@@ -81,7 +115,9 @@ export function initInventory() {
             case 'mine':
             case 'molotov':
             case 'bomb':
-              // 필드 영역 내
+            case 'toy':
+            case 'firecracker':
+            case 'radio':
               if (y >= FIELD_TOP && y <= FIELD_BOTTOM) {
                 used = useInventoryItem(dragItem.id, x, y);
               }
@@ -101,19 +137,45 @@ export function initInventory() {
         dragItem = null;
       },
     },
-    8 // 무기 컨트롤(5~6)보다 높은 우선순위
+    8
   );
 }
 
 /**
- * 인벤토리 바 렌더링
+ * 인벤토리 바 렌더링 (일반 모드) + 주머니 그리드 (pouch 모드)
  */
 export function drawInventory(ctx) {
   if (state.screen !== 'playing') return;
 
   const inv = state.inventory;
-  if (inv.length === 0 && !dragItem) return;
+  const isPouch = state.currentWeapon === 'pouch';
 
+  if (isPouch) {
+    drawPouchGrid(ctx, inv);
+  } else {
+    if (inv.length === 0 && !dragItem) return;
+    drawInventoryBar(ctx, inv);
+  }
+
+  // 드래그 중인 아이템 (바 위에 고스트)
+  if (dragItem) {
+    ctx.globalAlpha = 0.7;
+    ctx.save();
+    ctx.translate(dragX, dragY);
+    ctx.scale(0.8, 0.8);
+    drawItemIcon(ctx, dragItem, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // 아이템 라벨
+    ctx.fillStyle = dragItem.color || '#fff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(dragItem.label, dragX, dragY - 16);
+  }
+}
+
+function drawInventoryBar(ctx, inv) {
   // 바 배경
   ctx.fillStyle = '#0d0a08';
   ctx.fillRect(0, BAR_Y, W, BAR_H);
@@ -168,22 +230,93 @@ export function drawInventory(ctx) {
       ctx.stroke();
     }
   }
+}
 
-  // 드래그 중인 아이템 (바 위에 고스트)
-  if (dragItem) {
-    ctx.globalAlpha = 0.7;
-    ctx.save();
-    ctx.translate(dragX, dragY);
-    ctx.scale(0.8, 0.8);
-    drawItemIcon(ctx, dragItem, 0, 0);
-    ctx.restore();
-    ctx.globalAlpha = 1;
+/**
+ * 주머니 그리드 UI (2열 레이아웃, 아이템 바 + 무기 컨트롤 영역 사용)
+ */
+function drawPouchGrid(ctx, inv) {
+  const gridY = BAR_Y;
+  const gridH = CONTROLS_BOTTOM - BAR_Y;
 
-    // 아이템 라벨
-    ctx.fillStyle = dragItem.color || '#fff';
-    ctx.font = 'bold 10px monospace';
+  // 배경
+  ctx.fillStyle = '#0d0a08';
+  ctx.fillRect(0, gridY, W, gridH);
+
+  // 상단 구분선
+  ctx.strokeStyle = 'rgba(180,160,140,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, gridY);
+  ctx.lineTo(W, gridY);
+  ctx.stroke();
+
+  if (inv.length === 0) {
+    ctx.fillStyle = '#555';
+    ctx.font = '14px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(dragItem.label, dragX, dragY - 16);
+    ctx.fillText('아이템 없음', W / 2, gridY + gridH / 2);
+    return;
+  }
+
+  // 2열 그리드
+  const cols = 2;
+  const cellW = W / cols;
+  const cellH = 42;
+  const startY = gridY + 4;
+
+  for (let i = 0; i < inv.length; i++) {
+    const item = inv[i];
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cx = col * cellW;
+    const cy = startY + row * cellH;
+
+    // 셀이 보이는 영역 밖이면 스킵
+    if (cy + cellH > CONTROLS_BOTTOM) break;
+
+    // 슬롯 배경
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(cx + 2, cy + 1, cellW - 4, cellH - 2);
+
+    // 아이콘
+    const iconX = cx + 22;
+    const iconY = cy + cellH / 2;
+    ctx.save();
+    ctx.translate(iconX, iconY);
+    ctx.scale(0.8, 0.8);
+    drawItemIcon(ctx, item, 0, 0);
+    ctx.restore();
+
+    // 이름 + 수량
+    ctx.fillStyle = item.color || '#ccc';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(item.label, cx + 42, cy + cellH / 2 - 2);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.fillText(`x${item.count}`, cx + 42, cy + cellH / 2 + 12);
+
+    // 세로 구분선 (왼쪽 열의 오른쪽)
+    if (col === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx + cellW, cy);
+      ctx.lineTo(cx + cellW, cy + cellH);
+      ctx.stroke();
+    }
+
+    // 가로 구분선
+    if (row > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx + 4, cy);
+      ctx.lineTo(cx + cellW - 4, cy);
+      ctx.stroke();
+    }
   }
 }
 
@@ -243,10 +376,14 @@ export function drawInventoryDragOverlay(ctx) {
     }
     case 'mine':
     case 'molotov':
-    case 'bomb': {
+    case 'bomb':
+    case 'toy':
+    case 'firecracker':
+    case 'radio': {
       // 필드 위 타겟 크로스헤어
       if (dragY >= FIELD_TOP && dragY <= FIELD_BOTTOM) {
-        const radius = dragItem.id === 'bomb' ? 80 : dragItem.id === 'mine' ? 60 : 50;
+        const radiusMap = { bomb: 80, mine: 60, molotov: 50, toy: 150, firecracker: 300, radio: 200 };
+        const radius = radiusMap[dragItem.id] || 50;
         ctx.strokeStyle = `rgba(255,100,50,0.6)`;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);

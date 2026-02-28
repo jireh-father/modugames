@@ -1,27 +1,27 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo } from './game.js?v=10';
-import { initDial, updateDial, drawDial } from './aiming.js?v=10';
-import { drawField, drawFiringLine } from './renderer.js?v=10';
-import { initPistol, drawPistol } from './pistol.js?v=10';
-import { initBow, drawBow } from './bow.js?v=10';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=10';
-import { initMG, updateMG, drawMG } from './mg.js?v=10';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=10';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=10';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=10';
-import { updateWalls, drawWalls } from './wall.js?v=10';
-import { drawTower, initTower } from './tower.js?v=10';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=10';
-import { tryDropItem, initItems, updateItems, drawItems } from './items.js?v=10';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=10';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=11';
+import { initDial, updateDial, drawDial } from './aiming.js?v=11';
+import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=11';
+import { initPistol, drawPistol } from './pistol.js?v=11';
+import { initBow, drawBow } from './bow.js?v=11';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=11';
+import { initMG, updateMG, drawMG } from './mg.js?v=11';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=11';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=11';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=11';
+import { updateWalls, drawWalls } from './wall.js?v=11';
+import { drawTower, initTower } from './tower.js?v=11';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=11';
+import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=11';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=11';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=10';
-import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear, playDayComplete } from './audio.js?v=10';
-import { initSettings, drawSettings } from './settings.js?v=10';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=10';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=10';
+} from './hud.js?v=11';
+import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=11';
+import { initSettings, drawSettings } from './settings.js?v=11';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=11';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=11';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -100,6 +100,10 @@ function update(dt, realDt) {
   if (state.buffs.shieldTimer > 0) state.buffs.shieldTimer -= dt;
   if (state.buffs.speedTimer > 0) state.buffs.speedTimer -= dt;
 
+  // 소리 시스템 업데이트
+  updateSounds(dt);
+  updateSoundLures(dt);
+
   // 시스템 업데이트
   updateProjectiles(dt);
   updateZombies(dt);
@@ -146,24 +150,19 @@ function update(dt, realDt) {
     }
   }
 
-  // 웨이브 관리
+  // 스테이지 관리
   if (state.waveCleared) {
     state.wavePause += dt;
-    const pauseTime = state.wave % 5 === 0 ? 5 : 3;
-    if (state.wavePause >= pauseTime) {
+    if (state.wavePause >= 5) {
       startWave(state.wave + 1);
       playWaveStart();
       state.wavePause = 0;
     }
   } else if (!state.waveCleared && state.wave > 0) {
-    // waveCleared는 zombies.js의 updateZombies에서 설정됨
-    // 클리어되면 wavePause 리셋
     if (state.zombies.length === 0 && state.waveSpawnQueue.length === 0) {
       state.waveCleared = true;
       state.wavePause = 0;
-      // 웨이브 클리어 사운드
-      if (state.wave % 5 === 0) playDayComplete();
-      else playWaveClear();
+      playWaveClear();
     }
   }
 
@@ -205,6 +204,10 @@ function draw() {
 
   // 발사선
   drawFiringLine(ctx);
+
+  // 소리 시각화
+  drawSoundSources(ctx);
+  drawSoundLures(ctx);
 
   // 좀비
   drawZombies(ctx);

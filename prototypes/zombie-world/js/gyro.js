@@ -1,7 +1,7 @@
 // ── 자이로 조준 시스템 ──
 // DeviceOrientation 기반: 폰 기울기 각도 변화에 따라 조준점 이동
-import { state } from './game.js?v=10';
-import { settings } from './settings.js?v=10';
+import { state } from './game.js?v=11';
+import { settings } from './settings.js?v=11';
 
 let enabled = false;
 let supported = false;

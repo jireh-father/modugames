@@ -1,7 +1,7 @@
 // ── 설정 메뉴 ──
-import { state, W, H } from './game.js?v=10';
-import { registerZone } from './input.js?v=10';
-import { playUIClick } from './audio.js?v=10';
+import { state, W, H } from './game.js?v=11';
+import { registerZone } from './input.js?v=11';
+import { playUIClick } from './audio.js?v=11';
 
 // 설정값 범위
 const DRAG_MIN = 0.003, DRAG_MAX = 0.018, DRAG_STEP = 0.001, DRAG_DEFAULT = 0.009;

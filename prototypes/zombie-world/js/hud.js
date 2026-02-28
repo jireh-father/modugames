@@ -1,9 +1,9 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=10';
-import { registerZone } from './input.js?v=10';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=10';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=10';
-import { openSettings } from './settings.js?v=10';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=11';
+import { registerZone } from './input.js?v=11';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=11';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=11';
+import { openSettings } from './settings.js?v=11';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -88,8 +88,8 @@ export function initHUD() {
     100
   );
 
-  // 무기 슬롯 영역 (5개)
-  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow'];
+  // 무기 슬롯 영역 (5개 + 주머니)
+  const WEAPONS = ['pistol', 'bow', 'sniper', 'mg', 'crossbow', 'pouch'];
   const slotW = W / WEAPONS.length;
   registerZone(
     { x: 0, y: CONTROLS_TOP, w: W, h: SLOT_H },
@@ -120,16 +120,15 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'left';
   ctx.fillText(`${state.score}`, 10, 32);
 
-  // Day / Wave 정보 (중앙)
+  // Stage 정보 (중앙)
   if (state.wave > 0) {
-    const waveInDay = ((state.wave - 1) % 5) + 1;
     const zombieCount = state.zombies.filter(z => z.alive).length + state.waveSpawnQueue.length;
     const icon = state.isNight ? '\uD83C\uDF19' : '\u2600';
 
     ctx.textAlign = 'center';
     ctx.fillStyle = state.isNight ? '#8888cc' : '#c0a060';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(`Day ${state.day} - W${waveInDay} ${icon}  x${zombieCount}`, W / 2, 20);
+    ctx.fillText(`Stage ${state.wave} ${icon}  x${zombieCount}`, W / 2, 20);
   }
 
   // 콤보 (중앙 아래)
@@ -193,6 +192,7 @@ export function drawWeaponSlots(ctx) {
     { id: 'sniper', label: '저격', color: '#88bbff', bg: 'rgba(100,150,255,0.3)' },
     { id: 'mg', label: '기관총', color: '#ffaa66', bg: 'rgba(255,150,80,0.3)' },
     { id: 'crossbow', label: '석궁', color: '#88ff88', bg: 'rgba(100,255,100,0.3)' },
+    { id: 'pouch', label: '주머니', color: '#ccbbaa', bg: 'rgba(180,160,140,0.3)' },
   ];
   const slotW = W / weapons.length;
 
@@ -272,7 +272,7 @@ export function drawTitle(ctx) {
       ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.68);
     }
     if (state.bestWave > 0) {
-      ctx.fillText(`BEST WAVE: ${state.bestWave}`, W / 2, H * 0.73);
+      ctx.fillText(`BEST STAGE: ${state.bestWave}`, W / 2, H * 0.73);
     }
   }
 
@@ -305,7 +305,7 @@ export function drawPauseMenu(ctx) {
   // 현재 점수/웨이브 표시
   ctx.fillStyle = '#888';
   ctx.font = '14px monospace';
-  ctx.fillText(`SCORE: ${state.score}  |  Day ${state.day} W${((state.wave - 1) % 5) + 1}`, W / 2, H * 0.34);
+  ctx.fillText(`SCORE: ${state.score}  |  Stage ${state.wave}`, W / 2, H * 0.34);
 
   // 메뉴 버튼들
   const buttons = [
@@ -360,10 +360,10 @@ export function drawGameOver(ctx) {
   ctx.font = '14px monospace';
   ctx.fillText('SCORE', W / 2, H * 0.37 + 22);
 
-  // Day / Wave 도달
+  // Stage 도달
   ctx.fillStyle = '#c0a060';
   ctx.font = 'bold 18px monospace';
-  ctx.fillText(`Day ${state.day} - Wave ${((state.wave - 1) % 5) + 1}`, W / 2, H * 0.46);
+  ctx.fillText(`Stage ${state.wave}`, W / 2, H * 0.46);
 
   // 최대 콤보
   ctx.fillStyle = '#ffdd44';
@@ -389,11 +389,11 @@ export function drawGameOver(ctx) {
     const flash = 0.7 + Math.sin(congratsTimer * 6 + 1) * 0.3;
     ctx.fillStyle = `rgba(255,170,68,${flash})`;
     ctx.font = 'bold 18px monospace';
-    ctx.fillText('NEW BEST WAVE!', W / 2, recordY);
+    ctx.fillText('NEW BEST STAGE!', W / 2, recordY);
   } else {
     ctx.fillStyle = '#666';
     ctx.font = '14px monospace';
-    ctx.fillText(`BEST WAVE: ${state.bestWave}`, W / 2, recordY);
+    ctx.fillText(`BEST STAGE: ${state.bestWave}`, W / 2, recordY);
   }
   recordY += 24;
 

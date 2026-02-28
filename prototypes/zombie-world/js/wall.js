@@ -1,6 +1,6 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=10';
-import { playWallRebuildComplete } from './audio.js?v=10';
+import { W, state, WALL_Y } from './game.js?v=11';
+import { playWallRebuildComplete } from './audio.js?v=11';
 
 // 4 wall segments - positions along the arc
 const WALL_SEGMENTS = [
@@ -34,13 +34,18 @@ export function updateWalls(dt) {
     }
   }
 
-  // Check if all inside zombies are dead -> start rebuilding broken walls
-  const insideZombies = state.zombies.filter(z => z.pastWall);
-  if (insideZombies.length === 0) {
-    for (let i = 0; i < 4; i++) {
-      if (state.walls[i].hp <= 0 && !state.walls[i].rebuilding) {
+  // Check if no zombies near broken walls -> start rebuilding
+  for (let i = 0; i < 4; i++) {
+    if (state.walls[i].hp <= 0 && !state.walls[i].rebuilding) {
+      const seg = WALL_SEGMENTS[i];
+      const wy = getWallY(i);
+      const nearbyZombie = state.zombies.some(z =>
+        z.alive && z.x >= seg.x - 20 && z.x <= seg.x + seg.w + 20 &&
+        z.y >= wy - 30 && z.y <= wy + 50
+      );
+      if (!nearbyZombie) {
         state.walls[i].rebuilding = true;
-        state.walls[i].rebuildTimer = 5; // 5 seconds to rebuild
+        state.walls[i].rebuildTimer = 5;
       }
     }
   }

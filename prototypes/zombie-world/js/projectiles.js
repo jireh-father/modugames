@@ -1,5 +1,9 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, TOWER_Y } from './game.js?v=10';
+import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=11';
+
+export const PROJ_TO_WEAPON = {
+  bullet: 'pistol', arrow: 'bow', sniper: 'sniper', mgBullet: 'mg', bolt: 'crossbow'
+};
 
 /**
  * 발사체 생성
@@ -26,10 +30,12 @@ export function fireProjectile(type, aimAngle, special = false, power = 1) {
   else if (type === 'mgBullet') speed = 900;
   else if (type === 'bolt') speed = 500;
 
-  // Max range for arrows/bolts (based on power)
-  let maxRange = 9999;
-  if (type === 'arrow') maxRange = 200 + power * 500;
-  else if (type === 'bolt') maxRange = 150 + power * 400;
+  // Max range from weapon profiles
+  const wpName = PROJ_TO_WEAPON[type];
+  const wp = wpName ? WEAPON_PROFILES[wpName] : null;
+  let maxRange = wp ? wp.range : 9999;
+  if (type === 'arrow') maxRange = Math.min(200 + power * 500, maxRange);
+  else if (type === 'bolt') maxRange = Math.min(150 + power * 400, maxRange);
 
   // Check buff effects (only apply to non-arrow/bolt projectiles)
   const isGun = type !== 'arrow' && type !== 'bolt';
@@ -54,7 +60,14 @@ export function fireProjectile(type, aimAngle, special = false, power = 1) {
     freeze,
     chain,
     poison,
+    damage: wp ? wp.damage : 1,
+    penetrateLeft: wp ? wp.penetrate : 0,
   };
+
+  // Emit origin sound
+  if (wp && wp.originSound > 0) {
+    emitSound(state.tower.x, TOWER_Y, wp.originSound, 0.8, 'weapon');
+  }
 
   // Consume buff shots
   if (freeze) state.buffs.freezeShots--;

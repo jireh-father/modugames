@@ -474,3 +474,32 @@ export function playFreezeApply() {
   tone(1500, 0.1, 'sine', 0.08);
   sweep(2000, 3000, 0.08, 'sine', 0.06);
 }
+
+// ── 소리 유인 아이템 사운드 ──
+export function playToyActivate() {
+  // 귀여운 삐에로 징글
+  tone(800, 0.08, 'sine', 0.12);
+  setTimeout(() => tone(1000, 0.08, 'sine', 0.12), 100);
+  setTimeout(() => tone(800, 0.06, 'sine', 0.1), 200);
+  setTimeout(() => tone(1200, 0.1, 'sine', 0.14), 300);
+}
+
+export function playFirecrackerThrow() {
+  // 지직 스파크 소리
+  noise(0.15, 0.15, 5000);
+  sweep(1000, 3000, 0.1, 'sawtooth', 0.08);
+  setTimeout(() => noise(0.08, 0.1, 4000), 100);
+}
+
+export function playRadioActivate() {
+  // 라디오 정적 + 음악 톤
+  noise(0.15, 0.12, 2000);
+  setTimeout(() => {
+    tone(440, 0.15, 'sine', 0.1);
+    tone(554, 0.15, 'sine', 0.08);
+  }, 100);
+  setTimeout(() => {
+    tone(659, 0.12, 'sine', 0.1);
+    tone(880, 0.12, 'sine', 0.08);
+  }, 250);
+}
