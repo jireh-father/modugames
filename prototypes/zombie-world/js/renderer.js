@@ -1,66 +1,136 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES } from './game.js?v=13';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=13';
 
 /**
- * 필드 배경 그리기 (탑다운 2D)
+ * 필드 배경 그리기 – 폐허 도시 (Ruined City)
  */
+
+// 잔해/파편 데이터 (결정적 시드 난수로 매 프레임 동일 위치)
+const _rubbleRng = (() => {
+  let s = 42;
+  return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+})();
+const _rubbleData = [];
+for (let i = 0; i < 120; i++) {
+  _rubbleData.push({
+    x: _rubbleRng() * 540,
+    y: 48 + _rubbleRng() * 592,
+    r: 1 + _rubbleRng() * 2.5,
+    brown: _rubbleRng() < 0.5,
+    alpha: 0.08 + _rubbleRng() * 0.12,
+  });
+}
+
 export function drawField(ctx) {
-  // 하늘 그라데이션 (HUD 위 영역은 HUD가 덮으므로 FIELD_TOP부터)
-  // 낮: 밝은 파랑, 밤: 어두운 남색 (nightDarkness로 보간)
   const nd = state.nightDarkness;
-  const dayR = 100, dayG = 180, dayB = 240;
-  const nightR = 10, nightG = 10, nightB = 40;
-  const skyR = Math.round(dayR + (nightR - dayR) * nd);
-  const skyG = Math.round(dayG + (nightG - dayG) * nd);
-  const skyB = Math.round(dayB + (nightB - dayB) * nd);
+
+  // ── 하늘: 어둡고 회색빛 (폐허 도시) ──
+  const topR = Math.round(80 + (10 - 80) * nd);
+  const topG = Math.round(90 + (10 - 90) * nd);
+  const topB = Math.round(100 + (30 - 100) * nd);
+  const botR = Math.round(60 + (5 - 60) * nd);
+  const botG = Math.round(70 + (5 - 70) * nd);
+  const botB = Math.round(80 + (20 - 80) * nd);
 
   const skyGrad = ctx.createLinearGradient(0, 0, 0, FIELD_TOP + 40);
-  skyGrad.addColorStop(0, `rgb(${skyR},${skyG},${skyB})`);
-  skyGrad.addColorStop(1, `rgb(${Math.round(skyR * 0.7)},${Math.round(skyG * 0.8)},${Math.round(skyB * 0.9)})`);
+  skyGrad.addColorStop(0, `rgb(${topR},${topG},${topB})`);
+  skyGrad.addColorStop(1, `rgb(${botR},${botG},${botB})`);
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, W, FIELD_TOP + 40);
 
-  // 지면 (FIELD_TOP ~ FIELD_BOTTOM): 어두운 녹색 잔디
-  const groundR = Math.round(30 + (10 - 30) * nd);
-  const groundG = Math.round(60 + (20 - 60) * nd);
-  const groundB = Math.round(30 + (15 - 30) * nd);
-  ctx.fillStyle = `rgb(${groundR},${groundG},${groundB})`;
+  // ── 지면: 어두운 아스팔트 ──
+  const gv = Math.round(0x2a + (0x1a - 0x2a) * nd);
+  ctx.fillStyle = `rgb(${gv},${gv},${gv})`;
   ctx.fillRect(0, FIELD_TOP, W, FIELD_BOTTOM - FIELD_TOP);
 
-  // 미묘한 격자선
-  ctx.strokeStyle = `rgba(0,0,0,${0.06 + nd * 0.04})`;
+  // ── 수평 도로 (WALL_Y - 200 부근) ──
+  const roadY = WALL_Y - 200;
+  const roadH = 40;
+  const rv = Math.round(0x22 + (0x14 - 0x22) * nd);
+  ctx.fillStyle = `rgb(${rv},${rv},${rv})`;
+  ctx.fillRect(0, roadY - roadH / 2, W, roadH);
+
+  // 수평 도로 중앙 파선 (흰색)
+  ctx.save();
+  ctx.setLineDash([16, 12]);
+  ctx.strokeStyle = `rgba(255,255,255,${0.35 - nd * 0.15})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, roadY);
+  ctx.lineTo(W, roadY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // ── 수직 도로 (벽 세그먼트 사이 x=135, 270, 405) ──
+  const vertXs = [135, 270, 405];
+  const vertW = 30;
+  for (const rx of vertXs) {
+    ctx.fillStyle = `rgb(${rv},${rv},${rv})`;
+    ctx.fillRect(rx - vertW / 2, FIELD_TOP, vertW, FIELD_BOTTOM - FIELD_TOP);
+
+    // 수직 중앙 파선
+    ctx.save();
+    ctx.setLineDash([14, 10]);
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 - nd * 0.12})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(rx, FIELD_TOP);
+    ctx.lineTo(rx, FIELD_BOTTOM);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ── 교차로 덮기 ──
+  for (const rx of vertXs) {
+    ctx.fillStyle = `rgb(${rv},${rv},${rv})`;
+    ctx.fillRect(rx - vertW / 2, roadY - roadH / 2, vertW, roadH);
+  }
+
+  // ── 도로 경계선 (노란색) ──
+  const ya = 0.3 - nd * 0.1;
+  ctx.strokeStyle = `rgba(200,180,50,${ya})`;
+  ctx.lineWidth = 1;
+  // 수평
+  for (const oy of [roadY - roadH / 2, roadY + roadH / 2]) {
+    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
+  }
+  // 수직
+  for (const rx of vertXs) {
+    for (const ox of [rx - vertW / 2, rx + vertW / 2]) {
+      ctx.beginPath(); ctx.moveTo(ox, FIELD_TOP); ctx.lineTo(ox, FIELD_BOTTOM); ctx.stroke();
+    }
+  }
+
+  // ── 잔해/파편 ──
+  for (const d of _rubbleData) {
+    const a = d.alpha * (1 - nd * 0.4);
+    ctx.fillStyle = d.brown
+      ? `rgba(100,80,55,${a})`
+      : `rgba(120,115,110,${a})`;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── 격자선 (희미하게) ──
+  ctx.strokeStyle = `rgba(255,255,255,${0.02 + nd * 0.01})`;
   ctx.lineWidth = 1;
   const gridSize = 40;
   for (let x = 0; x <= W; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, FIELD_TOP);
-    ctx.lineTo(x, FIELD_BOTTOM);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, FIELD_TOP); ctx.lineTo(x, FIELD_BOTTOM); ctx.stroke();
   }
   for (let y = FIELD_TOP; y <= FIELD_BOTTOM; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
 
-  // 스폰 영역 표시 (y=48 ~ y=150): 미묘한 빨간 틴트
+  // ── 스폰 영역 (y=48 ~ y=150): 빨간 틴트 ──
   ctx.fillStyle = `rgba(180,30,30,${0.04 + nd * 0.02})`;
   ctx.fillRect(0, FIELD_TOP, W, 102);
 
-  // 경로 표시: 스폰에서 벽 구간으로의 미묘한 어두운 선
-  ctx.strokeStyle = `rgba(0,0,0,${0.03 + nd * 0.02})`;
-  ctx.lineWidth = 2;
-  const segXs = [80, 205, 335, 460]; // approximate wall segment centers
-  for (const sx of segXs) {
-    ctx.beginPath();
-    ctx.moveTo(sx, FIELD_TOP + 20);
-    ctx.lineTo(sx, WALL_Y - 10);
-    ctx.stroke();
-  }
-
-  // 성벽 아래 ~ FIELD_BOTTOM: 약간 밝은 내부 영역
-  ctx.fillStyle = `rgba(50,40,30,${0.15 + nd * 0.1})`;
+  // ── 성벽 아래 ~ FIELD_BOTTOM: 어두운 내부 영역 ──
+  ctx.fillStyle = `rgba(20,18,15,${0.2 + nd * 0.15})`;
   ctx.fillRect(0, WALL_Y + 20, W, FIELD_BOTTOM - WALL_Y - 20);
 }
 
@@ -70,7 +140,8 @@ export function drawField(ctx) {
 export function drawFiringLine(ctx) {
   if (state.currentWeapon === 'pouch') return;
 
-  const tx = state.tower.x, ty = TOWER_Y;
+  const fo = getFireOrigin();
+  const tx = fo.x, ty = fo.y;
   const dx = Math.cos(state.aimAngle);
   const dy = -Math.sin(state.aimAngle);
 
