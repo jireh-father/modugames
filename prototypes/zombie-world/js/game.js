@@ -199,6 +199,8 @@ export const state = {
   waveSpawnQueue: [],    // 순차 스폰 대기열
   waveCleared: false,
   wavePause: 0,          // 웨이브 간 대기 시간
+  waveClearedDuringNight: false, // 클리어 시점 밤 여부
+  waveWaitForTransition: false,  // 낮↔밤 전환 대기 중
 
   // 슬로모션
   slowMo: false,
@@ -284,6 +286,8 @@ export function resetGame() {
   state.waveSpawnQueue = [];
   state.waveCleared = false;
   state.wavePause = 0;
+  state.waveClearedDuringNight = false;
+  state.waveWaitForTransition = false;
   state.dayNightTimer = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
