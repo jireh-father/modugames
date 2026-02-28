@@ -11,7 +11,7 @@ import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverla
 import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=13';
 import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=13';
 import { updateWalls, drawWalls } from './wall.js?v=13';
-import { drawTower, initTower } from './tower.js?v=13';
+import { drawTowers, initTower } from './tower.js?v=13';
 import { updateDayNight, drawNightOverlay } from './daynight.js?v=13';
 import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=13';
 import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=13';
@@ -203,7 +203,7 @@ function draw() {
   drawWalls(ctx);
 
   // 타워
-  drawTower(ctx);
+  drawTowers(ctx);
 
   // 발사선
   drawFiringLine(ctx);
