@@ -125,9 +125,9 @@ export function updateAnimals(dt) {
       a.wanderAngle = Math.random() * Math.PI * 2;
     }
 
-    // 좀비에 의한 사망 (좀비 30px 이내)
+    // 좀비에 의한 사망 (끌린 좀비만, 20px 이내)
     for (const z of state.zombies) {
-      if (!z.alive) continue;
+      if (!z.alive || z.aiState === 'idle') continue;
       if (Math.hypot(a.x - z.x, a.y - z.y) < 20) {
         a.alive = false;
         break;
