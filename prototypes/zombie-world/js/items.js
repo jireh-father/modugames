@@ -1,5 +1,5 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=13';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, emitSound } from './game.js?v=13';
 import { registerZone } from './input.js?v=13';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
@@ -348,6 +348,12 @@ export function initItems() {
   registerZone(
     { x: 0, y: FIELD_TOP, w: W, h: FIELD_BOTTOM - FIELD_TOP },
     {
+      onStart(x, y) {
+        if (state.screen !== 'playing') return false;
+        // 타워 근처면 터치 캡처하지 않음 (타워 드래그 허용)
+        const dist = Math.hypot(x - state.tower.x, y - TOWER_Y);
+        if (dist < 50) return false;
+      },
       onTap(x, y) {
         let closest = null;
         let closestDist = 50;
