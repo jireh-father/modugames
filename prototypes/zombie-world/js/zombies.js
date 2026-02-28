@@ -62,9 +62,7 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
     aiState: 'idle',
     targetX: null,
     targetY: null,
-    idleDir: Math.random() * Math.PI * 2,
-    idleDirTimer: 2 + Math.random() * 2,
-    arrivedTimer: 0,
+    moveDir: null,       // 이동 방향 벡터 {x, y} — 타겟 통과 후에도 유지
     hearingRange: 300,
   };
 
@@ -90,9 +88,34 @@ function findClosestSound(z) {
   return best;
 }
 
+// ── 가장 가까운 타워 찾기 ──
+function findNearestTower(x, y) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const t of state.towers) {
+    if (t.hp <= 0) continue;
+    const dist = Math.hypot(x - t.x, y - TOWER_Y);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = t;
+    }
+  }
+  return { tower: best, dist: bestDist };
+}
+
+// ── 건물 충돌 체크 ──
+function zombieCollidesBuilding(x, y, size) {
+  for (const b of state.buildings) {
+    if (x + size > b.x && x - size < b.x + b.w &&
+        y + size > b.y && y - size < b.y + b.h) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ── 좀비 업데이트 ──
 function updateZombies(dt) {
-  const TOWER_X = state.tower.x;
   wallHitSoundTimer -= dt;
   towerHitSoundTimer -= dt;
 
@@ -117,149 +140,143 @@ function updateZombies(dt) {
     const frozen = z.statusEffects.frozen > 0;
     const speedMul = (frozen ? 0.5 : 1) * (z.buffed ? 1.3 : 1);
 
-    // ── AI 상태 머신 ──
+    // ── AI 상태 머신 (idle / attracted only) ──
     if (z.aiState === 'idle') {
-      // 천천히 무작위 이동
-      z.idleDirTimer -= dt;
-      if (z.idleDirTimer <= 0) {
-        z.idleDir = Math.random() * Math.PI * 2;
-        z.idleDirTimer = 2 + Math.random() * 2;
-      }
-
-      const idleSpeed = z.speed * 0.3 * speedMul;
-      z.x += Math.cos(z.idleDir) * idleSpeed * dt;
-      z.y += Math.sin(z.idleDir) * idleSpeed * dt;
-
-      // 화면 바운드 반사
-      if (z.x < 5) { z.x = 5; z.idleDir = Math.PI - z.idleDir; }
-      if (z.x > W - 5) { z.x = W - 5; z.idleDir = Math.PI - z.idleDir; }
-      if (z.y < 48) { z.y = 48; z.idleDir = -z.idleDir; }
-      if (z.y > 640) { z.y = 640; z.idleDir = -z.idleDir; }
+      // 완전 정지 — 소리만 대기
+      // (walkPhase는 계속 업데이트되어 제자리걸음 애니 가능)
 
       // 소리 감지
       const sound = findClosestSound(z);
       if (sound) {
         z.targetX = sound.x;
         z.targetY = sound.y;
+        // 이동 방향 저장 (타겟 지나쳐도 계속 이 방향으로 진행)
+        const ddx = sound.x - z.x;
+        const ddy = sound.y - z.y;
+        const ddist = Math.hypot(ddx, ddy);
+        if (ddist > 0) {
+          z.moveDir = { x: ddx / ddist, y: ddy / ddist };
+        }
         z.aiState = 'attracted';
       }
 
     } else if (z.aiState === 'attracted') {
-      // 타겟을 향해 이동
+      // 타겟 방향으로 직선 이동 (타겟 지나쳐도 계속 진행)
       const dx = z.targetX - z.x;
       const dy = z.targetY - z.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > 1) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        let moveSpeed = z.speed * speedMul;
+      // 현재 이동 방향 결정: 타겟이 아직 멀면 타겟 방향, 아니면 저장된 방향 유지
+      let nx, ny;
+      if (dist > 5) {
+        nx = dx / dist;
+        ny = dy / dist;
+        // 이동 방향 갱신
+        z.moveDir = { x: nx, y: ny };
+      } else {
+        // 타겟 도달/통과 — 저장된 방향으로 계속 진행
+        nx = z.moveDir ? z.moveDir.x : 0;
+        ny = z.moveDir ? z.moveDir.y : 1;
+      }
 
-        // 러너/스파이더: 지그재그
-        if (z.type === 'runner' || z.type === 'spider') {
-          z.zigzagPhase += dt * (z.type === 'spider' ? 8 : 5);
-          const zigAmp = z.type === 'spider' ? 40 : 25;
-          const zigOffset = Math.sin(z.zigzagPhase) * zigAmp;
-          z.x += nx * moveSpeed * dt + (-ny) * zigOffset * dt * 3;
-          z.y += ny * moveSpeed * dt + nx * zigOffset * dt * 3;
-        } else if (z.type === 'rammer') {
-          if (dist < 100) {
-            moveSpeed *= 2;
-            if (dist > 95 && dist < 100) playRammerCharge();
-          }
-          z.x += nx * moveSpeed * dt;
-          z.y += ny * moveSpeed * dt;
-        } else {
-          z.x += nx * moveSpeed * dt;
-          z.y += ny * moveSpeed * dt;
+      let moveSpeed = z.speed * speedMul;
+
+      // 러너/스파이더: 지그재그
+      let newX = z.x, newY = z.y;
+      if (z.type === 'runner' || z.type === 'spider') {
+        z.zigzagPhase += dt * (z.type === 'spider' ? 8 : 5);
+        const zigAmp = z.type === 'spider' ? 40 : 25;
+        const zigOffset = Math.sin(z.zigzagPhase) * zigAmp;
+        newX += nx * moveSpeed * dt + (-ny) * zigOffset * dt * 3;
+        newY += ny * moveSpeed * dt + nx * zigOffset * dt * 3;
+      } else if (z.type === 'rammer') {
+        if (dist < 100) {
+          moveSpeed *= 2;
+          if (dist > 95 && dist < 100) playRammerCharge();
         }
+        newX += nx * moveSpeed * dt;
+        newY += ny * moveSpeed * dt;
+      } else {
+        newX += nx * moveSpeed * dt;
+        newY += ny * moveSpeed * dt;
+      }
 
-        z.x = Math.max(5, Math.min(W - 5, z.x));
-        z.y = Math.max(48, Math.min(640, z.y));
+      newX = Math.max(5, Math.min(W - 5, newX));
+      newY = Math.max(48, Math.min(640, newY));
 
-        // ── 벽 충돌 체크 ──
-        const wallIdx = xToWallIdx(z.x);
-        const wallY = getWallY(wallIdx);
-        const wallSeg = WALL_SEGMENTS[wallIdx];
+      // ── 건물 충돌 체크 — 충돌 시 제자리걸음 (위치 갱신 안 함) ──
+      if (!zombieCollidesBuilding(newX, newY, z.size)) {
+        z.x = newX;
+        z.y = newY;
+      }
+      // 건물에 막혀도 walkPhase는 계속 업데이트되어 제자리걸음 애니 유지
 
-        if (z.y >= wallY && z.y <= wallY + 20 &&
-            z.x >= wallSeg.x && z.x <= wallSeg.x + wallSeg.w) {
-          if (state.walls[wallIdx].hp > 0) {
-            z.y = wallY; // 벽 앞에서 정지
+      // ── 벽 충돌 체크 ──
+      const wallIdx = xToWallIdx(z.x);
+      const wallY = getWallY(wallIdx);
+      const wallSeg = WALL_SEGMENTS[wallIdx];
 
-            if (state.buffs.shieldTimer <= 0) {
-              // 래머 돌진 1회 데미지
-              if (z.type === 'rammer' && !z.rammed) {
-                state.walls[wallIdx].hp -= 15;
-                if (state.walls[wallIdx].hp < 0) state.walls[wallIdx].hp = 0;
-                z.rammed = true;
-                playWallHit();
-              }
+      if (z.y >= wallY && z.y <= wallY + 20 &&
+          z.x >= wallSeg.x && z.x <= wallSeg.x + wallSeg.w) {
+        if (state.walls[wallIdx].hp > 0) {
+          z.y = wallY; // 벽 앞에서 정지
 
-              const prevHp = state.walls[wallIdx].hp;
-              const wallDmg = z.type === 'necromancer' ? 0 : ZOMBIE_TYPES[z.type].wallDmg;
-              state.walls[wallIdx].hp -= wallDmg * dt;
-              if (state.walls[wallIdx].hp < 0) state.walls[wallIdx].hp = 0;
-
-              if (wallHitSoundTimer <= 0 && wallDmg > 0) {
-                playWallHit();
-                wallHitSoundTimer = 0.8;
-              }
-              if (prevHp > 0 && state.walls[wallIdx].hp <= 0) playWallBreak();
-            }
-          }
-        }
-
-        // ── 타워 충돌 체크 ──
-        const distToTower = Math.hypot(z.x - TOWER_X, z.y - TOWER_Y);
-        if (distToTower < 20) {
           if (state.buffs.shieldTimer <= 0) {
-            state.tower.hp -= ZOMBIE_TYPES[z.type].wallDmg * dt;
-            if (state.tower.hp < 0) state.tower.hp = 0;
-            if (towerHitSoundTimer <= 0) {
-              playTowerHit();
-              towerHitSoundTimer = 1;
+            // 래머 돌진 1회 데미지
+            if (z.type === 'rammer' && !z.rammed) {
+              state.walls[wallIdx].hp -= 15;
+              if (state.walls[wallIdx].hp < 0) state.walls[wallIdx].hp = 0;
+              z.rammed = true;
+              playWallHit();
             }
+
+            const prevHp = state.walls[wallIdx].hp;
+            const wallDmg = z.type === 'necromancer' ? 0 : ZOMBIE_TYPES[z.type].wallDmg;
+            state.walls[wallIdx].hp -= wallDmg * dt;
+            if (state.walls[wallIdx].hp < 0) state.walls[wallIdx].hp = 0;
+
+            if (wallHitSoundTimer <= 0 && wallDmg > 0) {
+              playWallHit();
+              wallHitSoundTimer = 0.8;
+            }
+            if (prevHp > 0 && state.walls[wallIdx].hp <= 0) playWallBreak();
           }
         }
       }
 
-      // 타겟 도달 체크
-      const distToTarget = Math.hypot(z.targetX - z.x, z.targetY - z.y);
-      if (distToTarget < 15) {
-        z.aiState = 'arrived';
-        z.arrivedTimer = 1.5;
+      // ── 타워 충돌 체크 (가장 가까운 타워) ──
+      const nearest = findNearestTower(z.x, z.y);
+      if (nearest.tower && nearest.dist < 20) {
+        if (state.buffs.shieldTimer <= 0) {
+          nearest.tower.hp -= ZOMBIE_TYPES[z.type].wallDmg * dt;
+          if (nearest.tower.hp < 0) nearest.tower.hp = 0;
+          if (towerHitSoundTimer <= 0) {
+            playTowerHit();
+            towerHitSoundTimer = 1;
+          }
+        }
       }
 
-      // 더 가까운 새 소리 체크
+      // 새 소리 감지 — 범위 내 소리가 있으면 타겟 갱신
       const newSound = findClosestSound(z);
       if (newSound) {
         const newDist = Math.hypot(z.x - newSound.x, z.y - newSound.y);
-        if (newDist < distToTarget) {
+        // 새 소리가 현재 타겟보다 가까우면 방향 전환
+        const curTargetDist = Math.hypot(z.targetX - z.x, z.targetY - z.y);
+        if (newDist < curTargetDist) {
           z.targetX = newSound.x;
           z.targetY = newSound.y;
+          const sdx = newSound.x - z.x;
+          const sdy = newSound.y - z.y;
+          const sdist = Math.hypot(sdx, sdy);
+          if (sdist > 0) {
+            z.moveDir = { x: sdx / sdist, y: sdy / sdist };
+          }
         }
-      }
-
-    } else if (z.aiState === 'arrived') {
-      z.arrivedTimer -= dt;
-
-      if (z.arrivedTimer <= 0) {
-        z.aiState = 'idle';
-        z.idleDir = Math.random() * Math.PI * 2;
-        z.idleDirTimer = 2 + Math.random() * 2;
-      }
-
-      // 대기 중에도 새 소리 감지
-      const sound = findClosestSound(z);
-      if (sound) {
-        z.targetX = sound.x;
-        z.targetY = sound.y;
-        z.aiState = 'attracted';
       }
     }
 
-    // 걷기 애니메이션
+    // 걷기 애니메이션 (idle에서도 제자리걸음 가능하도록)
     z.walkPhase += dt * z.speed * 0.1;
     z.buffed = false;
 
@@ -368,9 +385,11 @@ function checkZombieHits(projectiles) {
 
         // 관통: 화살은 낙하지점 뒤쪽(타워에서 더 먼 쪽) 좀비에게만 관통
         if (p.type === 'arrow' && p.arcTarget) {
-          // 타워→타겟 거리 vs 타워→좀비 거리 비교
-          const towerToTarget = Math.hypot(p.arcTarget.x - state.tower.x, p.arcTarget.y - TOWER_Y);
-          const towerToZombie = Math.hypot(z.x - state.tower.x, z.y - TOWER_Y);
+          // 발사 타워(가장 가까운 타워) 기준으로 거리 비교
+          const shooterTower = findNearestTower(p.arcTarget.x, p.arcTarget.y);
+          const sTowerX = shooterTower.tower ? shooterTower.tower.x : 270;
+          const towerToTarget = Math.hypot(p.arcTarget.x - sTowerX, p.arcTarget.y - TOWER_Y);
+          const towerToZombie = Math.hypot(z.x - sTowerX, z.y - TOWER_Y);
           const isBehindTarget = towerToZombie >= towerToTarget - 5; // 타겟보다 뒤(멀리)에 있는지
           if (isBehindTarget && p.penetrateLeft > 0) {
             p.penetrateLeft--;
