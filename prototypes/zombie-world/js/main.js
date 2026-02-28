@@ -147,9 +147,9 @@ function update(dt, realDt) {
     // 빅원 킬 시 3~5개 드랍
     if (hit.type === 'bigone') {
       const dropCount = 3 + Math.floor(Math.random() * 3);
-      tryDropItem(hit.type, state.combo, dropCount);
+      tryDropItem(hit.type, state.combo, hit.x, hit.y, dropCount);
     } else {
-      tryDropItem(hit.type, state.combo);
+      tryDropItem(hit.type, state.combo, hit.x, hit.y);
     }
   }
 

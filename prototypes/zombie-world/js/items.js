@@ -1,6 +1,5 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=13';
-import { registerZone } from './input.js?v=13';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=13';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
@@ -308,13 +307,18 @@ export function drawSoundLures(ctx) {
  * 아이템 드랍 조건 체크 (좀비 킬 후 호출)
  * @param {string} zombieType - 좀비 종류
  * @param {number} combo - 현재 콤보 수
+ * @param {number} deathX - 좀비 사망 X 좌표
+ * @param {number} deathY - 좀비 사망 Y 좌표
  * @param {number} [dropCount] - 강제 드랍 횟수 (빅원 등)
  */
-export function tryDropItem(zombieType, combo, dropCount) {
+export function tryDropItem(zombieType, combo, deathX, deathY, dropCount) {
   // 빅원: 3~5개 동시 드랍
   if (dropCount && dropCount > 1) {
     for (let i = 0; i < dropCount; i++) {
-      dropSingleItem();
+      // 약간 흩뿌리기 (여러 개일 때 겹치지 않도록)
+      const ox = (Math.random() - 0.5) * 40;
+      const oy = (Math.random() - 0.5) * 20;
+      dropSingleItem(deathX + ox, deathY + oy);
     }
     return;
   }
@@ -331,94 +335,55 @@ export function tryDropItem(zombieType, combo, dropCount) {
   else if (Math.random() < 0.15) shouldDrop = true;
 
   if (!shouldDrop) return;
-  dropSingleItem();
+  dropSingleItem(deathX, deathY);
 }
 
-function dropSingleItem() {
+function dropSingleItem(deathX, deathY) {
   const item = pickWeightedItem();
-  const screenX = W * 0.15 + Math.random() * W * 0.7;
-  const screenY = FIELD_BOTTOM - 80 - Math.random() * 100;
+  // 좀비 사망 위치에 바로 놓기 (경계 클램핑)
+  const screenX = Math.max(20, Math.min(W - 20, deathX));
+  const screenY = Math.max(FIELD_TOP + 20, Math.min(FIELD_BOTTOM - 20, deathY));
 
   playItemDrop();
   state.items.push({
     ...item,
     screenX,
     screenY,
-    vy: -60,
-    gravity: 200,
-    grounded: false,
-    groundY: screenY + 40 + Math.random() * 30,
-    life: 8,
-    time: 0,
+    grounded: true,
     collected: false,
   });
 }
 
 /**
- * 아이템 줍기 등록 (터치 영역)
+ * 아이템 초기화 (v2: 플레이어가 걸어서 줍기 - player.js에서 pickedUp 처리)
  */
 export function initItems() {
-  registerZone(
-    { x: 0, y: FIELD_TOP, w: W, h: FIELD_BOTTOM - FIELD_TOP },
-    {
-      onStart(x, y) {
-        if (state.screen !== 'playing') return false;
-        // 플레이어 근처면 터치 캡처하지 않음 (타워/플레이어 드래그 허용)
-        const origin = getFireOrigin();
-        const dist = Math.hypot(x - origin.x, y - origin.y);
-        if (dist < 50) return false;
-      },
-      onTap(x, y) {
-        let closest = null;
-        let closestDist = 50;
-
-        for (const item of state.items) {
-          if (item.collected) continue;
-          const dist = Math.hypot(x - item.screenX, y - item.screenY);
-          if (dist < closestDist) {
-            closest = item;
-            closestDist = dist;
-          }
-        }
-
-        if (closest) {
-          closest.collected = true;
-          applyItem(closest);
-          playItemPickup();
-          spawnParticles(closest.screenX, closest.screenY, 'scoreText', {
-            text: closest.label,
-            color: '#44ff44',
-            fontSize: 14,
-          });
-        }
-      },
-    },
-    15  // 최상위 우선순위 (타워, 인벤토리보다 위)
-  );
+  // 터치로 아이템을 줍지 않음 - 플레이어가 근처로 걸어가면 자동 줍기 (player.js)
+  // 별도 존 등록 불필요
 }
 
 /**
- * 아이템 업데이트 (물리 + 수명)
+ * 아이템 업데이트 (영구 아이템, pickedUp 처리)
  */
 export function updateItems(dt) {
   for (let i = state.items.length - 1; i >= 0; i--) {
     const item = state.items[i];
-    item.time += dt;
 
-    // 물리
-    if (!item.grounded) {
-      item.vy += item.gravity * dt;
-      item.screenY += item.vy * dt;
-      if (item.screenY >= item.groundY) {
-        item.screenY = item.groundY;
-        item.grounded = true;
-        item.vy = 0;
-      }
+    // player.js가 pickedUp 플래그를 설정하면 수거 처리
+    if (item.pickedUp) {
+      applyItem(item);
+      playItemPickup();
+      spawnParticles(item.screenX, item.screenY, 'scoreText', {
+        text: item.label,
+        color: '#44ff44',
+        fontSize: 14,
+      });
+      state.items.splice(i, 1);
+      continue;
     }
 
-    // 수명
-    item.life -= dt;
-    if (item.life <= 0 || item.collected) {
+    // collected (레거시 호환)
+    if (item.collected) {
       state.items.splice(i, 1);
     }
   }
@@ -433,8 +398,6 @@ export function drawItems(ctx) {
 
     const x = item.screenX;
     const y = item.screenY;
-    const blinking = item.life < 2 && Math.sin(item.time * 10) > 0;
-    if (blinking) continue;
 
     // 아이템 배경 빛
     ctx.fillStyle = `rgba(255,255,100,0.15)`;
@@ -450,16 +413,6 @@ export function drawItems(ctx) {
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(item.label, x, y - 14);
-
-    // 수명 바
-    if (item.life < 4) {
-      const barW = 20;
-      const ratio = item.life / 8;
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(x - barW / 2, y + 12, barW, 3);
-      ctx.fillStyle = item.life < 2 ? '#f44' : '#fa4';
-      ctx.fillRect(x - barW / 2, y + 12, barW * ratio, 3);
-    }
   }
 }
 

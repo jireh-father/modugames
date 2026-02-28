@@ -1,9 +1,13 @@
-# Zombie World - Item & Inventory System (v13 - Ground Player)
+# Zombie World - Item & Inventory System (v2 - Ground Player)
 
 ## Overview
 Items dropped from zombies are split into two categories:
 - **Auto-apply items** (ammo) are applied immediately on pickup
 - **Inventory items** are stored and used manually via inventory bar or pouch grid
+
+Items spawn at the zombie's death position and persist forever on the ground.
+The player collects items by walking near them (auto-pickup within 30px, handled by player.js).
+There is no tap-to-pickup; items are only collected via proximity.
 
 ## Layout
 - Canvas: 540x960
