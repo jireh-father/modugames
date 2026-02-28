@@ -1,5 +1,6 @@
 // ── 2D 탑다운 발사체 시스템 ──
 import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=14';
+import { isInsideBuilding } from './buildings.js?v=14';
 
 export const PROJ_TO_WEAPON = {
   bullet: 'pistol', arrow: 'bow', sniper: 'sniper', mgBullet: 'mg', bolt: 'crossbow'
@@ -155,6 +156,13 @@ export function updateProjectiles(dt) {
       if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > 1000 || p.traveled >= p.maxRange) {
         p.alive = false;
         missedThisFrame++;
+      }
+    }
+
+    // Building collision (arcing arrows fly over)
+    if (p.alive && !(p.type === 'arrow' && p.arcTarget && !p.arcDescending)) {
+      if (isInsideBuilding(p.x, p.y, 0)) {
+        p.alive = false;
       }
     }
 
