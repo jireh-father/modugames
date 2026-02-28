@@ -185,22 +185,17 @@ function update(dt, realDt) {
   }
 
   // 스테이지 관리 — 클리어 후 다음 낮↔밤 전환까지 대기
-  if (state.waveCleared) {
+  if (state.waveCleared && !state.waveWaitForTransition) {
+    // 방금 클리어됨 (zombies.js 또는 여기서 감지) → 전환 대기 시작
+    state.waveClearedDuringNight = state.isNight;
+    state.waveWaitForTransition = true;
+    playWaveClear();
+  } else if (state.waveWaitForTransition) {
     // 낮밤 전환 감지: isNight이 클리어 시점과 달라지면 다음 웨이브 시작
-    if (state.waveWaitForTransition) {
-      if (state.isNight !== state.waveClearedDuringNight) {
-        startWave(state.wave + 1);
-        playWaveStart();
-        state.waveWaitForTransition = false;
-      }
-    }
-  } else if (!state.waveCleared && state.wave > 0) {
-    if (state.zombies.length === 0 && state.waveSpawnQueue.length === 0) {
-      state.waveCleared = true;
-      state.wavePause = 0;
-      state.waveClearedDuringNight = state.isNight; // 클리어 시점 낮/밤 기록
-      state.waveWaitForTransition = true;
-      playWaveClear();
+    if (state.isNight !== state.waveClearedDuringNight) {
+      startWave(state.wave + 1);
+      playWaveStart();
+      state.waveWaitForTransition = false;
     }
   }
 
