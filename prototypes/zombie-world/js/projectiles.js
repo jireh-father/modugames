@@ -1,5 +1,5 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, WORLD_W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=16';
+import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=16';
 import { isInsideBuilding } from './buildings.js?v=16';
 
 export const PROJ_TO_WEAPON = {
@@ -153,7 +153,7 @@ export function updateProjectiles(dt) {
       }
 
       // Out of bounds or max range reached
-      if (p.x < -20 || p.x > WORLD_W + 20 || p.y < -20 || p.y > 1000 || p.traveled >= p.maxRange) {
+      if (p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > 1000 || p.traveled >= p.maxRange) {
         p.alive = false;
         missedThisFrame++;
       }

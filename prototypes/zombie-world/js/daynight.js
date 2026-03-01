@@ -1,5 +1,5 @@
 // ── 낮/밤 사이클 & 손전등 효과 ──
-import { W, H, WORLD_W, state, TOWER_Y, getFireOrigin } from './game.js?v=16';
+import { W, H, state, TOWER_Y, getFireOrigin } from './game.js?v=16';
 
 /**
  * 낮/밤 상태 업데이트
@@ -36,7 +36,7 @@ export function drawNightOverlay(ctx) {
   // 어둠 오버레이
   ctx.save();
   ctx.fillStyle = `rgba(0,0,20,${darkness})`;
-  ctx.fillRect(-WORLD_W, 0, WORLD_W * 3, H);
+  ctx.fillRect(-W, 0, W * 3, H);
 
   // 손전등 원뿔 (타워 → 조준 방향)
   const coneLen = 500;

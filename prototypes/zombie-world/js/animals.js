@@ -1,5 +1,5 @@
 // ── 동물 시스템 (배고픔 + 사냥) ──
-import { W, WORLD_W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=16';
+import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=16';
 import { collidesWithBuilding } from './buildings.js?v=16';
 
 const ANIMAL_TYPES = {
@@ -29,7 +29,7 @@ function spawnOneAnimal() {
   const cfg = ANIMAL_TYPES[type];
   let x, y, attempts = 0;
   do {
-    x = 30 + Math.random() * (WORLD_W - 60);
+    x = 30 + Math.random() * (W - 60);
     y = FIELD_TOP + 20 + Math.random() * (WALL_Y - FIELD_TOP - 60);
     attempts++;
   } while (collidesWithBuilding(x, y, cfg.size) && attempts < 20);
@@ -114,7 +114,7 @@ export function updateAnimals(dt) {
     let ny = a.y + Math.sin(angle) * moveSpeed;
 
     // 경계 체크
-    nx = Math.max(10, Math.min(WORLD_W - 10, nx));
+    nx = Math.max(10, Math.min(W - 10, nx));
     ny = Math.max(FIELD_TOP + 10, Math.min(WALL_Y - 10, ny));
 
     // 건물 충돌

@@ -1,5 +1,5 @@
 // ── 건물 (폐허 도시 장애물) ──
-import { W, WORLD_W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=16';
+import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=16';
 
 // ── 건물 생성 ──
 
@@ -10,7 +10,7 @@ import { W, WORLD_W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js
  */
 export function generateBuildings() {
   const buildings = [];
-  const count = 60 + Math.floor(Math.random() * 20); // 60-80 (넓은 맵)
+  const count = 8 + Math.floor(Math.random() * 5); // 8-12
 
   const minY = FIELD_TOP + 40;   // 스폰 영역 아래
   const maxY = WALL_Y - 60;      // 벽 위쪽 여유
@@ -24,7 +24,7 @@ export function generateBuildings() {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const w = 40 + Math.floor(Math.random() * 81);  // 40-120
       const h = 40 + Math.floor(Math.random() * 41);  // 40-80
-      const x = Math.floor(Math.random() * (WORLD_W - w));
+      const x = Math.floor(Math.random() * (W - w));
       const y = minY + Math.floor(Math.random() * (maxY - minY - h));
 
       // 타워 위치 회피 (±50px)

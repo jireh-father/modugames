@@ -1,5 +1,5 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, WORLD_W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=16';
+import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=16';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
@@ -363,7 +363,7 @@ export function tryDropItem(zombieType, combo, deathX, deathY, dropCount) {
 function dropSingleItem(deathX, deathY) {
   const item = pickWeightedItem();
   // 좀비 사망 위치에 바로 놓기 (경계 클램핑)
-  const screenX = Math.max(20, Math.min(WORLD_W - 20, deathX));
+  const screenX = Math.max(20, Math.min(W - 20, deathX));
   const screenY = Math.max(FIELD_TOP + 20, Math.min(FIELD_BOTTOM - 20, deathY));
 
   playItemDrop();

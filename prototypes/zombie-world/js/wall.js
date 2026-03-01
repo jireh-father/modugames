@@ -1,9 +1,9 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, WORLD_W, state, WALL_Y } from './game.js?v=16';
+import { W, state, WALL_Y } from './game.js?v=16';
 import { playWallRebuildComplete } from './audio.js?v=16';
 
-// 4 wall segments - 넓은 월드에 균등 분할
-const SEG_W = WORLD_W / 4;
+// 4 wall segments
+const SEG_W = W / 4;
 const WALL_SEGMENTS = [
   { x: 0,         w: SEG_W },     // segment 0 (leftmost)
   { x: SEG_W,     w: SEG_W },     // segment 1
@@ -18,7 +18,7 @@ export function getWallSegments() { return WALL_SEGMENTS; }
 export function getWallY(segIdx) {
   // Elliptical: center segments are slightly lower (closer to tower)
   const cx = WALL_SEGMENTS[segIdx].x + WALL_SEGMENTS[segIdx].w / 2;
-  const ratio = (cx - WORLD_W / 2) / (WORLD_W / 2); // -1 to 1
+  const ratio = (cx - W / 2) / (W / 2); // -1 to 1
   return WALL_Y + WALL_ARC_DIP * (1 - ratio * ratio); // parabolic arc
 }
 

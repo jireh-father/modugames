@@ -1,5 +1,5 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, WORLD_W, state, isGameOver, getTotalAmmo, updateSounds, updateCamera } from './game.js?v=16';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=16';
 import { initDial, updateDial, drawDial } from './aiming.js?v=16';
 import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=16';
 import { initPistol, drawPistol } from './pistol.js?v=16';
@@ -205,9 +205,6 @@ function update(dt, realDt) {
     playBulletMiss();
   }
 
-  // 카메라 업데이트
-  updateCamera();
-
   // 게임 오버 체크 (플레이어 HP 기반)
   if (isGameOver()) {
     triggerGameOver();
@@ -228,10 +225,6 @@ function draw() {
   // 게임 화면 배경
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, W, H);
-
-  // ── 월드 공간 렌더링 (카메라 이동) ──
-  ctx.save();
-  ctx.translate(-state.camera.x, 0);
 
   // 필드
   drawField(ctx);
@@ -290,11 +283,6 @@ function draw() {
 
   // 밤 오버레이
   drawNightOverlay(ctx);
-
-  ctx.restore();
-  // ── 월드 공간 렌더링 끝 ──
-
-  // ── 스크린 공간 렌더링 (카메라 무관) ──
 
   // 웨이브 배너
   drawWaveBanner(ctx, W, H);
