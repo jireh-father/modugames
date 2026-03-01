@@ -1,5 +1,5 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=17';
+import { W, state, WALL_Y, isBaseMap } from './game.js?v=17';
 import { playWallRebuildComplete } from './audio.js?v=17';
 
 // 4 wall segments
@@ -23,6 +23,7 @@ export function getWallY(segIdx) {
 }
 
 export function updateWalls(dt) {
+  if (!isBaseMap()) return;
   for (let i = 0; i < 4; i++) {
     const w = state.walls[i];
     if (w.rebuilding) {
@@ -53,6 +54,7 @@ export function updateWalls(dt) {
 }
 
 export function drawWalls(ctx) {
+  if (!isBaseMap()) return;
   for (let i = 0; i < 4; i++) {
     const seg = WALL_SEGMENTS[i];
     const w = state.walls[i];
