@@ -1,5 +1,5 @@
 // ── 게임 상수 ──
-export const VERSION = 'v3.1.0';             // 게임 버전
+export const VERSION = 'v3.1.1';             // 게임 버전
 export const W = 540, H = 960;               // 뷰포트(캔버스) 크기
 export const HUD_H = 48;
 export const FIELD_TOP = HUD_H;              // 48 - field starts after HUD

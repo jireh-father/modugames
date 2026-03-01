@@ -1,5 +1,5 @@
 // ── A* Grid Pathfinding ──
-import { W, state, FIELD_TOP, WALL_Y, FIELD_BOTTOM, TOWER_Y } from './game.js?v=31';
+import { W, state, FIELD_TOP, WALL_Y, FIELD_BOTTOM, TOWER_Y } from './game.js?v=311';
 
 // ── Grid constants ──
 export const GRID = 20;

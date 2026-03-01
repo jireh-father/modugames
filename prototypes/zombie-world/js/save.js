@@ -1,6 +1,6 @@
 // ── 세이브/로드 시스템 ──
-import { state } from './game.js?v=31';
-import { world, chunkKey, generateChunk, loadChunkEntities, setChunkLoaders } from './world.js?v=31';
+import { state } from './game.js?v=311';
+import { world, chunkKey, generateChunk, loadChunkEntities, setChunkLoaders } from './world.js?v=311';
 
 const SAVE_KEY = 'zw_save_v3';
 

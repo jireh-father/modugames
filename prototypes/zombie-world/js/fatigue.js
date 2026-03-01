@@ -1,6 +1,6 @@
 // ── 피로 & 수면 시스템 ──
-import { state } from './game.js?v=31';
-import { saveGame } from './save.js?v=31';
+import { state } from './game.js?v=311';
+import { saveGame } from './save.js?v=311';
 
 export function updateFatigue(dt) {
   // 수면 중이면 회복
