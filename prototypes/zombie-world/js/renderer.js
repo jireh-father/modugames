@@ -193,19 +193,19 @@ export function drawSoundSources(ctx) {
 
 // 화살표 상수
 const ARROW_SIZE = 28;          // 화살표 크기 (px)
-const ARROW_SHOW_DIST = 120;    // 이 거리 이내에 플레이어가 오면 표시
+const ARROW_BRIGHT_DIST = 120;  // 이 거리 이내면 밝게 표시
+const ARROW_MIN_ALPHA = 0.25;   // 항상 보이는 최소 알파
 const ARROW_PULSE_SPEED = 3;    // 깜빡임 속도
 
-// 화살표 위치 계산 (플레이어 위치를 따라감)
+// 화살표 위치 (고정 - 각 가장자리 중앙)
 function getArrowDefs() {
-  const p = state.player;
-  const clampX = Math.max(30, Math.min(W - 30, p.x));
-  const clampY = Math.max(FIELD_TOP + 30, Math.min(FIELD_BOTTOM - 30, p.y));
+  const midX = W / 2;
+  const midY = (FIELD_TOP + FIELD_BOTTOM) / 2;
   return [
-    { dir: 'up',    x: clampX, y: FIELD_TOP + 16,       symbol: '\u25B2' },
-    { dir: 'down',  x: clampX, y: FIELD_BOTTOM - 16,    symbol: '\u25BC' },
-    { dir: 'left',  x: 16,     y: clampY,               symbol: '\u25C0' },
-    { dir: 'right', x: W - 16, y: clampY,               symbol: '\u25B6' },
+    { dir: 'up',    x: midX,    y: FIELD_TOP + 16,       symbol: '\u25B2' },
+    { dir: 'down',  x: midX,    y: FIELD_BOTTOM - 16,    symbol: '\u25BC' },
+    { dir: 'left',  x: 16,      y: midY,                 symbol: '\u25C0' },
+    { dir: 'right', x: W - 16,  y: midY,                 symbol: '\u25B6' },
   ];
 }
 
@@ -220,8 +220,7 @@ function edgeDist(dir, px, py) {
 
 /**
  * 맵 가장자리 화살표 아이콘 그리기
- * - 플레이어가 가장자리 근처에 있을 때 페이드인
- * - 화살표는 플레이어의 x/y 위치를 따라가므로 코너에서도 보임
+ * - 항상 표시 (최소 알파), 가까이 가면 밝아짐
  * - canMove 체크하여 이동 불가 방향은 숨김
  */
 export function drawEdgeArrows(ctx) {
@@ -238,19 +237,18 @@ export function drawEdgeArrows(ctx) {
     if (!canMove(world.currentCx, world.currentCy, a.dir)) continue;
 
     const dist = edgeDist(a.dir, p.x, p.y);
-    if (dist > ARROW_SHOW_DIST) continue;
 
-    // 거리에 비례한 알파값 (가까울수록 밝게)
-    const ratio = 1 - dist / ARROW_SHOW_DIST;
-    const pulse = 0.5 + Math.sin(t) * 0.2;
-    const alpha = ratio * pulse;
-
-    if (alpha <= 0.01) continue;
+    // 항상 보이되, 가까울수록 밝게
+    const proximityBoost = dist < ARROW_BRIGHT_DIST
+      ? (1 - dist / ARROW_BRIGHT_DIST) * 0.6
+      : 0;
+    const pulse = 0.5 + Math.sin(t) * 0.15;
+    const alpha = (ARROW_MIN_ALPHA + proximityBoost) * pulse;
 
     ctx.save();
 
     // 배경 원
-    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.15})`;
+    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.2})`;
     ctx.beginPath();
     ctx.arc(a.x, a.y, ARROW_SIZE * 0.7, 0, Math.PI * 2);
     ctx.fill();
@@ -273,15 +271,12 @@ export function drawEdgeArrows(ctx) {
   }
 }
 
-// 화살표 히트 영역 반환 (player.js에서 사용)
+// 화살표 히트 영역 반환 (player.js에서 사용) — 항상 반환
 export function getArrowHitAreas() {
   const arrows = getArrowDefs();
-  const p = state.player;
   const result = [];
   for (const a of arrows) {
     if (!canMove(world.currentCx, world.currentCy, a.dir)) continue;
-    const dist = edgeDist(a.dir, p.x, p.y);
-    if (dist > ARROW_SHOW_DIST) continue;
     result.push({ dir: a.dir, x: a.x, y: a.y, radius: ARROW_SIZE * 0.7 });
   }
   return result;

@@ -1,5 +1,5 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo, isBaseMap } from './game.js?v=20';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, VERSION, resetGame, getTotalAmmo, isBaseMap } from './game.js?v=20';
 import { registerZone } from './input.js?v=20';
 import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=20';
 import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=20';
@@ -639,6 +639,11 @@ export function drawTitle(ctx) {
   ctx.font = '14px monospace';
   ctx.textAlign = 'center';
   ctx.fillText('\u2699 SETTINGS', W / 2, H * 0.92);
+
+  // 버전 표시
+  ctx.fillStyle = '#333';
+  ctx.font = '11px monospace';
+  ctx.fillText(VERSION, W / 2, H * 0.97);
 }
 
 /**
