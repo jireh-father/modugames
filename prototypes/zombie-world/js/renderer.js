@@ -193,18 +193,19 @@ export function drawSoundSources(ctx) {
 
 // 화살표 상수
 const ARROW_SIZE = 28;          // 화살표 크기 (px)
-const ARROW_SHOW_DIST = 80;     // 이 거리 이내에 플레이어가 오면 표시
+const ARROW_SHOW_DIST = 120;    // 이 거리 이내에 플레이어가 오면 표시
 const ARROW_PULSE_SPEED = 3;    // 깜빡임 속도
 
-// 화살표 위치 & 방향 정의
+// 화살표 위치 계산 (플레이어 위치를 따라감)
 function getArrowDefs() {
-  const midX = W / 2;
-  const midY = (FIELD_TOP + FIELD_BOTTOM) / 2;
+  const p = state.player;
+  const clampX = Math.max(30, Math.min(W - 30, p.x));
+  const clampY = Math.max(FIELD_TOP + 30, Math.min(FIELD_BOTTOM - 30, p.y));
   return [
-    { dir: 'up',    x: midX, y: FIELD_TOP + 18,       symbol: '\u25B2' },
-    { dir: 'down',  x: midX, y: FIELD_BOTTOM - 18,    symbol: '\u25BC' },
-    { dir: 'left',  x: 18,   y: midY,                 symbol: '\u25C0' },
-    { dir: 'right', x: W - 18, y: midY,               symbol: '\u25B6' },
+    { dir: 'up',    x: clampX, y: FIELD_TOP + 16,       symbol: '\u25B2' },
+    { dir: 'down',  x: clampX, y: FIELD_BOTTOM - 16,    symbol: '\u25BC' },
+    { dir: 'left',  x: 16,     y: clampY,               symbol: '\u25C0' },
+    { dir: 'right', x: W - 16, y: clampY,               symbol: '\u25B6' },
   ];
 }
 
@@ -220,6 +221,7 @@ function edgeDist(dir, px, py) {
 /**
  * 맵 가장자리 화살표 아이콘 그리기
  * - 플레이어가 가장자리 근처에 있을 때 페이드인
+ * - 화살표는 플레이어의 x/y 위치를 따라가므로 코너에서도 보임
  * - canMove 체크하여 이동 불가 방향은 숨김
  */
 export function drawEdgeArrows(ctx) {

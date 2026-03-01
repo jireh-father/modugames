@@ -1,5 +1,5 @@
 // ── 건물 (폐허 도시 장애물) ──
-import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=20';
+import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS, isBaseMap } from './game.js?v=20';
 
 // ── 건물 유형별 비주얼 ──
 const BUILDING_VISUALS = {
@@ -136,29 +136,40 @@ export function collidesWithBuilding(x, y, size) {
  * 겹치지 않으면 원래 좌표 그대로 반환.
  */
 export function pushOutOfBuildings(x, y, size) {
-  for (const b of state.buildings) {
-    const closestX = Math.max(b.x, Math.min(x, b.x + b.w));
-    const closestY = Math.max(b.y, Math.min(y, b.y + b.h));
-    let dx = x - closestX;
-    let dy = y - closestY;
-    const distSq = dx * dx + dy * dy;
-    if (distSq < size * size && distSq > 0) {
-      const dist = Math.sqrt(distSq);
-      const push = size - dist + 1; // 1px 여유
-      x += (dx / dist) * push;
-      y += (dy / dist) * push;
-    } else if (distSq === 0) {
-      // 정확히 건물 안에 있을 때 → 가장 가까운 변으로 밀어냄
-      const toLeft = x - b.x;
-      const toRight = (b.x + b.w) - x;
-      const toTop = y - b.y;
-      const toBottom = (b.y + b.h) - y;
-      const minDist = Math.min(toLeft, toRight, toTop, toBottom);
-      if (minDist === toLeft) x = b.x - size - 1;
-      else if (minDist === toRight) x = b.x + b.w + size + 1;
-      else if (minDist === toTop) y = b.y - size - 1;
-      else y = b.y + b.h + size + 1;
+  for (let iter = 0; iter < 3; iter++) { // 여러 건물 겹침 시 반복 밀어내기
+    let pushed = false;
+    for (const b of state.buildings) {
+      const closestX = Math.max(b.x, Math.min(x, b.x + b.w));
+      const closestY = Math.max(b.y, Math.min(y, b.y + b.h));
+      let dx = x - closestX;
+      let dy = y - closestY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < size * size && distSq > 0) {
+        const dist = Math.sqrt(distSq);
+        const push = size - dist + 2;
+        x += (dx / dist) * push;
+        y += (dy / dist) * push;
+        pushed = true;
+      } else if (distSq === 0) {
+        // 건물 내부에 있을 때 → 가장 짧은 방향 2개를 모두 적용
+        const toLeft = x - b.x;
+        const toRight = (b.x + b.w) - x;
+        const toTop = y - b.y;
+        const toBottom = (b.y + b.h) - y;
+        const minH = Math.min(toLeft, toRight);
+        const minV = Math.min(toTop, toBottom);
+        // 더 짧은 축 우선, 모서리면 양방향 모두 밀어냄
+        if (minH <= minV) {
+          x = (toLeft < toRight) ? b.x - size - 1 : b.x + b.w + size + 1;
+          if (minV < size) y = (toTop < toBottom) ? b.y - size - 1 : b.y + b.h + size + 1;
+        } else {
+          y = (toTop < toBottom) ? b.y - size - 1 : b.y + b.h + size + 1;
+          if (minH < size) x = (toLeft < toRight) ? b.x - size - 1 : b.x + b.w + size + 1;
+        }
+        pushed = true;
+      }
     }
+    if (!pushed) break;
   }
   return { x, y };
 }
@@ -168,8 +179,10 @@ export function pushOutOfBuildings(x, y, size) {
 /**
  * 모든 건물을 캔버스에 그린다.
  * 유형별 색상/아이콘, 폐허 오버레이, 약탈 시 어둡게 처리.
+ * 진입 가능 건물은 하단에 입구 표시.
  */
 export function drawBuildings(ctx) {
+  const p = state.buildings.length > 0 ? state.player : null;
   for (const b of state.buildings) {
     ctx.save();
 
@@ -214,6 +227,44 @@ export function drawBuildings(ctx) {
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+    // ── 입구 표시 (유형이 있는 건물만, 베이스 맵 제외) ──
+    if (b.type && !isBaseMap()) {
+      const doorW = 10;
+      const doorH = 14;
+      const doorX = b.x + b.w / 2 - doorW / 2;
+      const doorY = b.y + b.h - doorH;
+
+      // 문 배경 (어두운 사각형)
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(doorX, doorY, doorW, doorH);
+
+      // 문 테두리
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(doorX, doorY, doorW, doorH);
+
+      // 문 손잡이
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      ctx.arc(doorX + doorW - 3, doorY + doorH / 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 플레이어가 가까이 있으면 'ENTER' 힌트 표시
+      if (p) {
+        const dx = p.x - (b.x + b.w / 2);
+        const dy = p.y - (b.y + b.h);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 60) {
+          const hintAlpha = Math.max(0, 1 - dist / 60);
+          ctx.fillStyle = `rgba(255,220,100,${hintAlpha * 0.9})`;
+          ctx.font = 'bold 8px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('ENTER', b.x + b.w / 2, b.y + b.h - doorH - 2);
+        }
+      }
+    }
 
     // ── 폐허 오버레이 ──
     if (b.ruined) {

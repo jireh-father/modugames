@@ -135,25 +135,35 @@ export function initPlayer() {
           }
         }
 
-        // 건물 탭 → 가까우면 진입
+        // 건물 탭 → 가까우면 진입, 멀면 건물 앞까지 이동 후 자동 진입
         for (const b of state.buildings) {
           if (!b.type) continue; // 베이스맵 건물은 진입 불가
-          if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
-            const cx = b.x + b.w / 2;
-            const cy = b.y + b.h / 2;
-            const playerDist = Math.hypot(p.x - cx, p.y - cy);
-            if (playerDist < Math.max(b.w, b.h) / 2 + 30) {
+          if (x >= b.x - 10 && x <= b.x + b.w + 10 && y >= b.y - 10 && y <= b.y + b.h + 10) {
+            const entranceX = b.x + b.w / 2;
+            const entranceY = b.y + b.h + p.size + 5; // 건물 아래쪽 입구
+            const playerDist = Math.hypot(p.x - entranceX, p.y - entranceY);
+            if (playerDist < 40) {
               enterInterior(b);
               return;
             }
-            // 멀면 건물 앞까지 이동
-            break;
+            // 멀면 건물 입구까지 이동 후 자동 진입
+            p.targetTower = -1;
+            p.targetEdgeDir = null;
+            p.targetBuilding = b;
+            const path = findPath(p.x, p.y, entranceX, entranceY);
+            if (path.length > 0) {
+              p.path = path;
+              p.pathIdx = 0;
+              p.moving = true;
+            }
+            return;
           }
         }
 
         // 일반 경로 탐색 후 이동
         p.targetTower = -1;
         p.targetEdgeDir = null;
+        p.targetBuilding = null;
         const path = findPath(p.x, p.y, x, y);
         if (path.length > 0) {
           p.path = path;
@@ -278,6 +288,16 @@ export function updatePlayer(dt) {
     }
   }
 
+  // ── 건물 자동 진입 (경로 이동 완료 시) ──
+  if (p.targetBuilding && !p.moving) {
+    const b = p.targetBuilding;
+    p.targetBuilding = null;
+    if (b.type) {
+      enterInterior(b);
+      return;
+    }
+  }
+
   // ── 화살표 방향 전환 (경로 이동 완료 시) ──
   if (p.targetEdgeDir && !p.moving) {
     const dir = p.targetEdgeDir;
@@ -357,7 +377,7 @@ export function updatePlayer(dt) {
 
   // ── 맵 경계 이동 체크 (전환 중이 아닐 때만) ──
   if (!world.transitioning && p.onTower < 0) {
-    const edgeMargin = 2;
+    const edgeMargin = p.size + 2; // 클램핑 경계와 일치시켜 끼임 방지
     if (p.x <= edgeMargin && canMove(world.currentCx, world.currentCy, 'left')) {
       startTransition('left');
       p.moving = false; p.path = []; p.pathIdx = 0;
