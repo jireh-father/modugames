@@ -179,7 +179,8 @@ function updateZombies(dt) {
     if (z.hitFlash > 0) z.hitFlash -= dt;
 
     const frozen = z.statusEffects.frozen > 0;
-    const speedMul = (frozen ? 0.5 : 1) * (z.buffed ? 1.3 : 1);
+    const nightMul = state.isNight ? 1.3 : 1.0;
+    const speedMul = (frozen ? 0.5 : 1) * (z.buffed ? 1.3 : 1) * nightMul;
 
     // ── AI 상태 머신 (idle / attracted) ──
     if (z.aiState === 'idle') {

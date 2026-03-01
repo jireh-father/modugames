@@ -7,8 +7,8 @@ import { W, H, state, TOWER_Y, getFireOrigin } from './game.js?v=17';
  */
 export function updateDayNight(dt) {
   state.dayNightTimer += dt;
-  const CYCLE = 60;        // 60초 풀 사이클
-  const DAY_RATIO = 40/60; // 40초 낮, 20초 밤
+  const CYCLE = 360;         // 6분(360초) 풀 사이클
+  const DAY_RATIO = 240/360; // 240초 낮, 120초 밤
 
   const phase = (state.dayNightTimer % CYCLE) / CYCLE;
   const targetNight = phase >= DAY_RATIO ? 1 : 0;
