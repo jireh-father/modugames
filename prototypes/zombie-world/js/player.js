@@ -375,30 +375,8 @@ export function updatePlayer(dt) {
     p.y = pushed.y;
   }
 
-  // ── 맵 경계 이동 체크 (전환 중이 아닐 때만) ──
-  if (!world.transitioning && p.onTower < 0) {
-    const edgeMargin = p.size + 2; // 클램핑 경계와 일치시켜 끼임 방지
-    if (p.x <= edgeMargin && canMove(world.currentCx, world.currentCy, 'left')) {
-      startTransition('left');
-      p.moving = false; p.path = []; p.pathIdx = 0;
-      return;
-    }
-    if (p.x >= W - edgeMargin && canMove(world.currentCx, world.currentCy, 'right')) {
-      startTransition('right');
-      p.moving = false; p.path = []; p.pathIdx = 0;
-      return;
-    }
-    if (p.y <= FIELD_TOP + edgeMargin && canMove(world.currentCx, world.currentCy, 'up')) {
-      startTransition('up');
-      p.moving = false; p.path = []; p.pathIdx = 0;
-      return;
-    }
-    if (p.y >= FIELD_BOTTOM - edgeMargin && canMove(world.currentCx, world.currentCy, 'down')) {
-      startTransition('down');
-      p.moving = false; p.path = []; p.pathIdx = 0;
-      return;
-    }
-  }
+  // ── 맵 전환은 화살표 아이콘 클릭(targetEdgeDir)으로만 가능 ──
+  // (자동 전환 제거: 모서리 도달 후 반대편 스폰 시 왕복 방지)
 
   // ── 경계 클램핑 ──
   p.x = Math.max(p.size, Math.min(W - p.size, p.x));
