@@ -549,7 +549,7 @@ export function drawTitle(ctx) {
   // 부제
   ctx.fillStyle = '#ddd';
   ctx.font = '16px monospace';
-  ctx.fillText('\uC131\uBCBD\uC744 \uC9C0\uCF1C\uB77C', W / 2, H * 0.28 + 90);
+  ctx.fillText('\uC0DD\uC874\uC744 \uC2DC\uC791\uD558\uB77C', W / 2, H * 0.28 + 90);
 
   // 시작 안내
   const alpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
@@ -702,7 +702,7 @@ export function drawGameOver(ctx) {
   const alpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
   ctx.fillStyle = `rgba(255,200,100,${alpha})`;
   ctx.font = 'bold 18px monospace';
-  ctx.fillText('TAP TO RESTART', W / 2, H * 0.78);
+  ctx.fillText('TAP FOR NEW GAME', W / 2, H * 0.78);
 }
 
 /**
@@ -719,11 +719,12 @@ export function triggerGameOver() {
     localStorage.setItem('zw_best', String(state.score));
   }
 
-  // 웨이브 기록
-  newBestWave = state.wave > state.bestWave;
+  // 생존 일수 기록
+  const survivalDays = Math.floor(state.worldTime / 360) + 1;
+  newBestWave = survivalDays > state.bestWave;
   if (newBestWave) {
-    state.bestWave = state.wave;
-    localStorage.setItem('zw_best_wave', String(state.wave));
+    state.bestWave = survivalDays;
+    localStorage.setItem('zw_best_wave', String(survivalDays));
   }
 
   congratsTimer = 0;
