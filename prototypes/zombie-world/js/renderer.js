@@ -1,5 +1,6 @@
 // ── 탑다운 2D 필드 렌더링 ──
 import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=17';
+import { world } from './world.js?v=17';
 
 /**
  * 필드 배경 그리기 – 폐허 도시 (Ruined City)
@@ -186,4 +187,22 @@ export function drawSoundSources(ctx) {
     ctx.arc(s.x, s.y, s.range * s.intensity * 0.5, 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+/**
+ * 맵 전환 슬라이드 오버레이 (진행중 표시)
+ */
+export function drawTransitionOverlay(ctx) {
+  if (!world.transitioning) return;
+  const ease = world.transProgress * world.transProgress * (3 - 2 * world.transProgress);
+  const alpha = Math.sin(ease * Math.PI) * 0.3;
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  ctx.fillRect(0, 0, W, H);
+
+  // 방향 화살표
+  ctx.fillStyle = `rgba(255,255,255,${0.3 + ease * 0.4})`;
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  const arrows = { left: '←', right: '→', up: '↑', down: '↓' };
+  ctx.fillText(arrows[world.transDir] || '', W / 2, H / 2);
 }

@@ -3,6 +3,7 @@ import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js
 import { findPath, drawPathDebug } from './pathfinding.js?v=17';
 import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=17';
 import { registerZone } from './input.js?v=17';
+import { world, canMove, startTransition } from './world.js?v=17';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -249,6 +250,31 @@ export function updatePlayer(dt) {
     const pushed = pushOutOfBuildings(p.x, p.y, p.size);
     p.x = pushed.x;
     p.y = pushed.y;
+  }
+
+  // ── 맵 경계 이동 체크 (전환 중이 아닐 때만) ──
+  if (!world.transitioning && p.onTower < 0) {
+    const edgeMargin = 2;
+    if (p.x <= edgeMargin && canMove(world.currentCx, world.currentCy, 'left')) {
+      startTransition('left');
+      p.moving = false; p.path = []; p.pathIdx = 0;
+      return;
+    }
+    if (p.x >= W - edgeMargin && canMove(world.currentCx, world.currentCy, 'right')) {
+      startTransition('right');
+      p.moving = false; p.path = []; p.pathIdx = 0;
+      return;
+    }
+    if (p.y <= FIELD_TOP + edgeMargin && canMove(world.currentCx, world.currentCy, 'up')) {
+      startTransition('up');
+      p.moving = false; p.path = []; p.pathIdx = 0;
+      return;
+    }
+    if (p.y >= FIELD_BOTTOM - edgeMargin && canMove(world.currentCx, world.currentCy, 'down')) {
+      startTransition('down');
+      p.moving = false; p.path = []; p.pathIdx = 0;
+      return;
+    }
   }
 
   // ── 경계 클램핑 ──
