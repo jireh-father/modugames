@@ -294,6 +294,36 @@ export function initWorld() {
   return baseChunk;
 }
 
+// ── 인접 청크 틱-라이트 업데이트 (소리 전파) ──
+export function updateAdjacentChunks(dt) {
+  const adj = getAdjacentCoords(world.currentCx, world.currentCy);
+  for (const { cx, cy } of adj) {
+    const key = chunkKey(cx, cy);
+    const chunk = world.chunks.get(key);
+    if (!chunk || !chunk.savedZombies) continue;
+
+    // 현재 맵의 소리가 경계를 넘으면 인접 맵 좀비 유인
+    for (const sound of state.soundSources) {
+      const dirCx = cx - world.currentCx;
+      const dirCy = cy - world.currentCy;
+      const edgeDist = distToChunkEdge(sound.x, sound.y, dirCx, dirCy);
+      if (sound.range > edgeDist) {
+        const targetEdge = getEdgePoint(dirCx, dirCy);
+        for (const z of chunk.savedZombies) {
+          if (!z.alive) continue;
+          const dx = targetEdge.x - z.x;
+          const dy = targetEdge.y - z.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 5) {
+            z.x += (dx / dist) * z.speed * 0.1 * dt;
+            z.y += (dy / dist) * z.speed * 0.1 * dt;
+          }
+        }
+      }
+    }
+  }
+}
+
 // ── 경계까지 거리 계산 (소리 전파용) ──
 export function distToChunkEdge(x, y, dirCx, dirCy) {
   if (dirCx < 0) return x;

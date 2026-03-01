@@ -28,7 +28,7 @@ import { buildGrid } from './pathfinding.js?v=17';
 import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=17';
 import { initFlashlight, updateFlashlight, drawFlashlightControls } from './flashlight.js?v=17';
 import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=17';
-import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition } from './world.js?v=17';
+import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition, updateAdjacentChunks } from './world.js?v=17';
 import { setWorldRef } from './game.js?v=17';
 import { initWorldMap, drawWorldMap } from './worldmap.js?v=17';
 
@@ -138,6 +138,9 @@ function update(dt, realDt) {
   // 소리 시스템 업데이트
   updateSounds(dt);
   updateSoundLures(dt);
+
+  // 인접 청크 소리 전파
+  updateAdjacentChunks(dt);
 
   // 시스템 업데이트
   updateProjectiles(dt);
