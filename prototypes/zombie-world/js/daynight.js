@@ -31,7 +31,7 @@ export function updateDayNight(dt) {
 export function drawNightOverlay(ctx) {
   if (state.nightDarkness <= 0) return;
 
-  const darkness = state.nightDarkness * 0.85;
+  const darkness = state.nightDarkness * 0.7; // 밤 최대 어둠 70% (좀비 가시성 확보)
 
   // 어둠 오버레이
   ctx.save();
@@ -97,6 +97,64 @@ export function drawNightOverlay(ctx) {
     ctx.fillStyle = slGrad;
     ctx.beginPath();
     ctx.arc(slX, slY, slR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── 조명 영역에 강한 노란빛 글로우 (좀비 포함 전체 밝게) ──
+  ctx.globalCompositeOperation = 'lighter';
+
+  const glowAlpha = state.nightDarkness * 0.55;
+
+  // 타워 조준 조명 — 넓고 강하게
+  {
+    const o = getFireOrigin();
+    const gLen = 500;
+    const gAngle = 0.4; // 약간 더 넓은 각도
+    const gGrad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, gLen);
+    gGrad.addColorStop(0, `rgba(255,245,180,${glowAlpha})`);
+    gGrad.addColorStop(0.4, `rgba(255,230,120,${glowAlpha * 0.6})`);
+    gGrad.addColorStop(0.8, `rgba(255,220,100,${glowAlpha * 0.15})`);
+    gGrad.addColorStop(1, 'rgba(255,220,100,0)');
+    ctx.fillStyle = gGrad;
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y);
+    const la = state.aimAngle + gAngle;
+    const ra = state.aimAngle - gAngle;
+    ctx.lineTo(o.x + Math.cos(la) * gLen, o.y - Math.sin(la) * gLen);
+    ctx.lineTo(o.x + Math.cos(ra) * gLen, o.y - Math.sin(ra) * gLen);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 플레이어 손전등 노란빛
+  if (state.flashlight.on && state.player.onTower < 0) {
+    const px = state.player.x, py = state.player.y;
+    const fGrad = ctx.createRadialGradient(px, py, 0, px, py, 220);
+    fGrad.addColorStop(0, `rgba(255,245,180,${glowAlpha * 0.9})`);
+    fGrad.addColorStop(0.4, `rgba(255,230,120,${glowAlpha * 0.5})`);
+    fGrad.addColorStop(0.8, `rgba(255,220,100,${glowAlpha * 0.1})`);
+    fGrad.addColorStop(1, 'rgba(255,220,100,0)');
+    ctx.fillStyle = fGrad;
+    ctx.beginPath();
+    ctx.arc(px, py, 220, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 타워 서치라이트 노란빛
+  for (let i = 0; i < state.towers.length; i++) {
+    const t = state.towers[i];
+    if (t.hp <= 0) continue;
+    const slAngle = state.time * (Math.PI * 2 / 8) + i * (Math.PI * 2 / 3);
+    const slX = t.x + Math.cos(slAngle) * 200;
+    const slY = TOWER_Y - Math.sin(slAngle) * 200;
+    const sGrad = ctx.createRadialGradient(slX, slY, 0, slX, slY, 130);
+    sGrad.addColorStop(0, `rgba(255,245,180,${glowAlpha * 0.8})`);
+    sGrad.addColorStop(0.3, `rgba(255,230,120,${glowAlpha * 0.4})`);
+    sGrad.addColorStop(0.7, `rgba(255,220,100,${glowAlpha * 0.1})`);
+    sGrad.addColorStop(1, 'rgba(255,220,100,0)');
+    ctx.fillStyle = sGrad;
+    ctx.beginPath();
+    ctx.arc(slX, slY, 130, 0, Math.PI * 2);
     ctx.fill();
   }
 
