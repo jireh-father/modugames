@@ -238,12 +238,14 @@ let _spawnChunkZombies = null;
 let _spawnAnimals = null;
 let _loadChunkBuildings = null;
 let _buildGrid = null;
+let _generateBuildings = null;
 
 export function setChunkLoaders(fns) {
   _spawnChunkZombies = fns.spawnChunkZombies;
   _spawnAnimals = fns.spawnAnimals;
   _loadChunkBuildings = fns.loadChunkBuildings;
   _buildGrid = fns.buildGrid;
+  _generateBuildings = fns.generateBuildings;
 }
 
 export function loadChunkEntities(chunk) {
@@ -260,7 +262,12 @@ export function loadChunkEntities(chunk) {
     if (_spawnAnimals) _spawnAnimals(chunk.animalCount);
   }
   state.items = chunk.savedItems ? chunk.savedItems.map(i => ({ ...i })) : [];
-  if (_loadChunkBuildings) _loadChunkBuildings(chunk);
+  // 베이스맵: 기존 건물 생성 (타워 회피 로직 포함), 비베이스: 청크 건물
+  if (chunk.isBase) {
+    if (_generateBuildings) _generateBuildings();
+  } else {
+    if (_loadChunkBuildings) _loadChunkBuildings(chunk);
+  }
   if (_buildGrid) _buildGrid();
 
   // 비 베이스맵: 플레이어 지상 강제

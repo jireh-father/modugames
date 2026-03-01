@@ -205,6 +205,10 @@ export const state = {
   // 슬로모션
   slowMo: false,
   slowMoTimer: 0,
+
+  // 월드
+  currentChunk: null,
+  worldTime: 0,
 };
 
 export function resetGame() {
@@ -291,6 +295,8 @@ export function resetGame() {
   state.dayNightTimer = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
+  state.currentChunk = null;
+  state.worldTime = 0;
 }
 
 export function getTotalAmmo() {
@@ -342,6 +348,13 @@ export function emitSound(x, y, range, duration = 1.0, type = 'generic', target 
   // loudness = 원본 range (밤 보정 전). 좀비가 소리 크기 비교에 사용
   // target = 소리의 원래 목적지 좌표 (체인 전파 시 원래 충격 지점 유지용)
   state.soundSources.push({ x, y, intensity: 1, range: actualRange, loudness: range, timer: duration, duration, type, target });
+}
+
+// world.js 에서 임포트하면 순환 참조이므로 여기서 참조용 export
+let _world = null;
+export function setWorldRef(w) { _world = w; }
+export function isBaseMap() {
+  return _world ? (_world.currentCx === 0 && _world.currentCy === 0) : true;
 }
 
 export function updateSounds(dt) {

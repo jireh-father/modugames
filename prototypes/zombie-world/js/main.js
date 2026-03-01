@@ -1,5 +1,5 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo, updateSounds } from './game.js?v=17';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=17';
 import { initDial, updateDial, drawDial } from './aiming.js?v=17';
 import { drawField, drawFiringLine, drawSoundSources } from './renderer.js?v=17';
 import { initPistol, drawPistol } from './pistol.js?v=17';
@@ -9,7 +9,7 @@ import { initMG, updateMG, drawMG } from './mg.js?v=17';
 import { initCrossbow, drawCrossbow } from './crossbow.js?v=17';
 import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=17';
 import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=17';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner } from './zombies.js?v=17';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner, spawnChunkZombies } from './zombies.js?v=17';
 import { updateWalls, drawWalls } from './wall.js?v=17';
 import { drawTowers, initTower } from './tower.js?v=17';
 import { updateDayNight, drawNightOverlay } from './daynight.js?v=17';
@@ -23,11 +23,13 @@ import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } f
 import { initSettings, drawSettings } from './settings.js?v=17';
 import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=17';
 import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=17';
-import { generateBuildings, drawBuildings } from './buildings.js?v=17';
+import { generateBuildings, drawBuildings, loadChunkBuildings } from './buildings.js?v=17';
 import { buildGrid } from './pathfinding.js?v=17';
 import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=17';
 import { initFlashlight, updateFlashlight, drawFlashlightControls } from './flashlight.js?v=17';
 import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=17';
+import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition } from './world.js?v=17';
+import { setWorldRef } from './game.js?v=17';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -57,11 +59,20 @@ initItems();
 initInventory();
 initTower();
 initSettings();
-generateBuildings();
-buildGrid();
+// (v3: 건물/그리드는 loadChunkEntities에서 생성)
 initPlayer();
 initDescendButton();
 initFlashlight();
+
+// ── 월드 시스템 연결 ──
+setWorldRef(world);
+setChunkLoaders({
+  spawnChunkZombies,
+  spawnAnimals,
+  loadChunkBuildings,
+  buildGrid,
+  generateBuildings,
+});
 
 // ── 게임 루프 ──
 let lastTime = 0;
@@ -83,14 +94,20 @@ function update(dt, realDt) {
   if (state.screen !== 'playing') return;
 
   state.time += dt;
+  state.worldTime += dt;
 
-  // 첫 웨이브 시작 (게임 시작 직후)
-  if (state.wave === 0) {
-    startWave(1);
-    playWaveStart();
-    // 초기 동물 스폰 + 시작 식량
-    spawnAnimals(5);
+  // ── 청크 기반 초기화 (첫 프레임) ──
+  if (!state.currentChunk) {
+    const chunk = initWorld();
+    loadChunkEntities(chunk);
+    state.currentChunk = chunk;
     state.inventory.push({ id: 'food', count: 3 });
+  }
+
+  // ── 맵 전환 중이면 게임 업데이트 건너뜀 ──
+  if (world.transitioning) {
+    updateTransition(dt);
+    return;
   }
 
   // 낮/밤 사이클
@@ -184,18 +201,26 @@ function update(dt, realDt) {
     }
   }
 
-  // 스테이지 관리 — 클리어 후 다음 낮↔밤 전환까지 대기
-  if (state.waveCleared && !state.waveWaitForTransition) {
-    // 방금 클리어됨 (zombies.js 또는 여기서 감지) → 전환 대기 시작
-    state.waveClearedDuringNight = state.isNight;
-    state.waveWaitForTransition = true;
-    playWaveClear();
-  } else if (state.waveWaitForTransition) {
-    // 낮밤 전환 감지: isNight이 클리어 시점과 달라지면 다음 웨이브 시작
-    if (state.isNight !== state.waveClearedDuringNight) {
-      startWave(state.wave + 1);
-      playWaveStart();
-      state.waveWaitForTransition = false;
+  // ── 청크 좀비 리스폰 (30% 이하로 줄면 경계에서 보충) ──
+  if (state.currentChunk) {
+    const cfg = state.currentChunk.zombieConfig;
+    const aliveCount = state.zombies.filter(z => z.alive).length;
+    if (aliveCount < cfg.density * 0.3) {
+      const reinforceCount = Math.floor(cfg.density * 0.2);
+      for (let i = 0; i < reinforceCount; i++) {
+        const type = cfg.types[Math.floor(Math.random() * cfg.types.length)];
+        const edge = Math.floor(Math.random() * 4);
+        let x, y;
+        if (edge === 0) { x = Math.random() * W; y = FIELD_TOP - 10; }
+        else if (edge === 1) { x = Math.random() * W; y = FIELD_BOTTOM + 10; }
+        else if (edge === 2) { x = -10; y = FIELD_TOP + Math.random() * (FIELD_BOTTOM - FIELD_TOP); }
+        else { x = W + 10; y = FIELD_TOP + Math.random() * (FIELD_BOTTOM - FIELD_TOP); }
+        // spawnZombie는 zombies.js의 내부 함수, 대신 spawnChunkZombies 패턴 사용
+        state.waveSpawnQueue.push({
+          type, x, hpMul: cfg.hpMul, speedMul: cfg.speedMul, delay: Math.random() * 2,
+          overrides: { y },
+        });
+      }
     }
   }
 
@@ -283,9 +308,6 @@ function draw() {
 
   // 밤 오버레이
   drawNightOverlay(ctx);
-
-  // 웨이브 배너
-  drawWaveBanner(ctx, W, H);
 
   // 슬로모션 오버레이
   if (state.slowMo) {

@@ -723,4 +723,21 @@ function drawWaveBanner(ctx, w, h) {
   }
 }
 
-export { spawnZombie, updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner, ZOMBIE_TYPES };
+// ── 청크 기반 좀비 스폰 ──
+function spawnChunkZombies(chunk) {
+  const cfg = chunk.zombieConfig;
+  const count = cfg.density;
+  for (let i = 0; i < count; i++) {
+    const type = cfg.types[Math.floor(Math.random() * cfg.types.length)];
+    const sz = ZOMBIE_TYPES[type] ? ZOMBIE_TYPES[type].size : 14;
+    let x, y, tries = 0;
+    do {
+      x = 30 + Math.random() * (W - 60);
+      y = 60 + Math.random() * 440;
+      tries++;
+    } while (tries < 20 && zombieCollidesBuilding(x, y, sz));
+    spawnZombie(type, x, cfg.hpMul, cfg.speedMul, { y });
+  }
+}
+
+export { spawnZombie, updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner, spawnChunkZombies, ZOMBIE_TYPES };

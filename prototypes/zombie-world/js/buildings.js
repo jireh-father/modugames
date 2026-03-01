@@ -66,6 +66,11 @@ export function generateBuildings() {
   state.buildings = buildings;
 }
 
+// ── 청크 건물 로드 ──
+export function loadChunkBuildings(chunk) {
+  state.buildings = chunk.buildings.map(b => ({ ...b }));
+}
+
 // ── 충돌 감지 ──
 
 /**
