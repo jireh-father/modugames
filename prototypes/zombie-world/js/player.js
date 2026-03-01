@@ -375,12 +375,17 @@ export function updatePlayer(dt) {
     p.y = pushed.y;
   }
 
-  // ── 맵 전환은 화살표 아이콘 클릭(targetEdgeDir)으로만 가능 ──
-  // (자동 전환 제거: 모서리 도달 후 반대편 스폰 시 왕복 방지)
-
   // ── 경계 클램핑 ──
+  const prevX = p.x, prevY = p.y;
   p.x = Math.max(p.size, Math.min(W - p.size, p.x));
   p.y = Math.max(FIELD_TOP + p.size, Math.min(FIELD_BOTTOM - p.size, p.y));
+
+  // 경계에 부딪혀 클램핑됐으면 경로 이동 중단 (끼임 방지)
+  if (p.moving && (p.x !== prevX || p.y !== prevY)) {
+    p.moving = false;
+    p.path = [];
+    p.pathIdx = 0;
+  }
 }
 
 // ── drawPlayer: 지상에 있을 때만 렌더링 ──
