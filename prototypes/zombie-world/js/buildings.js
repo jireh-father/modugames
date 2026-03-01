@@ -1,6 +1,30 @@
 // ── 건물 (폐허 도시 장애물) ──
 import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=18';
 
+// ── 건물 유형별 비주얼 ──
+const BUILDING_VISUALS = {
+  house:       { fill: '#5a5a5a', accent: '#8ab4d6', icon: 'H' },
+  apartment:   { fill: '#5a5a6a', accent: '#8ab4d6', icon: 'A' },
+  convenience: { fill: '#5a6a5a', accent: '#88dd88', icon: '$' },
+  supermarket: { fill: '#5a6a5a', accent: '#66cc66', icon: 'SM' },
+  gunshop:     { fill: '#6a5a5a', accent: '#dd8888', icon: 'G' },
+  police:      { fill: '#4a4a6a', accent: '#8888dd', icon: 'P' },
+  hospital:    { fill: '#5a5a5a', accent: '#dd4444', icon: '+' },
+  pharmacy:    { fill: '#5a6a5a', accent: '#44dd44', icon: 'Rx' },
+  warehouse:   { fill: '#5a5a4a', accent: '#aa9966', icon: 'W' },
+  factory:     { fill: '#4a4a4a', accent: '#aa8844', icon: 'F' },
+  gasstation:  { fill: '#5a5a5a', accent: '#dd8844', icon: 'GS' },
+  school:      { fill: '#5a5a6a', accent: '#88aadd', icon: 'Sc' },
+  church:      { fill: '#6a6a6a', accent: '#ddddaa', icon: 'Ch' },
+  library:     { fill: '#5a5a4a', accent: '#bbaa88', icon: 'Li' },
+  firestation: { fill: '#6a4a4a', accent: '#ff6644', icon: 'FS' },
+  restaurant:  { fill: '#5a4a4a', accent: '#ddaa44', icon: 'R' },
+  garage:      { fill: '#4a4a4a', accent: '#888888', icon: 'Ga' },
+  military:    { fill: '#3a4a3a', accent: '#669966', icon: 'M' },
+  ruin:        { fill: '#4a3a2a', accent: '#6a5a3a', icon: '' },
+  bunker:      { fill: '#3a3a3a', accent: '#666666', icon: 'B' },
+};
+
 // ── 건물 생성 ──
 
 /**
@@ -143,19 +167,57 @@ export function pushOutOfBuildings(x, y, size) {
 
 /**
  * 모든 건물을 캔버스에 그린다.
- * - 일반: 회색(#5a5a5a) + 창문
- * - 폐허: 갈색(#4a3a2a) + 균열 + 부서진 모서리
+ * 유형별 색상/아이콘, 폐허 오버레이, 약탈 시 어둡게 처리.
  */
 export function drawBuildings(ctx) {
   for (const b of state.buildings) {
     ctx.save();
 
-    if (b.ruined) {
-      // ── 폐허 건물 ──
-      ctx.fillStyle = '#4a3a2a';
-      ctx.fillRect(b.x, b.y, b.w, b.h);
+    const vis = b.type ? BUILDING_VISUALS[b.type] : null;
+    const fillColor = vis ? vis.fill : '#5a5a5a';
+    const accentColor = vis ? vis.accent : '#8ab4d6';
+    const icon = vis ? vis.icon : '';
+    const lootDim = b.looted ? 0.5 : 1.0;
 
-      // 부서진 모서리 (오른쪽 상단)
+    if (lootDim < 1) ctx.globalAlpha = lootDim;
+
+    // ── 건물 본체 ──
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+
+    // ── 지붕 악센트 (상단 3px 스트립) ──
+    ctx.fillStyle = accentColor;
+    ctx.fillRect(b.x, b.y, b.w, 3);
+
+    // ── 창문 ──
+    const winSize = 6;
+    const winGap = 14;
+    ctx.fillStyle = accentColor;
+    const cols = Math.floor((b.w - 8) / winGap);
+    const rows = Math.floor((b.h - 12) / winGap);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillRect(b.x + 6 + c * winGap, b.y + 8 + r * winGap, winSize, winSize);
+      }
+    }
+
+    // ── 유형 라벨 (건물 중앙) ──
+    if (icon) {
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(icon, b.x + b.w / 2, b.y + b.h / 2);
+    }
+
+    // ── 테두리 ──
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+    // ── 폐허 오버레이 ──
+    if (b.ruined) {
+      // 부서진 모서리
       ctx.fillStyle = '#3a2a1a';
       const chipW = 6 + Math.floor(b.w * 0.15);
       const chipH = 6 + Math.floor(b.h * 0.15);
@@ -166,54 +228,23 @@ export function drawBuildings(ctx) {
       ctx.closePath();
       ctx.fill();
 
-      // 부서진 모서리를 배경색으로 지우기 (투명 효과)
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
 
-      // 균열 그리기
+      // 균열
+      ctx.globalAlpha = lootDim;
       ctx.strokeStyle = '#2a1a0a';
       ctx.lineWidth = 1.5;
-      // 균열 1: 대각선
       ctx.beginPath();
       ctx.moveTo(b.x + b.w * 0.2, b.y);
       ctx.lineTo(b.x + b.w * 0.35, b.y + b.h * 0.4);
       ctx.lineTo(b.x + b.w * 0.25, b.y + b.h * 0.7);
       ctx.stroke();
-      // 균열 2: 수평
       ctx.beginPath();
       ctx.moveTo(b.x + b.w * 0.5, b.y + b.h * 0.3);
       ctx.lineTo(b.x + b.w * 0.8, b.y + b.h * 0.35);
       ctx.stroke();
-
-      // 어두운 테두리
-      ctx.strokeStyle = '#2a1a0a';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.x, b.y, b.w, b.h);
-
-    } else {
-      // ── 일반 건물 ──
-      ctx.fillStyle = '#5a5a5a';
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-
-      // 창문 그리기
-      const winSize = 6;
-      const winGap = 14;
-      ctx.fillStyle = '#8ab4d6';
-      const cols = Math.floor((b.w - 8) / winGap);
-      const rows = Math.floor((b.h - 8) / winGap);
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const wx = b.x + 6 + c * winGap;
-          const wy = b.y + 6 + r * winGap;
-          ctx.fillRect(wx, wy, winSize, winSize);
-        }
-      }
-
-      // 어두운 테두리
-      ctx.strokeStyle = '#3a3a3a';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.x, b.y, b.w, b.h);
     }
 
     ctx.restore();
