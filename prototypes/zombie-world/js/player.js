@@ -6,6 +6,7 @@ import { registerZone } from './input.js?v=19';
 import { world, canMove, startTransition } from './world.js?v=19';
 import { enterInterior, getNearbyBuilding } from './interior.js?v=19';
 import { getFatigueSpeedMul } from './fatigue.js?v=19';
+import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=19';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -44,6 +45,27 @@ export function initPlayer() {
       onTap(x, y) {
         if (state.screen !== 'playing') return;
         const p = state.player;
+
+        // 하차 버튼 체크
+        if (state.riding) {
+          if (x >= DISMOUNT_BTN.x && x <= DISMOUNT_BTN.x + DISMOUNT_BTN.w &&
+              y >= DISMOUNT_BTN.y && y <= DISMOUNT_BTN.y + DISMOUNT_BTN.h) {
+            dismountVehicle();
+            return;
+          }
+        }
+
+        // 탈것 탑승 체크 (미탑승 시)
+        if (!state.riding) {
+          const nearV = getNearbyVehicle(x, y, 35);
+          if (nearV) {
+            const playerDist = Math.hypot(p.x - nearV.x, p.y - nearV.y);
+            if (playerDist < 40) {
+              boardVehicle(nearV);
+              return;
+            }
+          }
+        }
 
         // 타워 위에 있으면 필드 탭 무시
         if (p.onTower >= 0) return;
@@ -180,7 +202,8 @@ export function updatePlayer(dt) {
       // HP 비례 이동속도 (최소 30%)
       const hpRatio = Math.max(0.3, p.hp / p.maxHp);
       const fatigueMul = getFatigueSpeedMul();
-      const moveSpeed = p.speed * hpRatio * fatigueMul;
+      const baseSpeed = state.riding ? VEHICLE_TYPES[state.riding.type].speed : p.speed;
+      const moveSpeed = baseSpeed * hpRatio * fatigueMul;
       const step = moveSpeed * dt;
 
       let newX = p.x + nx * step;

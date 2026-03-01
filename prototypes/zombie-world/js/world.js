@@ -1,5 +1,6 @@
 // ── 월드 시스템 (Chunk 기반 무한 맵) ──
 import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=19';
+import { spawnChunkVehicles } from './vehicle.js?v=19';
 
 // ── 시드 기반 난수 생성기 ──
 export function seededRng(seed) {
@@ -136,10 +137,12 @@ export function generateChunk(cx, cy) {
 
   const zombieConfig = generateZombieConfig(rng, distFromBase, isBase);
   const animalCount = isBase ? 5 : Math.floor(2 + rng() * 4);
+  const vehicles = isBase ? [] : spawnChunkVehicles(rng, buildings);
 
   const chunk = {
     cx, cy, seed, isBase,
     buildings,
+    vehicles,
     zombieConfig,
     animalCount,
     items: [],
@@ -197,6 +200,15 @@ function completeTransition() {
   if (dir === 'up') ncy--;
   if (dir === 'down') ncy++;
 
+  // 탑승 중인 탈것 저장 (청크 전환 시 이동)
+  const ridingVehicle = state.riding ? { ...state.riding } : null;
+  if (ridingVehicle) {
+    // 이전 청크에서 탑승 중이던 탈것 제거
+    const idx = state.vehicles.indexOf(state.riding);
+    if (idx >= 0) state.vehicles.splice(idx, 1);
+    state.riding = null;
+  }
+
   // 이전 청크 엔티티 저장
   saveChunkEntities(world.currentCx, world.currentCy);
 
@@ -218,6 +230,14 @@ function completeTransition() {
   if (dir === 'up') p.y = FIELD_BOTTOM - p.size - 1;
   if (dir === 'down') p.y = FIELD_TOP + p.size + 1;
 
+  // 탑승 중이던 탈것을 새 청크에 추가
+  if (ridingVehicle) {
+    ridingVehicle.x = p.x;
+    ridingVehicle.y = p.y;
+    state.vehicles.push(ridingVehicle);
+    state.riding = ridingVehicle;
+  }
+
   world.transitioning = false;
   world.transDir = null;
   world.transProgress = 0;
@@ -231,6 +251,7 @@ export function saveChunkEntities(cx, cy) {
   chunk.savedZombies = state.zombies.map(z => ({ ...z }));
   chunk.savedAnimals = state.animals.map(a => ({ ...a }));
   chunk.savedItems = state.items.map(i => ({ ...i }));
+  chunk.savedVehicles = state.vehicles.map(v => ({ ...v }));
 }
 
 // ── 청크 엔티티 로드 (외부에서 spawnChunkZombies, spawnAnimals, loadChunkBuildings, buildGrid 주입) ──
@@ -262,6 +283,8 @@ export function loadChunkEntities(chunk) {
     if (_spawnAnimals) _spawnAnimals(chunk.animalCount);
   }
   state.items = chunk.savedItems ? chunk.savedItems.map(i => ({ ...i })) : [];
+  state.vehicles = chunk.savedVehicles ? chunk.savedVehicles.map(v => ({ ...v })) : (chunk.vehicles ? chunk.vehicles.map(v => ({ ...v })) : []);
+  state.riding = null; // 청크 전환 시 하차 (아래 completeTransition에서 재탑승 처리)
   // 베이스맵: 기존 건물 생성 (타워 회피 로직 포함), 비베이스: 청크 건물
   if (chunk.isBase) {
     if (_generateBuildings) _generateBuildings();

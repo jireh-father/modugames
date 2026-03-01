@@ -140,18 +140,32 @@ export function deleteSave() {
   localStorage.removeItem(SAVE_KEY);
 }
 
-// ── 청크 델타 직렬화 (looted 건물만) ──
+// ── 청크 델타 직렬화 (looted 건물 + 탈것 상태) ──
 function serializeChunkDeltas() {
   const deltas = {};
   for (const [key, chunk] of world.chunks) {
+    const delta = {};
+    // looted 건물
     const lootedIndices = [];
     for (let i = 0; i < chunk.buildings.length; i++) {
       if (chunk.buildings[i].looted) {
         lootedIndices.push(i);
       }
     }
-    if (lootedIndices.length > 0) {
-      deltas[key] = { looted: lootedIndices };
+    if (lootedIndices.length > 0) delta.looted = lootedIndices;
+
+    // 탈것 상태 (위치, 연료, 파손)
+    const vehicles = chunk.savedVehicles || chunk.vehicles || [];
+    if (vehicles.length > 0) {
+      delta.vehicles = vehicles.map(v => ({
+        type: v.type, x: v.x, y: v.y,
+        fuel: v.fuel === Infinity ? -1 : v.fuel,
+        broken: v.broken,
+      }));
+    }
+
+    if (Object.keys(delta).length > 0) {
+      deltas[key] = delta;
     }
   }
   return deltas;
@@ -168,6 +182,14 @@ function deserializeChunkDeltas(deltas) {
           chunk.buildings[idx].looted = true;
         }
       }
+    }
+    if (delta.vehicles) {
+      chunk.vehicles = delta.vehicles.map(v => ({
+        ...v,
+        fuel: v.fuel === -1 ? Infinity : v.fuel,
+        fuelMax: v.fuel === -1 ? Infinity : (v.fuelMax || 100),
+      }));
+      chunk.savedVehicles = chunk.vehicles.map(v => ({ ...v }));
     }
   }
 }

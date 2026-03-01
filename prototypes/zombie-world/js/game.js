@@ -156,6 +156,10 @@ export const state = {
   sleepDuration: 0,
   sleepType: null,
 
+  // 탈것
+  vehicles: [],
+  riding: null,
+
   // 동물
   animals: [],
 
@@ -277,6 +281,8 @@ export function resetGame() {
   state.sleepTimer = 0;
   state.sleepDuration = 0;
   state.sleepType = null;
+  state.vehicles = [];
+  state.riding = null;
   state.animals = [];
   state.buildings = [];
   state.doors = [

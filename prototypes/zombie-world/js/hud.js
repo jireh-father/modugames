@@ -6,6 +6,7 @@ import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=19';
 import { openSettings } from './settings.js?v=19';
 import { world } from './world.js?v=19';
 import { hasSave, loadGame, deleteSave, saveGame } from './save.js?v=19';
+import { VEHICLE_TYPES } from './vehicle.js?v=19';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -218,6 +219,27 @@ export function drawHUD(ctx) {
   ctx.font = 'bold 7px monospace';
   ctx.textAlign = 'right';
   ctx.fillText('Zz', hpBarX - 3, 43);
+
+  // 탑승 중 연료 바
+  if (state.riding) {
+    const vCfg = VEHICLE_TYPES[state.riding.type];
+    const vLabel = state.riding.type.toUpperCase();
+    ctx.fillStyle = '#ccc';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(vLabel, 10, 43);
+    if (vCfg.fuelMax !== Infinity) {
+      const fuelRatio = state.riding.fuel / vCfg.fuelMax;
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillRect(10, 45, 60, 3);
+      ctx.fillStyle = fuelRatio > 0.3 ? '#44cc44' : '#cc4444';
+      ctx.fillRect(10, 45, 60 * fuelRatio, 3);
+    } else {
+      ctx.fillStyle = '#44cc44';
+      ctx.font = 'bold 6px monospace';
+      ctx.fillText('NO FUEL', 10, 48);
+    }
+  }
 
   // 타워 상태 점 3개 (베이스맵 전용)
   if (isBaseMap()) {

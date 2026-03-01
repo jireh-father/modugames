@@ -33,6 +33,7 @@ import { setWorldRef } from './game.js?v=19';
 import { initWorldMap, drawWorldMap } from './worldmap.js?v=19';
 import { initInterior, updateInterior, drawInterior } from './interior.js?v=19';
 import { updateFatigue, getAimWobble } from './fatigue.js?v=19';
+import { updateVehicles, checkVehicleCollisions, drawVehicles, drawDismountButton } from './vehicle.js?v=19';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -182,6 +183,10 @@ function update(dt, realDt) {
     if (state.player.hp < 0) state.player.hp = 0;
   }
 
+  // 탈것 업데이트
+  updateVehicles(dt);
+  checkVehicleCollisions();
+
   // 동물 업데이트
   updateAnimals(dt);
 
@@ -313,14 +318,18 @@ function draw() {
   // 건물 (장애물)
   drawBuildings(ctx);
 
+  // 탈것
+  drawVehicles(ctx);
+
   // 성벽
   drawWalls(ctx);
 
   // 타워
   drawTowers(ctx);
 
-  // 내려가기 버튼 (타워 위일 때)
+  // 내려가기 버튼 (타워 위일 때) / 하차 버튼 (탑승 중)
   drawDescendButton(ctx);
+  drawDismountButton(ctx);
 
   // 발사선
   drawFiringLine(ctx);
