@@ -390,6 +390,22 @@ function updateZombies(dt) {
     }
   }
 
+  // ── 화염 전파 (불붙은 좀비 → 접촉 좀비) ──
+  for (let i = 0; i < state.zombies.length; i++) {
+    const a = state.zombies[i];
+    if (!a.alive || !a.statusEffects.burning || a.statusEffects.burning <= 0) continue;
+    for (let j = 0; j < state.zombies.length; j++) {
+      if (i === j) continue;
+      const b = state.zombies[j];
+      if (!b.alive || (b.statusEffects.burning && b.statusEffects.burning > 0)) continue;
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (dist < 10) {
+        if (!b.statusEffects.burning) b.statusEffects.burning = 0;
+        b.statusEffects.burning = 1.5;
+      }
+    }
+  }
+
   // ── 벽 압력 시스템 (세그먼트별 데미지) ──
   if (state.buffs.shieldTimer <= 0) {
     const wallPressure = [0, 0, 0, 0];
