@@ -1,6 +1,6 @@
 // ── 동물 시스템 (배고픔 + 사냥) ──
-import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=16';
-import { collidesWithBuilding } from './buildings.js?v=16';
+import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=17';
+import { collidesWithBuilding } from './buildings.js?v=17';
 
 const ANIMAL_TYPES = {
   chicken: { color: '#ffcc66', size: 8,  speed: 40,  fleeSpeed: 80,  meat: 25, bodyColor: '#ffcc66', headColor: '#ff8844' },

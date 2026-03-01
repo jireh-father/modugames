@@ -1,5 +1,5 @@
 // ── 낮/밤 사이클 & 손전등 효과 ──
-import { W, H, state, TOWER_Y, getFireOrigin } from './game.js?v=16';
+import { W, H, state, TOWER_Y, getFireOrigin } from './game.js?v=17';
 
 /**
  * 낮/밤 상태 업데이트

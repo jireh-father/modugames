@@ -1,6 +1,6 @@
 // ── 성벽 시스템 (4구간) ──
-import { W, state, WALL_Y } from './game.js?v=16';
-import { playWallRebuildComplete } from './audio.js?v=16';
+import { W, state, WALL_Y } from './game.js?v=17';
+import { playWallRebuildComplete } from './audio.js?v=17';
 
 // 4 wall segments
 const SEG_W = W / 4;

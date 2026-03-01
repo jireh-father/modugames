@@ -1,5 +1,5 @@
 // ── 건물 (폐허 도시 장애물) ──
-import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=16';
+import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=17';
 
 // ── 건물 생성 ──
 

@@ -1,5 +1,5 @@
 // ── 파티클 이펙트 시스템 ──
-import { state } from './game.js?v=16';
+import { state } from './game.js?v=17';
 
 /**
  * 파티클 생성
