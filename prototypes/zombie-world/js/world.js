@@ -1,6 +1,6 @@
 // ── 월드 시스템 (Chunk 기반 무한 맵) ──
-import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=20';
-import { spawnChunkVehicles } from './vehicle.js?v=20';
+import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=31';
+import { spawnChunkVehicles } from './vehicle.js?v=31';
 
 // ── 시드 기반 난수 생성기 ──
 export function seededRng(seed) {

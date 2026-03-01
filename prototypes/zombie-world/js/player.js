@@ -1,14 +1,14 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound, isBaseMap } from './game.js?v=20';
-import { findPath, drawPathDebug } from './pathfinding.js?v=20';
-import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=20';
-import { registerZone } from './input.js?v=20';
-import { world, canMove, startTransition } from './world.js?v=20';
-import { getArrowHitAreas } from './renderer.js?v=20';
-import { enterInterior, enterBaseCamp, getNearbyBuilding } from './interior.js?v=20';
-import { getFatigueSpeedMul } from './fatigue.js?v=20';
-import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=20';
-import { getWeatherEffects } from './weather.js?v=20';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound, isBaseMap } from './game.js?v=31';
+import { findPath, drawPathDebug } from './pathfinding.js?v=31';
+import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=31';
+import { registerZone } from './input.js?v=31';
+import { world, canMove, startTransition } from './world.js?v=31';
+import { getArrowHitAreas } from './renderer.js?v=31';
+import { enterInterior, enterBaseCamp, getNearbyBuilding } from './interior.js?v=31';
+import { getFatigueSpeedMul } from './fatigue.js?v=31';
+import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=31';
+import { getWeatherEffects } from './weather.js?v=31';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {

@@ -1,5 +1,5 @@
 // ── 타워 렌더링 (3개 고정 타워) ──
-import { state, TOWER_Y, isBaseMap } from './game.js?v=20';
+import { state, TOWER_Y, isBaseMap } from './game.js?v=31';
 
 const TOWER_SIZE = 24;
 

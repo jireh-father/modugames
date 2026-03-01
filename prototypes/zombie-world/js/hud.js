@@ -1,13 +1,13 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, VERSION, resetGame, getTotalAmmo, isBaseMap } from './game.js?v=20';
-import { registerZone } from './input.js?v=20';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=20';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=20';
-import { openSettings } from './settings.js?v=20';
-import { world } from './world.js?v=20';
-import { hasSave, loadGame, deleteSave, saveGame } from './save.js?v=20';
-import { VEHICLE_TYPES } from './vehicle.js?v=20';
-import { getWeatherIcon } from './weather.js?v=20';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, VERSION, resetGame, getTotalAmmo, isBaseMap } from './game.js?v=31';
+import { registerZone } from './input.js?v=31';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=31';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=31';
+import { openSettings } from './settings.js?v=31';
+import { world } from './world.js?v=31';
+import { hasSave, loadGame, deleteSave, saveGame } from './save.js?v=31';
+import { VEHICLE_TYPES } from './vehicle.js?v=31';
+import { getWeatherIcon } from './weather.js?v=31';
 
 let gameOverTriggered = false;
 let newBestScore = false;

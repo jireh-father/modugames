@@ -1,40 +1,40 @@
 // ── Zombie World - 메인 게임 루프 ──
-import { W, H, state, isGameOver, getTotalAmmo, updateSounds, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=20';
-import { initDial, updateDial, drawDial } from './aiming.js?v=20';
-import { drawField, drawFiringLine, drawSoundSources, drawTransitionOverlay, drawEdgeArrows } from './renderer.js?v=20';
-import { initPistol, drawPistol } from './pistol.js?v=20';
-import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=20';
-import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=20';
-import { initMG, updateMG, drawMG } from './mg.js?v=20';
-import { initCrossbow, drawCrossbow } from './crossbow.js?v=20';
-import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=20';
-import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=20';
-import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner, spawnChunkZombies } from './zombies.js?v=20';
-import { updateWalls, drawWalls } from './wall.js?v=20';
-import { drawTowers, initTower } from './tower.js?v=20';
-import { updateDayNight, drawNightOverlay } from './daynight.js?v=20';
-import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=20';
-import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=20';
+import { W, H, state, isGameOver, getTotalAmmo, updateSounds, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=31';
+import { initDial, updateDial, drawDial } from './aiming.js?v=31';
+import { drawField, drawFiringLine, drawSoundSources, drawTransitionOverlay, drawEdgeArrows } from './renderer.js?v=31';
+import { initPistol, drawPistol } from './pistol.js?v=31';
+import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=31';
+import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=31';
+import { initMG, updateMG, drawMG } from './mg.js?v=31';
+import { initCrossbow, drawCrossbow } from './crossbow.js?v=31';
+import { initFlamethrower, updateFlamethrower, drawFlamethrower, drawFlameOverlay } from './flamethrower.js?v=31';
+import { updateProjectiles, drawProjectiles, missedThisFrame } from './projectiles.js?v=31';
+import { updateZombies, checkZombieHits, drawZombies, startWave, drawWaveBanner, spawnChunkZombies } from './zombies.js?v=31';
+import { updateWalls, drawWalls } from './wall.js?v=31';
+import { drawTowers, initTower } from './tower.js?v=31';
+import { updateDayNight, drawNightOverlay } from './daynight.js?v=31';
+import { tryDropItem, initItems, updateItems, drawItems, updateSoundLures, drawSoundLures } from './items.js?v=31';
+import { updateParticles, drawParticles, spawnParticles } from './particles.js?v=31';
 import {
   initHUD, drawHUD, drawWeaponSlots, drawControlsBg,
   drawTitle, drawGameOver, drawPauseMenu, triggerGameOver, initScreenHandlers,
-} from './hud.js?v=20';
-import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=20';
-import { initSettings, drawSettings } from './settings.js?v=20';
-import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=20';
-import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=20';
-import { generateBuildings, drawBuildings, loadChunkBuildings } from './buildings.js?v=20';
-import { buildGrid } from './pathfinding.js?v=20';
-import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=20';
-import { initFlashlight, updateFlashlight, drawFlashlightControls } from './flashlight.js?v=20';
-import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=20';
-import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition, updateAdjacentChunks } from './world.js?v=20';
-import { setWorldRef } from './game.js?v=20';
-import { initWorldMap, drawWorldMap } from './worldmap.js?v=20';
-import { initInterior, updateInterior, drawInterior } from './interior.js?v=20';
-import { updateFatigue, getAimWobble } from './fatigue.js?v=20';
-import { updateVehicles, checkVehicleCollisions, drawVehicles, drawDismountButton } from './vehicle.js?v=20';
-import { updateWeather, drawWeatherOverlay, getWeatherEffects } from './weather.js?v=20';
+} from './hud.js?v=31';
+import { playCombo, playSlowMo, playBulletMiss, playWaveStart, playWaveClear } from './audio.js?v=31';
+import { initSettings, drawSettings } from './settings.js?v=31';
+import { updateMines, updateHazards, drawMines, drawHazards } from './hazards.js?v=31';
+import { initInventory, drawInventory, drawInventoryDragOverlay } from './inventory.js?v=31';
+import { generateBuildings, drawBuildings, loadChunkBuildings } from './buildings.js?v=31';
+import { buildGrid } from './pathfinding.js?v=31';
+import { initPlayer, updatePlayer, drawPlayer, initDescendButton, drawDescendButton } from './player.js?v=31';
+import { initFlashlight, updateFlashlight, drawFlashlightControls } from './flashlight.js?v=31';
+import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=31';
+import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition, updateAdjacentChunks } from './world.js?v=31';
+import { setWorldRef } from './game.js?v=31';
+import { initWorldMap, drawWorldMap } from './worldmap.js?v=31';
+import { initInterior, updateInterior, drawInterior } from './interior.js?v=31';
+import { updateFatigue, getAimWobble } from './fatigue.js?v=31';
+import { updateVehicles, checkVehicleCollisions, drawVehicles, drawDismountButton } from './vehicle.js?v=31';
+import { updateWeather, drawWeatherOverlay, getWeatherEffects } from './weather.js?v=31';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
