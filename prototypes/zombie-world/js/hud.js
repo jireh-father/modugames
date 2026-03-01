@@ -617,6 +617,11 @@ export function drawTitle(ctx) {
   ctx.font = 'bold 18px monospace';
   ctx.fillText(hasSave() ? 'TAP FOR NEW GAME' : 'TAP TO START', W / 2, H * 0.66);
 
+  // 버전 표시
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '12px monospace';
+  ctx.fillText(VERSION, W / 2, H * 0.66 + 24);
+
   // 기록 표시
   if (state.bestScore > 0 || state.bestWave > 0) {
     ctx.fillStyle = '#888';
@@ -640,10 +645,6 @@ export function drawTitle(ctx) {
   ctx.textAlign = 'center';
   ctx.fillText('\u2699 SETTINGS', W / 2, H * 0.92);
 
-  // 버전 표시
-  ctx.fillStyle = '#666';
-  ctx.font = '12px monospace';
-  ctx.fillText(VERSION, W / 2, H * 0.97);
 }
 
 /**
