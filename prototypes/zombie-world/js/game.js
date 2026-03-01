@@ -16,9 +16,9 @@ export const DIAL_R = 80;                    // half-circle dial radius
 export const WEAPON_PROFILES = {
   pistol:   { range: 400, damage: 2, originSound: 480, impactSound: 200,  penetrate: 0 },
   bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 120,  penetrate: 1 },
-  sniper:   { range: 9999, damage: 5, originSound: 1000, impactSound: 320,  penetrate: 99 },
+  sniper:   { range: 9999, damage: 3, originSound: 1000, impactSound: 320,  penetrate: 2 },
   mg:       { range: 350, damage: 1, originSound: 720, impactSound: 120,  penetrate: 0 },
-  crossbow: { range: 450, damage: 4, originSound: 120,  impactSound: 120,  penetrate: 1 },
+  crossbow: { range: 450, damage: 3, originSound: 120,  impactSound: 120,  penetrate: 1 },
   flamethrower: { range: 180, damage: 3, originSound: 320, impactSound: 0, penetrate: 0 },
   flashlight: { range: 0, damage: 0, originSound: 0, impactSound: 0, penetrate: 0 },
 };

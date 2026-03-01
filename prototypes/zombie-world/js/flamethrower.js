@@ -12,7 +12,7 @@ const TANK_W = Math.floor(W * 0.30);
 const GUN_W = W - TANK_W;
 
 const FUEL_RATE = 15;  // 초당 연료 소모
-const DAMAGE_RATE = 3; // 초당 데미지
+const DAMAGE_RATE = 1.5; // 초당 데미지 (v3 밸런스: 3→1.5)
 const FLAME_RANGE = 180; // 화염 사거리
 const FLAME_SPREAD = 0.4; // 화염 확산 각도 (라디안)
 

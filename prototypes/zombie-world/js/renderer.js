@@ -174,15 +174,14 @@ export function drawFiringLine(ctx) {
  */
 export function drawSoundSources(ctx) {
   for (const s of state.soundSources) {
-    const alpha = s.intensity * 0.25;
-    const pulse = Math.sin(Date.now() / 200) * 0.08;
-    ctx.strokeStyle = `rgba(255,255,100,${alpha + pulse})`;
+    const alpha = s.intensity * 0.06;
+    const pulse = Math.sin(Date.now() / 200) * 0.02;
+    ctx.strokeStyle = `rgba(200,200,150,${alpha + pulse})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.range * s.intensity, 0, Math.PI * 2);
     ctx.stroke();
-    // 내부 파동
-    ctx.strokeStyle = `rgba(255,200,50,${alpha * 1.5})`;
+    ctx.strokeStyle = `rgba(180,180,120,${alpha * 1.5})`;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.range * s.intensity * 0.5, 0, Math.PI * 2);
     ctx.stroke();

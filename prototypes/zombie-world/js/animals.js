@@ -3,11 +3,11 @@ import { W, state, FIELD_TOP, FIELD_BOTTOM, WALL_Y } from './game.js?v=17';
 import { collidesWithBuilding } from './buildings.js?v=17';
 
 const ANIMAL_TYPES = {
-  chicken: { color: '#ffcc66', size: 8,  speed: 40,  fleeSpeed: 80,  meat: 25, bodyColor: '#ffcc66', headColor: '#ff8844' },
-  rabbit:  { color: '#cc9966', size: 7,  speed: 25,  fleeSpeed: 60,  meat: 30, bodyColor: '#cc9966', headColor: '#ddbbaa' },
-  rat:     { color: '#999999', size: 5,  speed: 50,  fleeSpeed: 100, meat: 15, bodyColor: '#888888', headColor: '#aaaaaa' },
-  pigeon:  { color: '#aaaacc', size: 6,  speed: 30,  fleeSpeed: 70,  meat: 20, bodyColor: '#9999bb', headColor: '#bbbbdd' },
-  frog:    { color: '#66cc66', size: 6,  speed: 15,  fleeSpeed: 35,  meat: 20, bodyColor: '#55bb55', headColor: '#77dd77' },
+  chicken: { color: '#ffcc66', size: 12, speed: 40,  fleeSpeed: 80,  meat: 25, bodyColor: '#ffcc66', headColor: '#ff8844' },
+  rabbit:  { color: '#cc9966', size: 11, speed: 25,  fleeSpeed: 60,  meat: 30, bodyColor: '#cc9966', headColor: '#ddbbaa' },
+  rat:     { color: '#999999', size: 8,  speed: 50,  fleeSpeed: 100, meat: 15, bodyColor: '#888888', headColor: '#aaaaaa' },
+  pigeon:  { color: '#aaaacc', size: 9,  speed: 30,  fleeSpeed: 70,  meat: 20, bodyColor: '#9999bb', headColor: '#bbbbdd' },
+  frog:    { color: '#66cc66', size: 9,  speed: 15,  fleeSpeed: 35,  meat: 20, bodyColor: '#55bb55', headColor: '#77dd77' },
 };
 
 const ANIMAL_NAMES = Object.keys(ANIMAL_TYPES);
@@ -70,14 +70,14 @@ export function updateAnimals(dt) {
     const cfg = ANIMAL_TYPES[a.type];
     const distToPlayer = Math.hypot(a.x - p.x, a.y - p.y);
 
-    // 플레이어 접근 시 도주 (80px)
-    if (p.onTower < 0 && distToPlayer < 80) {
+    // 플레이어 접근 시 도주 (100px)
+    if (p.onTower < 0 && distToPlayer < 100) {
       a.fleeing = true;
       a.fleeAngle = Math.atan2(a.y - p.y, a.x - p.x);
     }
 
-    // 플레이어 근접 시 잡힘 (15px)
-    if (p.onTower < 0 && distToPlayer < 15) {
+    // 플레이어 근접 시 잡힘 (25px)
+    if (p.onTower < 0 && distToPlayer < 25) {
       a.alive = false;
       // 고기 아이템을 인벤토리에 직접 추가
       const existing = state.inventory.find(it => it.id === 'meat');
