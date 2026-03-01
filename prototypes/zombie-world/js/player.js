@@ -4,6 +4,7 @@ import { findPath, drawPathDebug } from './pathfinding.js?v=20';
 import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=20';
 import { registerZone } from './input.js?v=20';
 import { world, canMove, startTransition } from './world.js?v=20';
+import { getArrowHitAreas } from './renderer.js?v=20';
 import { enterInterior, enterBaseCamp, getNearbyBuilding } from './interior.js?v=20';
 import { getFatigueSpeedMul } from './fatigue.js?v=20';
 import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=20';
@@ -78,6 +79,38 @@ export function initPlayer() {
           p.y = pushed.y;
         }
 
+        // 화살표 아이콘 탭 체크 → 가장자리로 이동 후 전환
+        const arrowHits = getArrowHitAreas();
+        for (const ah of arrowHits) {
+          const dist = Math.hypot(x - ah.x, y - ah.y);
+          if (dist < ah.radius + 10) {
+            // 가장자리 끝 좌표 계산
+            let edgeX = p.x, edgeY = p.y;
+            if (ah.dir === 'up')    { edgeX = ah.x; edgeY = FIELD_TOP + p.size + 1; }
+            if (ah.dir === 'down')  { edgeX = ah.x; edgeY = FIELD_BOTTOM - p.size - 1; }
+            if (ah.dir === 'left')  { edgeX = p.size + 1; edgeY = ah.y; }
+            if (ah.dir === 'right') { edgeX = W - p.size - 1; edgeY = ah.y; }
+
+            // 이미 가장자리에 가까우면 즉시 전환
+            const playerEdgeDist = Math.hypot(p.x - edgeX, p.y - edgeY);
+            if (playerEdgeDist < 30) {
+              startTransition(ah.dir);
+              p.moving = false; p.path = []; p.pathIdx = 0;
+              return;
+            }
+
+            const path = findPath(p.x, p.y, edgeX, edgeY);
+            if (path.length > 0) {
+              p.path = path;
+              p.pathIdx = 0;
+              p.moving = true;
+              p.targetTower = -1;
+              p.targetEdgeDir = ah.dir;
+            }
+            return;
+          }
+        }
+
         // 타워 클릭 체크
         for (let i = 0; i < state.towers.length; i++) {
           const t = state.towers[i];
@@ -120,6 +153,7 @@ export function initPlayer() {
 
         // 일반 경로 탐색 후 이동
         p.targetTower = -1;
+        p.targetEdgeDir = null;
         const path = findPath(p.x, p.y, x, y);
         if (path.length > 0) {
           p.path = path;
@@ -241,6 +275,17 @@ export function updatePlayer(dt) {
         // 현재 웨이포인트 건너뛰기 (무한 멈춤 방지)
         if (p.pathIdx < p.path.length) p.pathIdx++;
       }
+    }
+  }
+
+  // ── 화살표 방향 전환 (경로 이동 완료 시) ──
+  if (p.targetEdgeDir && !p.moving) {
+    const dir = p.targetEdgeDir;
+    p.targetEdgeDir = null;
+    if (canMove(world.currentCx, world.currentCy, dir)) {
+      startTransition(dir);
+      p.path = []; p.pathIdx = 0;
+      return;
     }
   }
 

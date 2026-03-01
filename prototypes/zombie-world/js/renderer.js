@@ -1,6 +1,6 @@
 // ── 탑다운 2D 필드 렌더링 ──
 import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=20';
-import { world } from './world.js?v=20';
+import { world, canMove } from './world.js?v=20';
 
 /**
  * 필드 배경 그리기 – 폐허 도시 (Ruined City)
@@ -187,6 +187,102 @@ export function drawSoundSources(ctx) {
     ctx.arc(s.x, s.y, s.range * s.intensity * 0.5, 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+// ── 맵 가장자리 방향 화살표 아이콘 ──
+
+// 화살표 상수
+const ARROW_SIZE = 28;          // 화살표 크기 (px)
+const ARROW_SHOW_DIST = 80;     // 이 거리 이내에 플레이어가 오면 표시
+const ARROW_PULSE_SPEED = 3;    // 깜빡임 속도
+
+// 화살표 위치 & 방향 정의
+function getArrowDefs() {
+  const midX = W / 2;
+  const midY = (FIELD_TOP + FIELD_BOTTOM) / 2;
+  return [
+    { dir: 'up',    x: midX, y: FIELD_TOP + 18,       symbol: '\u25B2' },
+    { dir: 'down',  x: midX, y: FIELD_BOTTOM - 18,    symbol: '\u25BC' },
+    { dir: 'left',  x: 18,   y: midY,                 symbol: '\u25C0' },
+    { dir: 'right', x: W - 18, y: midY,               symbol: '\u25B6' },
+  ];
+}
+
+// 플레이어와 가장자리 간 거리 계산
+function edgeDist(dir, px, py) {
+  if (dir === 'up')    return py - FIELD_TOP;
+  if (dir === 'down')  return FIELD_BOTTOM - py;
+  if (dir === 'left')  return px;
+  if (dir === 'right') return W - px;
+  return Infinity;
+}
+
+/**
+ * 맵 가장자리 화살표 아이콘 그리기
+ * - 플레이어가 가장자리 근처에 있을 때 페이드인
+ * - canMove 체크하여 이동 불가 방향은 숨김
+ */
+export function drawEdgeArrows(ctx) {
+  if (world.transitioning) return;
+  if (state.screen !== 'playing') return;
+
+  const p = state.player;
+  if (p.onTower >= 0) return;
+
+  const arrows = getArrowDefs();
+  const t = state.time * ARROW_PULSE_SPEED;
+
+  for (const a of arrows) {
+    if (!canMove(world.currentCx, world.currentCy, a.dir)) continue;
+
+    const dist = edgeDist(a.dir, p.x, p.y);
+    if (dist > ARROW_SHOW_DIST) continue;
+
+    // 거리에 비례한 알파값 (가까울수록 밝게)
+    const ratio = 1 - dist / ARROW_SHOW_DIST;
+    const pulse = 0.5 + Math.sin(t) * 0.2;
+    const alpha = ratio * pulse;
+
+    if (alpha <= 0.01) continue;
+
+    ctx.save();
+
+    // 배경 원
+    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.15})`;
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, ARROW_SIZE * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 화살표 텍스트
+    ctx.fillStyle = `rgba(255,220,100,${alpha})`;
+    ctx.font = `bold ${ARROW_SIZE}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(a.symbol, a.x, a.y);
+
+    // 테두리
+    ctx.strokeStyle = `rgba(255,220,100,${alpha * 0.6})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, ARROW_SIZE * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+// 화살표 히트 영역 반환 (player.js에서 사용)
+export function getArrowHitAreas() {
+  const arrows = getArrowDefs();
+  const p = state.player;
+  const result = [];
+  for (const a of arrows) {
+    if (!canMove(world.currentCx, world.currentCy, a.dir)) continue;
+    const dist = edgeDist(a.dir, p.x, p.y);
+    if (dist > ARROW_SHOW_DIST) continue;
+    result.push({ dir: a.dir, x: a.x, y: a.y, radius: ARROW_SIZE * 0.7 });
+  }
+  return result;
 }
 
 /**

@@ -1,7 +1,7 @@
 // ── Zombie World - 메인 게임 루프 ──
 import { W, H, state, isGameOver, getTotalAmmo, updateSounds, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=20';
 import { initDial, updateDial, drawDial } from './aiming.js?v=20';
-import { drawField, drawFiringLine, drawSoundSources, drawTransitionOverlay } from './renderer.js?v=20';
+import { drawField, drawFiringLine, drawSoundSources, drawTransitionOverlay, drawEdgeArrows } from './renderer.js?v=20';
 import { initPistol, drawPistol } from './pistol.js?v=20';
 import { initBow, drawBow, drawBowTargetOverlay } from './bow.js?v=20';
 import { initSniper, updateSniper, drawSniper, drawScopeOverlay } from './sniper.js?v=20';
@@ -376,6 +376,9 @@ function draw() {
 
   // 파티클
   drawParticles(ctx);
+
+  // 맵 가장자리 방향 화살표
+  drawEdgeArrows(ctx);
 
   // 밤 오버레이
   drawNightOverlay(ctx);

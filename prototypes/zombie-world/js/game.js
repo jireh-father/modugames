@@ -136,6 +136,7 @@ export const state = {
     moving: false,
     hitFlash: 0,
     targetTower: -1,     // pathfind 목표 타워
+    targetEdgeDir: null, // 화살표 탭 시 전환할 방향
     moveNoiseRange: 160,  // 이동 소음 범위 (4x)
     moveNoiseTimer: 0,
     shoeType: null,      // null | 'silent' | 'stealth'
@@ -276,7 +277,7 @@ export function resetGame() {
   state.player = {
     x: 270, y: 590, hp: 100, maxHp: 100, speed: 220, size: 16,
     onTower: 1, path: [], pathIdx: 0, moving: false, hitFlash: 0,
-    targetTower: -1, moveNoiseRange: 160, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
+    targetTower: -1, targetEdgeDir: null, moveNoiseRange: 160, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
   };
   state.hunger = 100;
   state.fatigue = 100;
