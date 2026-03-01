@@ -125,6 +125,36 @@ function zombieCollidesBuilding(x, y, size) {
   return false;
 }
 
+// ── 좀비 간 분리 물리 (겹침 방지) ──
+function applySeparation() {
+  const zombies = state.zombies;
+  for (let i = 0; i < zombies.length; i++) {
+    const a = zombies[i];
+    if (!a.alive) continue;
+    let pushX = 0, pushY = 0;
+    for (let j = i + 1; j < zombies.length; j++) {
+      const b = zombies[j];
+      if (!b.alive) continue;
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = (a.size + b.size) * 0.8;
+      if (dist < minDist && dist > 0) {
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const force = overlap * 0.5;
+        pushX += nx * force;
+        pushY += ny * force;
+        b.x -= nx * force;
+        b.y -= ny * force;
+      }
+    }
+    a.x += pushX;
+    a.y += pushY;
+  }
+}
+
 // ── 좀비 업데이트 ──
 function updateZombies(dt) {
   wallHitSoundTimer -= dt;
@@ -370,6 +400,9 @@ function updateZombies(dt) {
       }
     }
   }
+
+  // ── 좀비 간 분리 물리 (겹침 방지) ──
+  applySeparation();
 
   // 죽은 좀비 제거
   for (let i = state.zombies.length - 1; i >= 0; i--) {
