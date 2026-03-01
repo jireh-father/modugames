@@ -5,6 +5,7 @@ import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, play
 import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=18';
 import { openSettings } from './settings.js?v=18';
 import { world } from './world.js?v=18';
+import { hasSave, loadGame, deleteSave, saveGame } from './save.js?v=18';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -91,10 +92,20 @@ export function initHUD() {
           playUIClick();
           return;
         }
+        // Save 버튼
+        const saveY = MENU_Y_START + MENU_GAP * 3;
+        if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
+            y >= saveY && y <= saveY + MENU_BTN_H) {
+          saveGame();
+          playUIClick();
+          state.screen = 'playing';
+          return;
+        }
         // Exit 버튼
-        const exitY = MENU_Y_START + MENU_GAP * 3;
+        const exitY = MENU_Y_START + MENU_GAP * 4;
         if (x >= cx - MENU_BTN_W / 2 && x <= cx + MENU_BTN_W / 2 &&
             y >= exitY && y <= exitY + MENU_BTN_H) {
+          saveGame(); // 나가기 전 자동 저장
           state.screen = 'title';
           playUIClick();
           return;
@@ -563,21 +574,34 @@ export function drawTitle(ctx) {
   ctx.font = '16px monospace';
   ctx.fillText('\uC0DD\uC874\uC744 \uC2DC\uC791\uD558\uB77C', W / 2, H * 0.28 + 90);
 
-  // 시작 안내
+  // CONTINUE 버튼 (세이브 존재 시)
+  if (hasSave()) {
+    const contY = H * 0.52;
+    ctx.fillStyle = '#4a8866';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(W / 2 - 100, contY, 200, 45, 8);
+    else ctx.rect(W / 2 - 100, contY, 200, 45);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText('CONTINUE', W / 2, contY + 30);
+  }
+
+  // 새 게임 안내
   const alpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
   ctx.fillStyle = `rgba(255,200,100,${alpha})`;
   ctx.font = 'bold 18px monospace';
-  ctx.fillText('TAP TO START', W / 2, H * 0.6);
+  ctx.fillText(hasSave() ? 'TAP FOR NEW GAME' : 'TAP TO START', W / 2, H * 0.66);
 
   // 기록 표시
   if (state.bestScore > 0 || state.bestWave > 0) {
     ctx.fillStyle = '#888';
     ctx.font = '14px monospace';
     if (state.bestScore > 0) {
-      ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.68);
+      ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.73);
     }
     if (state.bestWave > 0) {
-      ctx.fillText(`BEST DAYS: ${state.bestWave}`, W / 2, H * 0.73);
+      ctx.fillText(`BEST DAYS: ${state.bestWave}`, W / 2, H * 0.78);
     }
   }
 
@@ -618,6 +642,7 @@ export function drawPauseMenu(ctx) {
     { label: 'RESUME', color: '#4a8' },
     { label: 'RESTART', color: '#a84' },
     { label: 'SETTINGS', color: '#668' },
+    { label: 'SAVE', color: '#486' },
     { label: 'EXIT', color: '#844' },
   ];
 
@@ -741,6 +766,7 @@ export function triggerGameOver() {
 
   congratsTimer = 0;
   state.screen = 'gameover';
+  deleteSave(); // 사망 시 세이브 삭제
   playGameOver();
   if (newBestScore || newBestWave) {
     setTimeout(() => playNewRecord(), 600);
@@ -761,8 +787,20 @@ export function initScreenHandlers() {
             openSettings();
             return;
           }
+          // CONTINUE 버튼 (세이브가 있을 때)
+          const contY = H * 0.52;
+          if (hasSave() && x >= W / 2 - 100 && x <= W / 2 + 100 && y >= contY && y <= contY + 45) {
+            requestGyro();
+            resetGyroRef();
+            if (loadGame()) {
+              playStart();
+              return;
+            }
+          }
+          // 새 게임 시작 (세이브 삭제)
           requestGyro();
           resetGyroRef();
+          deleteSave();
           resetGame();
           playStart();
         } else if (state.screen === 'gameover') {

@@ -1,5 +1,6 @@
 // ── 피로 & 수면 시스템 ──
 import { state } from './game.js?v=18';
+import { saveGame } from './save.js?v=18';
 
 export function updateFatigue(dt) {
   // 수면 중이면 회복
@@ -10,6 +11,8 @@ export function updateFatigue(dt) {
     if (state.sleepTimer >= state.sleepDuration) {
       state.sleeping = false;
       state.sleepTimer = 0;
+      // 수면 완료 시 자동 저장
+      saveGame();
     }
     return;
   }
