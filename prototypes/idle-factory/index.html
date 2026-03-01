@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>아이들 팩토리</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none}
+canvas{background:#1a1a1a;max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c" width="540" height="960"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+function fmt(n){
+  if(n>=1e12)return(n/1e12).toFixed(1)+'T';
+  if(n>=1e9)return(n/1e9).toFixed(1)+'B';
+  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
+  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  return Math.floor(n).toString();
+}
+
+const MACHINES=[
+  {name:'채굴기',cost:10,emoji:'⛏️',produces:'stone',rate:1,consumes:null,color:'#8b4513'},
+  {name:'제련소',cost:50,emoji:'🔥',produces:'metal',rate:0.5,consumes:'stone',color:'#b22222'},
+  {name:'조립기',cost:200,emoji:'🔧',produces:'parts',rate:0.3,consumes:'metal',color:'#4682b4'},
+  {name:'공장',cost:500,emoji:'🏭',produces:'products',rate:0.2,consumes:'parts',color:'#2e8b57'},
+  {name:'판매소',cost:100,emoji:'💰',produces:'coins',rate:0.5,consumes:'products',color:'#daa520'},
+  {name:'연구소',cost:1000,emoji:'🔬',produces:'research',rate:0.1,consumes:null,color:'#6a5acd'},
+  {name:'자동화봇',cost:2000,emoji:'🤖',produces:null,rate:0,consumes:null,color:'#20b2aa'}
+];
+
+const UPGRADES=[
+  {name:'채굴 효율',desc:'채굴기 속도 x2',cost:5,target:0,mult:2,bought:false},
+  {name:'제련 효율',desc:'제련소 속도 x2',cost:10,target:1,mult:2,bought:false},
+  {name:'조립 효율',desc:'조립기 속도 x2',cost:15,target:2,mult:2,bought:false},
+  {name:'생산 효율',desc:'공장 속도 x2',cost:20,target:3,mult:2,bought:false},
+  {name:'판매 보너스',desc:'판매소 수입 x2',cost:25,target:4,mult:2,bought:false},
+  {name:'자동 구매',desc:'자동으로 가장 싼 기계 구매',cost:30,target:-1,mult:1,bought:false},
+  {name:'시간 가속',desc:'모든 생산 속도 x1.5',cost:50,target:-2,mult:1.5,bought:false}
+];
+
+let coins=20,resources={stone:0,metal:0,parts:0,products:0,research:0};
+let machines=[0,0,0,0,0,0,0]; // count of each machine
+let tab='machines'; // 'machines' or 'upgrades'
+let speedMult=1,autoBuy=false;
+let animations=[]; // {x,y,text,life}
+let conveyorOffset=0;
+
+function getMachineCost(idx){return Math.floor(MACHINES[idx].cost*Math.pow(1.15,machines[idx]))}
+
+function buyMachine(idx){
+  let cost=getMachineCost(idx);
+  if(coins<cost)return;
+  coins-=cost;
+  machines[idx]++;
+  animations.push({x:W/2,y:400,text:'+1 '+MACHINES[idx].name,life:1,color:MACHINES[idx].color});
+}
+
+function buyUpgrade(idx){
+  let u=UPGRADES[idx];
+  if(u.bought||resources.research<u.cost)return;
+  resources.research-=u.cost;
+  u.bought=true;
+  if(u.target===-1)autoBuy=true;
+  if(u.target===-2)speedMult*=u.mult;
+}
+
+function getCanvasPos(e){
+  let r=c.getBoundingClientRect();
+  let t=e.touches?e.touches[0]:e;
+  return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H};
+}
+
+c.addEventListener('mousedown',e=>handleClick(getCanvasPos(e)));
+c.addEventListener('touchstart',e=>{e.preventDefault();handleClick(getCanvasPos(e))});
+
+function handleClick(p){
+  // Tab buttons
+  if(p.y>120&&p.y<160){
+    if(p.x<W/2)tab='machines';else tab='upgrades';
+    return;
+  }
+  // Items in main area
+  if(p.y>170&&p.y<870){
+    let idx=Math.floor((p.y-170)/95);
+    if(tab==='machines'&&idx>=0&&idx<7){
+      // Check if clicking buy button area (right side)
+      if(p.x>370) buyMachine(idx);
+    }else if(tab==='upgrades'&&idx>=0&&idx<7){
+      if(p.x>370) buyUpgrade(idx);
+    }
+  }
+}
+
+let lastTime=0,saveTimer=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+
+  conveyorOffset=(conveyorOffset+dt*30)%20;
+
+  // Production
+  for(let i=0;i<7;i++){
+    if(machines[i]===0)continue;
+    let m=MACHINES[i];
+    let rate=m.rate*machines[i]*speedMult;
+    // Apply upgrade multiplier
+    let u=UPGRADES.find(u=>u.target===i&&u.bought);
+    if(u)rate*=u.mult;
+    // Auto bot bonus
+    rate*=(1+machines[6]*0.1);
+
+    if(i===6)continue; // auto bot doesn't produce
+
+    if(m.consumes){
+      let consume=rate*dt;
+      if(resources[m.consumes]>=consume){
+        resources[m.consumes]-=consume;
+        if(m.produces==='coins')coins+=consume*10;
+        else resources[m.produces]+=consume;
+      }
+    }else{
+      if(m.produces==='coins')coins+=rate*dt;
+      else if(m.produces)resources[m.produces]+=rate*dt;
+    }
+  }
+
+  // Auto buy
+  if(autoBuy){
+    for(let i=0;i<5;i++){
+      let cost=getMachineCost(i);
+      if(coins>=cost*3){buyMachine(i);break}
+    }
+  }
+
+  // Animations
+  for(let a of animations){a.life-=dt;a.y-=30*dt}
+  animations=animations.filter(a=>a.life>0);
+
+  // Auto save
+  saveTimer+=dt;
+  if(saveTimer>30){saveTimer=0;saveGame()}
+
+  draw();
+}
+
+function saveGame(){
+  try{
+    localStorage.setItem('idle-factory',JSON.stringify({coins,resources,machines,upgrades:UPGRADES.map(u=>u.bought)}));
+  }catch(e){}
+}
+function loadGame(){
+  try{
+    let d=JSON.parse(localStorage.getItem('idle-factory'));
+    if(d){coins=d.coins;resources=d.resources;machines=d.machines;
+      d.upgrades.forEach((b,i)=>{UPGRADES[i].bought=b;if(UPGRADES[i].target===-1&&b)autoBuy=true;if(UPGRADES[i].target===-2&&b)speedMult*=UPGRADES[i].mult});
+    }
+  }catch(e){}
+}
+loadGame();
+
+function draw(){
+  ctx.fillStyle='#1a1a1a';ctx.fillRect(0,0,W,H);
+
+  // Conveyor belt background accent
+  ctx.fillStyle='#222';
+  for(let y=170;y<870;y+=20){
+    ctx.fillStyle=Math.floor((y+conveyorOffset)/20)%2===0?'#1e1e1e':'#222';
+    ctx.fillRect(0,y,W,10);
+  }
+
+  // Top bar - coins
+  ctx.fillStyle='#2a2a2a';ctx.fillRect(0,0,W,55);
+  ctx.fillStyle='#ffd700';ctx.font='bold 22px sans-serif';ctx.textAlign='left';
+  ctx.fillText('💰 '+fmt(coins),20,35);
+  ctx.fillStyle='#b388ff';ctx.textAlign='right';
+  ctx.fillText('🔬 '+fmt(resources.research),W-20,35);
+
+  // Resource bar
+  ctx.fillStyle='#252525';ctx.fillRect(0,55,W,60);
+  let resNames=[['stone','⛏️'],['metal','🔧'],['parts','⚙️'],['products','📦']];
+  ctx.font='13px sans-serif';ctx.textAlign='center';
+  for(let i=0;i<4;i++){
+    let x=30+i*(W-60)/4;
+    ctx.fillStyle='#aaa';ctx.fillText(resNames[i][1]+' '+fmt(resources[resNames[i][0]]),x+50,80);
+  }
+
+  // Tab buttons
+  ctx.fillStyle=tab==='machines'?'#d4840a':'#333';
+  ctx.fillRect(0,120,W/2,40);
+  ctx.fillStyle=tab==='upgrades'?'#6a5acd':'#333';
+  ctx.fillRect(W/2,120,W/2,40);
+  ctx.fillStyle='#fff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+  ctx.fillText('기계',W/4,147);ctx.fillText('업그레이드',W*3/4,147);
+
+  // Main area
+  if(tab==='machines'){
+    for(let i=0;i<7;i++){
+      let m=MACHINES[i],y=170+i*95;
+      ctx.fillStyle='#2a2a2a';ctx.fillRect(10,y+5,W-20,85);
+      ctx.strokeStyle=m.color;ctx.lineWidth=2;ctx.strokeRect(10,y+5,W-20,85);
+
+      // Icon
+      ctx.font='32px sans-serif';ctx.textAlign='left';
+      ctx.fillText(m.emoji,25,y+50);
+
+      // Name & count
+      ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';
+      ctx.fillText(m.name,70,y+35);
+      ctx.fillStyle='#aaa';ctx.font='13px sans-serif';
+      ctx.fillText('보유: '+machines[i],70,y+55);
+
+      // Production info
+      let rate=m.rate*Math.max(1,machines[i])*speedMult;
+      let u=UPGRADES.find(u=>u.target===i&&u.bought);
+      if(u)rate*=u.mult;
+      rate*=(1+machines[6]*0.1);
+      if(i<6){
+        ctx.fillText((m.consumes?m.consumes+'→':'')+
+          (m.produces||'boost')+' '+fmt(rate)+'/s',70,y+73);
+      }else{
+        ctx.fillText('전체 속도 +'+machines[i]*10+'%',70,y+73);
+      }
+
+      // Buy button
+      let cost=getMachineCost(i);
+      ctx.fillStyle=coins>=cost?'#d4840a':'#555';
+      ctx.fillRect(380,y+20,130,50);
+      ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+      ctx.fillText('구매',445,y+42);
+      ctx.font='12px sans-serif';
+      ctx.fillText(fmt(cost)+'G',445,y+60);
+      ctx.textAlign='left';
+    }
+  }else{
+    for(let i=0;i<7;i++){
+      let u=UPGRADES[i],y=170+i*95;
+      ctx.fillStyle=u.bought?'#1a3a1a':'#2a2a2a';
+      ctx.fillRect(10,y+5,W-20,85);
+      ctx.strokeStyle=u.bought?'#4caf50':'#6a5acd';ctx.lineWidth=2;
+      ctx.strokeRect(10,y+5,W-20,85);
+
+      ctx.fillStyle=u.bought?'#4caf50':'#fff';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+      ctx.fillText((u.bought?'✅ ':'')+u.name,25,y+35);
+      ctx.fillStyle='#aaa';ctx.font='13px sans-serif';
+      ctx.fillText(u.desc,25,y+55);
+      ctx.fillText('비용: 🔬'+u.cost,25,y+73);
+
+      if(!u.bought){
+        ctx.fillStyle=resources.research>=u.cost?'#6a5acd':'#555';
+        ctx.fillRect(380,y+20,130,50);
+        ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+        ctx.fillText('연구',445,y+42);
+        ctx.font='12px sans-serif';
+        ctx.fillText('🔬'+u.cost,445,y+60);
+      }else{
+        ctx.fillStyle='#4caf50';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
+        ctx.fillText('완료',445,y+50);
+      }
+      ctx.textAlign='left';
+    }
+  }
+
+  // Bottom bar
+  ctx.fillStyle='#2a2a2a';ctx.fillRect(0,880,W,80);
+  ctx.fillStyle='#888';ctx.font='12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('💰 수입: '+fmt(machines[4]*MACHINES[4].rate*speedMult*(1+machines[6]*0.1)*(UPGRADES[4].bought?2:1)*10)+'/s',W/2,910);
+  ctx.fillText('⛏️→🔧→⚙️→📦→💰 생산 체인',W/2,930);
+
+  // Animations
+  for(let a of animations){
+    ctx.globalAlpha=a.life;ctx.fillStyle=a.color||'#fff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+    ctx.fillText(a.text,a.x,a.y);
+  }
+  ctx.globalAlpha=1;
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>

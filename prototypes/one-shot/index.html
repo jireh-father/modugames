@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>한방 (One Shot)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #121212;
+  overflow: hidden;
+  touch-action: none;
+  font-family: 'Segoe UI', sans-serif;
+  user-select: none;
+}
+canvas { display: block; }
+#ui {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; pointer-events: none; z-index: 10;
+}
+#ui > div {
+  background: rgba(0,0,0,0.6); padding: 8px 16px;
+  border-radius: 20px; font-size: 15px; color: #e0e0e0; font-weight: bold;
+}
+#startScreen {
+  position: fixed; inset: 0;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#startScreen h1 {
+  font-size: 52px; margin-bottom: 8px;
+  background: linear-gradient(90deg, #e94560, #ff6b6b, #ffd93d);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+#startScreen p { color: #aaa; margin-bottom: 30px; font-size: 16px; text-align: center; line-height: 1.6; }
+#startScreen button {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: #fff; border: none; padding: 16px 48px; border-radius: 30px;
+  font-size: 20px; cursor: pointer; font-weight: bold;
+  box-shadow: 0 4px 20px rgba(233,69,96,0.5);
+}
+#levelComplete {
+  position: fixed; inset: 0; background: rgba(18,18,18,0.95);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#levelComplete h2 { font-size: 32px; margin-bottom: 12px; }
+#osStars { font-size: 48px; color: #ffd93d; margin-bottom: 8px; }
+#osInfo { font-size: 18px; color: #aaa; margin-bottom: 24px; }
+#levelComplete button {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: #fff; border: none; padding: 14px 36px; border-radius: 30px;
+  font-size: 18px; cursor: pointer; font-weight: bold; margin: 6px;
+  box-shadow: 0 4px 15px rgba(233,69,96,0.4);
+}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>한방</h1>
+  <p>공 하나로 모든 별을 맞추세요!<br>벽에 튕기는 각도를 계산하세요!</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="shotsDisplay">발사: 0</div>
+  <div id="starsCollected">별: 0/0</div>
+</div>
+<div id="levelComplete">
+  <h2 id="osTitle">레벨 클리어!</h2>
+  <div id="osStars"></div>
+  <div id="osInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, dur, type='sine', vol=0.12) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+function playLaunch() { playSound(250, 0.15, 'sine', 0.1); playSound(400, 0.1, 'sine', 0.06); }
+function playBounce() { playSound(300 + Math.random() * 200, 0.1, 'sine', 0.08); }
+function playStar() {
+  playSound(600, 0.3, 'sine', 0.15);
+  setTimeout(() => playSound(800, 0.2, 'sine', 0.1), 80);
+  setTimeout(() => playSound(1000, 0.15, 'sine', 0.08), 160);
+}
+
+// Game state
+let ball = null;
+let targets = [];
+let walls = [];
+let trail = [];
+let particles = [];
+let sparkles = [];
+let launchPos = { x: 0, y: 0 };
+let aimPos = null;
+let isDragging = false;
+let shotsFired = 0;
+let level = 1;
+let gameActive = false;
+let ballActive = false;
+let totalStarsCollected = 0;
+
+const BALL_SPEED = 10;
+const BALL_RADIUS = 8;
+const MAX_BOUNCES = 15;
+const STAR_RADIUS = 16;
+const TRAIL_MAX = 60;
+
+// Level definitions
+const levelDefs = [
+  // Level 1: Simple, 2 stars
+  (w, h) => ({
+    launch: { x: w * 0.2, y: h * 0.8 },
+    stars: [
+      { x: w * 0.5, y: h * 0.4 },
+      { x: w * 0.8, y: h * 0.7 },
+    ],
+    walls: [],
+    par: 1,
+  }),
+  // Level 2: One wall
+  (w, h) => ({
+    launch: { x: w * 0.15, y: h * 0.85 },
+    stars: [
+      { x: w * 0.8, y: h * 0.3 },
+      { x: w * 0.5, y: h * 0.6 },
+      { x: w * 0.2, y: h * 0.3 },
+    ],
+    walls: [
+      { x1: w * 0.4, y1: h * 0.15, x2: w * 0.4, y2: h * 0.55 },
+    ],
+    par: 1,
+  }),
+  // Level 3: Two walls
+  (w, h) => ({
+    launch: { x: w * 0.5, y: h * 0.9 },
+    stars: [
+      { x: w * 0.2, y: h * 0.2 },
+      { x: w * 0.8, y: h * 0.2 },
+      { x: w * 0.5, y: h * 0.5 },
+    ],
+    walls: [
+      { x1: w * 0.35, y1: h * 0.35, x2: w * 0.35, y2: h * 0.75 },
+      { x1: w * 0.65, y1: h * 0.35, x2: w * 0.65, y2: h * 0.75 },
+    ],
+    par: 1,
+  }),
+  // Level 4: Maze-like
+  (w, h) => ({
+    launch: { x: w * 0.1, y: h * 0.9 },
+    stars: [
+      { x: w * 0.9, y: h * 0.15 },
+      { x: w * 0.3, y: h * 0.5 },
+      { x: w * 0.7, y: h * 0.7 },
+      { x: w * 0.5, y: h * 0.25 },
+    ],
+    walls: [
+      { x1: w * 0.25, y1: h * 0.1, x2: w * 0.25, y2: h * 0.6 },
+      { x1: w * 0.5, y1: h * 0.4, x2: w * 0.5, y2: h * 0.9 },
+      { x1: w * 0.75, y1: h * 0.1, x2: w * 0.75, y2: h * 0.55 },
+    ],
+    par: 1,
+  }),
+  // Level 5: Complex
+  (w, h) => ({
+    launch: { x: w * 0.5, y: h * 0.92 },
+    stars: [
+      { x: w * 0.15, y: h * 0.15 },
+      { x: w * 0.85, y: h * 0.15 },
+      { x: w * 0.5, y: h * 0.35 },
+      { x: w * 0.3, y: h * 0.65 },
+      { x: w * 0.7, y: h * 0.65 },
+    ],
+    walls: [
+      { x1: w * 0.3, y1: h * 0.25, x2: w * 0.7, y2: h * 0.25 },
+      { x1: w * 0.2, y1: h * 0.5, x2: w * 0.45, y2: h * 0.5 },
+      { x1: w * 0.55, y1: h * 0.5, x2: w * 0.8, y2: h * 0.5 },
+      { x1: w * 0.1, y1: h * 0.75, x2: w * 0.4, y2: h * 0.75 },
+      { x1: w * 0.6, y1: h * 0.75, x2: w * 0.9, y2: h * 0.75 },
+    ],
+    par: 2,
+  }),
+  // Level 6
+  (w, h) => ({
+    launch: { x: w * 0.9, y: h * 0.9 },
+    stars: [
+      { x: w * 0.1, y: h * 0.1 },
+      { x: w * 0.5, y: h * 0.3 },
+      { x: w * 0.8, y: h * 0.5 },
+      { x: w * 0.2, y: h * 0.7 },
+    ],
+    walls: [
+      { x1: w * 0.3, y1: h * 0.2, x2: w * 0.7, y2: h * 0.2 },
+      { x1: w * 0.4, y1: h * 0.4, x2: w * 0.4, y2: h * 0.8 },
+      { x1: w * 0.6, y1: h * 0.35, x2: w * 0.6, y2: h * 0.7 },
+    ],
+    par: 2,
+  }),
+  // Level 7
+  (w, h) => ({
+    launch: { x: w * 0.5, y: h * 0.5 },
+    stars: [
+      { x: w * 0.15, y: h * 0.15 },
+      { x: w * 0.85, y: h * 0.15 },
+      { x: w * 0.15, y: h * 0.85 },
+      { x: w * 0.85, y: h * 0.85 },
+      { x: w * 0.5, y: h * 0.15 },
+    ],
+    walls: [
+      { x1: w * 0.3, y1: h * 0.3, x2: w * 0.7, y2: h * 0.3 },
+      { x1: w * 0.3, y1: h * 0.7, x2: w * 0.7, y2: h * 0.7 },
+      { x1: w * 0.3, y1: h * 0.3, x2: w * 0.3, y2: h * 0.7 },
+      { x1: w * 0.7, y1: h * 0.3, x2: w * 0.7, y2: h * 0.7 },
+    ],
+    par: 2,
+  }),
+  // Level 8
+  (w, h) => ({
+    launch: { x: w * 0.05, y: h * 0.95 },
+    stars: [
+      { x: w * 0.2, y: h * 0.2 },
+      { x: w * 0.4, y: h * 0.4 },
+      { x: w * 0.6, y: h * 0.6 },
+      { x: w * 0.8, y: h * 0.3 },
+      { x: w * 0.5, y: h * 0.15 },
+      { x: w * 0.9, y: h * 0.8 },
+    ],
+    walls: [
+      { x1: w * 0.3, y1: h * 0.1, x2: w * 0.3, y2: h * 0.5 },
+      { x1: w * 0.5, y1: h * 0.3, x2: w * 0.5, y2: h * 0.7 },
+      { x1: w * 0.7, y1: h * 0.1, x2: w * 0.7, y2: h * 0.5 },
+      { x1: w * 0.2, y1: h * 0.7, x2: w * 0.8, y2: h * 0.7 },
+    ],
+    par: 2,
+  }),
+];
+
+function initLevel(lvl) {
+  const margin = 60;
+  const defIndex = Math.min(lvl - 1, levelDefs.length - 1);
+  const def = levelDefs[defIndex](W - margin * 2, H - margin * 2 - 50);
+
+  // Offset everything by margin
+  launchPos = { x: def.launch.x + margin, y: def.launch.y + margin + 50 };
+
+  targets = def.stars.map(s => ({
+    x: s.x + margin,
+    y: s.y + margin + 50,
+    collected: false,
+    pulse: Math.random() * Math.PI * 2,
+    collectAnim: 0,
+  }));
+
+  walls = def.walls.map(w => ({
+    x1: w.x1 + margin, y1: w.y1 + margin + 50,
+    x2: w.x2 + margin, y2: w.y2 + margin + 50,
+  }));
+
+  ball = null;
+  trail = [];
+  particles = [];
+  sparkles = [];
+  shotsFired = 0;
+  ballActive = false;
+  aimPos = null;
+
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('levelDisplay').textContent = `레벨 ${level}`;
+  document.getElementById('shotsDisplay').textContent = `발사: ${shotsFired}`;
+  const collected = targets.filter(t => t.collected).length;
+  document.getElementById('starsCollected').textContent = `별: ${collected}/${targets.length}`;
+}
+
+// Shoot ball
+function shoot(dx, dy) {
+  if (ballActive) return;
+
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 20) return;
+
+  ball = {
+    x: launchPos.x,
+    y: launchPos.y,
+    vx: -(dx / len) * BALL_SPEED,
+    vy: -(dy / len) * BALL_SPEED,
+    bounces: 0,
+    alive: true,
+  };
+
+  trail = [];
+  shotsFired++;
+  ballActive = true;
+  playLaunch();
+  updateUI();
+}
+
+// Input
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (!gameActive || ballActive) return;
+
+  const px = e.clientX;
+  const py = e.clientY;
+  const dx = px - launchPos.x;
+  const dy = py - launchPos.y;
+  if (Math.sqrt(dx * dx + dy * dy) < 150) {
+    isDragging = true;
+    aimPos = { x: px, y: py };
+  }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  e.preventDefault();
+  if (isDragging) {
+    aimPos = { x: e.clientX, y: e.clientY };
+  }
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  e.preventDefault();
+  if (isDragging && aimPos) {
+    const dx = aimPos.x - launchPos.x;
+    const dy = aimPos.y - launchPos.y;
+    shoot(dx, dy);
+  }
+  isDragging = false;
+  aimPos = null;
+});
+
+// Line segment intersection
+function lineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 0.001) return null;
+
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return {
+      x: x1 + t * (x2 - x1),
+      y: y1 + t * (y2 - y1),
+      t,
+    };
+  }
+  return null;
+}
+
+// Reflect velocity off a wall
+function reflect(vx, vy, nx, ny) {
+  const dot = vx * nx + vy * ny;
+  return {
+    vx: vx - 2 * dot * nx,
+    vy: vy - 2 * dot * ny,
+  };
+}
+
+// Get wall normal
+function wallNormal(wall) {
+  const dx = wall.x2 - wall.x1;
+  const dy = wall.y2 - wall.y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  return { nx: -dy / len, ny: dx / len };
+}
+
+// Predict trajectory for preview
+function predictTrajectory(startX, startY, vx, vy, maxBounces) {
+  const points = [{ x: startX, y: startY }];
+  let cx = startX, cy = startY;
+  let cvx = vx, cvy = vy;
+  let bounces = 0;
+
+  for (let step = 0; step < maxBounces + 1; step++) {
+    // Find nearest wall intersection
+    let nearestT = Infinity;
+    let nearestWall = null;
+
+    // Screen boundary walls
+    const boundaries = [
+      { x1: 0, y1: 0, x2: W, y2: 0 },
+      { x1: W, y1: 0, x2: W, y2: H },
+      { x1: W, y1: H, x2: 0, y2: H },
+      { x1: 0, y1: H, x2: 0, y2: 0 },
+    ];
+
+    const allWalls = [...boundaries, ...walls];
+
+    for (const wall of allWalls) {
+      const hit = lineIntersect(
+        cx, cy, cx + cvx * 500, cy + cvy * 500,
+        wall.x1, wall.y1, wall.x2, wall.y2
+      );
+      if (hit && hit.t > 0.001 && hit.t < nearestT) {
+        nearestT = hit.t;
+        nearestWall = wall;
+      }
+    }
+
+    if (nearestWall && nearestT < 500) {
+      const hitX = cx + cvx * nearestT * 500;
+      const hitY = cy + cvy * nearestT * 500;
+      points.push({ x: hitX, y: hitY });
+
+      const n = wallNormal(nearestWall);
+      const ref = reflect(cvx, cvy, n.nx, n.ny);
+      cvx = ref.vx;
+      cvy = ref.vy;
+      cx = hitX + cvx * 0.01;
+      cy = hitY + cvy * 0.01;
+      bounces++;
+    } else {
+      points.push({ x: cx + cvx * 200, y: cy + cvy * 200 });
+      break;
+    }
+  }
+
+  return points;
+}
+
+function update() {
+  if (!gameActive) return;
+
+  // Update ball
+  if (ball && ball.alive) {
+    // Move ball in small steps for accurate collision
+    const steps = 3;
+    for (let s = 0; s < steps; s++) {
+      ball.x += ball.vx / steps;
+      ball.y += ball.vy / steps;
+
+      // Trail
+      if (s === 0) {
+        trail.push({ x: ball.x, y: ball.y, age: 0 });
+        if (trail.length > TRAIL_MAX) trail.shift();
+      }
+
+      // Wall collisions (screen boundaries)
+      if (ball.x - BALL_RADIUS <= 0) {
+        ball.x = BALL_RADIUS;
+        ball.vx = Math.abs(ball.vx);
+        ball.bounces++;
+        playBounce();
+        addBounceParticles(ball.x, ball.y);
+      }
+      if (ball.x + BALL_RADIUS >= W) {
+        ball.x = W - BALL_RADIUS;
+        ball.vx = -Math.abs(ball.vx);
+        ball.bounces++;
+        playBounce();
+        addBounceParticles(ball.x, ball.y);
+      }
+      if (ball.y - BALL_RADIUS <= 0) {
+        ball.y = BALL_RADIUS;
+        ball.vy = Math.abs(ball.vy);
+        ball.bounces++;
+        playBounce();
+        addBounceParticles(ball.x, ball.y);
+      }
+      if (ball.y + BALL_RADIUS >= H) {
+        ball.y = H - BALL_RADIUS;
+        ball.vy = -Math.abs(ball.vy);
+        ball.bounces++;
+        playBounce();
+        addBounceParticles(ball.x, ball.y);
+      }
+
+      // Custom wall collisions
+      for (const wall of walls) {
+        const dx = wall.x2 - wall.x1;
+        const dy = wall.y2 - wall.y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+
+        // Distance from ball to line segment
+        const t = Math.max(0, Math.min(1,
+          ((ball.x - wall.x1) * dx + (ball.y - wall.y1) * dy) / (len * len)
+        ));
+
+        const closestX = wall.x1 + t * dx;
+        const closestY = wall.y1 + t * dy;
+        const distX = ball.x - closestX;
+        const distY = ball.y - closestY;
+        const dist = Math.sqrt(distX * distX + distY * distY);
+
+        if (dist < BALL_RADIUS + 3) {
+          // Reflect
+          const n = wallNormal(wall);
+          const dot = ball.vx * n.nx + ball.vy * n.ny;
+          if (dot < 0) {
+            ball.vx -= 2 * dot * n.nx;
+            ball.vy -= 2 * dot * n.ny;
+            ball.x = closestX + n.nx * (BALL_RADIUS + 4);
+            ball.y = closestY + n.ny * (BALL_RADIUS + 4);
+            ball.bounces++;
+            playBounce();
+            addBounceParticles(closestX, closestY);
+          }
+        }
+      }
+
+      // Star collisions
+      for (const target of targets) {
+        if (target.collected) continue;
+        const dx = ball.x - target.x;
+        const dy = ball.y - target.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < BALL_RADIUS + STAR_RADIUS) {
+          target.collected = true;
+          target.collectAnim = 1;
+          totalStarsCollected++;
+          playStar();
+          updateUI();
+
+          // Star collect particles
+          for (let i = 0; i < 16; i++) {
+            const angle = (Math.PI * 2 / 16) * i;
+            const speed = 3 + Math.random() * 4;
+            particles.push({
+              x: target.x, y: target.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: 1.2,
+              color: '#ffd93d',
+              size: 4 + Math.random() * 4,
+            });
+          }
+
+          // Score sparkle
+          sparkles.push({
+            x: target.x, y: target.y - 25,
+            text: '+100',
+            life: 1.5,
+          });
+        }
+      }
+
+      // Check if ball should stop
+      if (ball.bounces >= MAX_BOUNCES) {
+        ball.alive = false;
+      }
+    }
+
+    // Update trail ages
+    for (const t of trail) t.age++;
+
+    // Ball died
+    if (!ball.alive) {
+      ballActive = false;
+      const allCollected = targets.every(t => t.collected);
+      if (allCollected) {
+        setTimeout(() => showLevelComplete(), 500);
+      }
+    }
+  }
+
+  // Update targets
+  for (const t of targets) {
+    t.pulse += 0.04;
+    if (t.collectAnim > 0) t.collectAnim -= 0.05;
+  }
+
+  // Update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    p.life -= 0.025;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Update sparkles
+  for (let i = sparkles.length - 1; i >= 0; i--) {
+    sparkles[i].y -= 1;
+    sparkles[i].life -= 0.03;
+    if (sparkles[i].life <= 0) sparkles.splice(i, 1);
+  }
+}
+
+function addBounceParticles(x, y) {
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 2;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.8,
+      color: '#64b5f6',
+      size: 2 + Math.random() * 2,
+    });
+  }
+}
+
+function draw() {
+  // Background
+  ctx.fillStyle = '#121212';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid pattern
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Walls
+  ctx.strokeStyle = '#90caf9';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = '#42a5f5';
+  ctx.shadowBlur = 10;
+  for (const wall of walls) {
+    ctx.beginPath();
+    ctx.moveTo(wall.x1, wall.y1);
+    ctx.lineTo(wall.x2, wall.y2);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Screen boundary glow
+  ctx.strokeStyle = 'rgba(100,181,246,0.2)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W - 2, H - 2);
+
+  // Targets (stars)
+  for (const t of targets) {
+    if (t.collected) continue;
+    const pulse = 1 + Math.sin(t.pulse) * 0.1;
+    const r = STAR_RADIUS * pulse;
+
+    // Glow
+    const glow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 3);
+    glow.addColorStop(0, 'rgba(255,217,61,0.3)');
+    glow.addColorStop(1, 'rgba(255,217,61,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Star shape
+    ctx.fillStyle = '#ffd93d';
+    ctx.shadowColor = '#ffd93d';
+    ctx.shadowBlur = 15;
+    drawStarShape(t.x, t.y, r, r * 0.4, 5);
+    ctx.shadowBlur = 0;
+  }
+
+  // Aim line (when dragging)
+  if (isDragging && aimPos && !ballActive) {
+    const dx = aimPos.x - launchPos.x;
+    const dy = aimPos.y - launchPos.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+
+    if (len > 10) {
+      // Direction arrow
+      const dirX = -dx / len;
+      const dirY = -dy / len;
+
+      // Predict trajectory
+      const predicted = predictTrajectory(
+        launchPos.x, launchPos.y,
+        dirX * BALL_SPEED, dirY * BALL_SPEED, 3
+      );
+
+      // Draw predicted path
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = 'rgba(233,69,96,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < predicted.length; i++) {
+        if (i === 0) ctx.moveTo(predicted[i].x, predicted[i].y);
+        else ctx.lineTo(predicted[i].x, predicted[i].y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw drag line
+      ctx.strokeStyle = 'rgba(233,69,96,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(launchPos.x, launchPos.y);
+      ctx.lineTo(aimPos.x, aimPos.y);
+      ctx.stroke();
+
+      // Power indicator
+      const power = Math.min(1, len / 150);
+      ctx.fillStyle = `rgba(233,69,96,${0.3 + power * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(launchPos.x, launchPos.y, 15 + power * 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Launch position
+  if (!ballActive) {
+    // Pulsing launch point
+    const lPulse = 1 + Math.sin(Date.now() * 0.004) * 0.15;
+    ctx.fillStyle = 'rgba(233,69,96,0.3)';
+    ctx.beginPath();
+    ctx.arc(launchPos.x, launchPos.y, 25 * lPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#e94560';
+    ctx.beginPath();
+    ctx.arc(launchPos.x, launchPos.y, BALL_RADIUS + 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Trail
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    const alpha = (i / trail.length) * 0.6;
+    const size = (i / trail.length) * BALL_RADIUS;
+    ctx.fillStyle = `rgba(233,69,96,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Ball
+  if (ball && ball.alive) {
+    // Ball glow
+    ctx.shadowColor = '#e94560';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ff6b6b';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Ball highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(ball.x - 2, ball.y - 2, BALL_RADIUS * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bounce counter
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${ball.bounces}/${MAX_BOUNCES}`, ball.x, ball.y - 16);
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.fillStyle = p.color || '#fff';
+    ctx.globalAlpha = Math.min(1, p.life);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Score sparkles
+  for (const s of sparkles) {
+    ctx.fillStyle = `rgba(255,217,61,${Math.min(1, s.life)})`;
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.text, s.x, s.y);
+  }
+
+  // Instructions
+  if (!ballActive && shotsFired === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('발사 지점을 드래그하여 조준하세요', W / 2, H - 30);
+  }
+
+  // Ball dead, not all collected - retry hint
+  if (ball && !ball.alive && !targets.every(t => t.collected)) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('다시 발사하세요!', W / 2, H - 30);
+  }
+}
+
+function drawStarShape(cx, cy, outerR, innerR, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (Math.PI / points) * i - Math.PI / 2;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function showLevelComplete() {
+  gameActive = false;
+  const def = levelDefs[Math.min(level - 1, levelDefs.length - 1)](W, H);
+  const par = def.par;
+  let starCount = 1;
+  if (shotsFired <= par) starCount = 3;
+  else if (shotsFired <= par + 1) starCount = 2;
+
+  const starStr = '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
+  document.getElementById('osStars').textContent = starStr;
+  document.getElementById('osTitle').textContent = `레벨 ${level} 클리어!`;
+  document.getElementById('osInfo').textContent = `발사: ${shotsFired}회 (기준: ${par}회) | 별: ${targets.length}개`;
+  document.getElementById('levelComplete').style.display = 'flex';
+
+  playSound(523, 0.2, 'sine', 0.15);
+  setTimeout(() => playSound(659, 0.2, 'sine', 0.15), 150);
+  setTimeout(() => playSound(784, 0.3, 'sine', 0.15), 300);
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('levelComplete').style.display = 'none';
+  level = 1;
+  totalStarsCollected = 0;
+  initLevel(level);
+  gameActive = true;
+}
+
+function nextLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  level++;
+  initLevel(level);
+  gameActive = true;
+}
+
+function retryLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  initLevel(level);
+  gameActive = true;
+}
+
+gameLoop();
+</script>
+</body>
+</html>

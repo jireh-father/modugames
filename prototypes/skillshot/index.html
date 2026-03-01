@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>스킬샷 (Skillshot)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a1a2e;overflow:hidden;touch-action:none;font-family:'Segoe UI',sans-serif;user-select:none}
+canvas{display:block}
+#ui{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;pointer-events:none;z-index:10}
+#ui>div{background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;font-size:15px;color:#80deea;font-weight:bold}
+#startScreen{position:fixed;inset:0;background:linear-gradient(180deg,#0a1a2e 0%,#004d40 50%,#0a1a2e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#startScreen h1{font-size:48px;margin-bottom:8px;background:linear-gradient(90deg,#80deea,#4dd0e1,#00bcd4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#startScreen p{color:#80deea;margin-bottom:30px;font-size:16px;text-align:center;line-height:1.6}
+#startScreen button{background:linear-gradient(135deg,#00838f,#00bcd4);color:#fff;border:none;padding:16px 48px;border-radius:30px;font-size:20px;cursor:pointer;font-weight:bold;box-shadow:0 4px 20px rgba(0,188,212,0.5)}
+#levelComplete{position:fixed;inset:0;background:rgba(10,26,46,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#levelComplete h2{font-size:32px;margin-bottom:12px}
+#lcStars{font-size:48px;color:#ffd54f;margin-bottom:8px}
+#lcInfo{font-size:18px;color:#80deea;margin-bottom:24px}
+#levelComplete button{background:linear-gradient(135deg,#00838f,#00bcd4);color:#fff;border:none;padding:14px 36px;border-radius:30px;font-size:18px;cursor:pointer;font-weight:bold;margin:6px}
+#skillInfo{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,131,143,0.4);padding:10px 24px;border-radius:20px;color:#b2ebf2;font-size:14px;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>스킬샷</h1>
+  <p>공을 발사하면 벽에 튕길 때마다<br>파동이 생겨서 구슬을 밀어요!<br><br>한 번의 발사로 모든 구슬을 합치세요!</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="scoreDisplay">점수: 0</div>
+  <div id="shotDisplay">발사: 0</div>
+</div>
+<div id="skillInfo">드래그로 조준 → 릴리스로 발사 | 바운스마다 파동 생성!</div>
+<div id="levelComplete">
+  <h2 id="lcTitle">레벨 클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+
+const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+function playSound(f,d,t='sine',v=0.12){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d)}
+function playLaunch(){playSound(300,0.2,'sine',0.1);playSound(500,0.15,'sine',0.06)}
+function playBounceRipple(){playSound(250,0.3,'sine',0.1);playSound(400,0.2,'sine',0.06)}
+function playMerge(c){const b=400+c*80;playSound(b,0.5,'sine',0.2);playSound(b*1.5,0.3,'sine',0.1)}
+
+const COLORS=[
+  {fill:'#ef5350',glow:'rgba(239,83,80,'},
+  {fill:'#42a5f5',glow:'rgba(66,165,245,'},
+  {fill:'#66bb6a',glow:'rgba(102,187,106,'},
+  {fill:'#ffa726',glow:'rgba(255,167,38,'},
+  {fill:'#ab47bc',glow:'rgba(171,71,188,'},
+];
+
+let orbs=[],ripples=[],particles=[],flashes=[];
+let ball=null,trail=[];
+let shotCount=0,score=0,totalScore=0,level=1,gameActive=false,ballActive=false,comboCount=0;
+let isDragging=false,aimPos=null,launchPos={x:0,y:0};
+
+const FRICTION=0.985,ORB_RADIUS=22,BALL_SPEED=9,BALL_RADIUS=7,MAX_BOUNCES=12;
+const RIPPLE_SPEED=5,RIPPLE_FORCE=3.5;
+
+const levels=[
+  {colors:2,perColor:2,par:1},{colors:2,perColor:3,par:1},
+  {colors:3,perColor:2,par:1},{colors:3,perColor:3,par:2},
+  {colors:4,perColor:2,par:2},{colors:4,perColor:3,par:2},
+  {colors:3,perColor:4,par:2},{colors:5,perColor:2,par:2},
+];
+
+function initLevel(l){
+  const cfg=levels[Math.min(l-1,levels.length-1)];
+  orbs=[];ripples=[];particles=[];flashes=[];trail=[];ball=null;
+  shotCount=0;score=0;comboCount=0;ballActive=false;
+  launchPos={x:W/2,y:H-80};
+  const margin=80;
+  for(let c=0;c<cfg.colors;c++){
+    for(let n=0;n<cfg.perColor;n++){
+      let x,y,ok,att=0;
+      do{x=margin+Math.random()*(W-margin*2);y=margin+60+Math.random()*(H-margin*2-160);ok=true;
+        for(const o of orbs){const dx=x-o.x,dy=y-o.y;if(Math.sqrt(dx*dx+dy*dy)<ORB_RADIUS*3.5){ok=false;break}}att++}while(!ok&&att<100);
+      orbs.push({x,y,vx:0,vy:0,radius:ORB_RADIUS,color:c,mergeCount:0,pulse:Math.random()*Math.PI*2});
+    }
+  }
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById('levelDisplay').textContent=`레벨 ${level}`;
+  document.getElementById('scoreDisplay').textContent=`점수: ${totalScore+score}`;
+  document.getElementById('shotDisplay').textContent=`발사: ${shotCount}`;
+}
+
+// Input
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();if(!gameActive||ballActive)return;
+  const dx=e.clientX-launchPos.x,dy=e.clientY-launchPos.y;
+  if(Math.sqrt(dx*dx+dy*dy)<200){isDragging=true;aimPos={x:e.clientX,y:e.clientY}}
+});
+canvas.addEventListener('pointermove',e=>{e.preventDefault();if(isDragging)aimPos={x:e.clientX,y:e.clientY}});
+canvas.addEventListener('pointerup',e=>{
+  e.preventDefault();
+  if(isDragging&&aimPos){
+    const dx=aimPos.x-launchPos.x,dy=aimPos.y-launchPos.y;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    if(len>20){
+      ball={x:launchPos.x,y:launchPos.y,vx:-(dx/len)*BALL_SPEED,vy:-(dy/len)*BALL_SPEED,bounces:0,alive:true};
+      trail=[];shotCount++;ballActive=true;comboCount=0;playLaunch();updateUI();
+    }
+  }
+  isDragging=false;aimPos=null;
+});
+
+function createBounceRipple(x,y){
+  ripples.push({x,y,radius:0,maxRadius:200,alpha:1,force:RIPPLE_FORCE});
+  for(let i=0;i<8;i++){
+    const ang=(Math.PI*2/8)*i;
+    particles.push({x,y,vx:Math.cos(ang)*2,vy:Math.sin(ang)*2,life:0.8,color:'rgba(128,222,234,',size:3});
+  }
+  playBounceRipple();
+}
+
+function update(){
+  // Update ball
+  if(ball&&ball.alive){
+    for(let s=0;s<3;s++){
+      ball.x+=ball.vx/3;ball.y+=ball.vy/3;
+      if(s===0){trail.push({x:ball.x,y:ball.y,age:0});if(trail.length>50)trail.shift()}
+      // Wall bounces with ripple
+      if(ball.x-BALL_RADIUS<=0){ball.x=BALL_RADIUS;ball.vx=Math.abs(ball.vx);ball.bounces++;createBounceRipple(ball.x,ball.y)}
+      if(ball.x+BALL_RADIUS>=W){ball.x=W-BALL_RADIUS;ball.vx=-Math.abs(ball.vx);ball.bounces++;createBounceRipple(ball.x,ball.y)}
+      if(ball.y-BALL_RADIUS<=0){ball.y=BALL_RADIUS;ball.vy=Math.abs(ball.vy);ball.bounces++;createBounceRipple(ball.x,ball.y)}
+      if(ball.y+BALL_RADIUS>=H){ball.y=H-BALL_RADIUS;ball.vy=-Math.abs(ball.vy);ball.bounces++;createBounceRipple(ball.x,ball.y)}
+      if(ball.bounces>=MAX_BOUNCES)ball.alive=false;
+    }
+    for(const t of trail)t.age++;
+    if(!ball.alive){ballActive=false}
+  }
+
+  // Update ripples → push orbs
+  for(let i=ripples.length-1;i>=0;i--){
+    const r=ripples[i];r.radius+=RIPPLE_SPEED;r.alpha=Math.max(0,1-r.radius/r.maxRadius);
+    for(const orb of orbs){
+      const dx=orb.x-r.x,dy=orb.y-r.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>0&&Math.abs(dist-r.radius)<25){
+        const intensity=1-Math.abs(dist-r.radius)/25;
+        const force=r.force*r.alpha*intensity;
+        orb.vx+=dx/dist*force;orb.vy+=dy/dist*force;
+      }
+    }
+    if(r.radius>=r.maxRadius)ripples.splice(i,1);
+  }
+
+  // Update orbs
+  for(const orb of orbs){
+    orb.x+=orb.vx;orb.y+=orb.vy;orb.vx*=FRICTION;orb.vy*=FRICTION;orb.pulse+=0.03;
+    const m=10;
+    if(orb.x-orb.radius<m){orb.x=m+orb.radius;orb.vx=Math.abs(orb.vx)*0.7}
+    if(orb.x+orb.radius>W-m){orb.x=W-m-orb.radius;orb.vx=-Math.abs(orb.vx)*0.7}
+    if(orb.y-orb.radius<m+50){orb.y=m+50+orb.radius;orb.vy=Math.abs(orb.vy)*0.7}
+    if(orb.y+orb.radius>H-m){orb.y=H-m-orb.radius;orb.vy=-Math.abs(orb.vy)*0.7}
+    for(const o2 of orbs){
+      if(o2===orb)continue;
+      const dx=orb.x-o2.x,dy=orb.y-o2.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<orb.radius+o2.radius&&dist>0&&orb.color!==o2.color){
+        const push=(orb.radius+o2.radius-dist)*0.3;
+        orb.vx+=dx/dist*push;orb.vy+=dy/dist*push;
+      }
+    }
+  }
+
+  // Check merges
+  for(let i=orbs.length-1;i>=0;i--){
+    for(let j=i-1;j>=0;j--){
+      if(i>=orbs.length||j>=orbs.length)continue;
+      const a=orbs[i],b=orbs[j];if(!a||!b||a.color!==b.color)continue;
+      const dx=a.x-b.x,dy=a.y-b.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<a.radius+b.radius-5){
+        const nx=(a.x+b.x)/2,ny=(a.y+b.y)/2;
+        const nm=Math.max(a.mergeCount,b.mergeCount)+1;
+        comboCount++;const pts=100*comboCount;score+=pts;
+        flashes.push({x:nx,y:ny,radius:0,maxRadius:80,alpha:1,color:COLORS[a.color].glow});
+        // Merge creates a mini ripple too!
+        ripples.push({x:nx,y:ny,radius:0,maxRadius:100+nm*20,alpha:0.6,force:RIPPLE_FORCE*0.5});
+        for(let p=0;p<14;p++){const ang=(Math.PI*2/14)*p,spd=2+Math.random()*3;
+          particles.push({x:nx,y:ny,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,color:COLORS[a.color].glow,size:4+Math.random()*3})}
+        particles.push({x:nx,y:ny-20,vx:0,vy:-1,life:1.5,color:'rgba(255,255,255,',size:0,text:`+${pts}`,isText:true});
+        orbs.splice(i,1);
+        orbs[j]={x:nx,y:ny,vx:(a.vx+b.vx)*0.3,vy:(a.vy+b.vy)*0.3,radius:ORB_RADIUS+nm*5,color:a.color,mergeCount:nm,pulse:0};
+        playMerge(comboCount);updateUI();break;
+      }
+    }
+  }
+
+  // Win check
+  if(gameActive&&!ballActive){
+    const cc={};for(const o of orbs)cc[o.color]=(cc[o.color]||0)+1;
+    if(Object.values(cc).every(c=>c<=1)){
+      const allStill=orbs.every(o=>Math.abs(o.vx)<0.5&&Math.abs(o.vy)<0.5);
+      if(allStill&&ripples.length===0){gameActive=false;setTimeout(()=>showComplete(),500)}
+    }
+  }
+
+  for(let i=particles.length-1;i>=0;i--){particles[i].x+=particles[i].vx;particles[i].y+=particles[i].vy;particles[i].life-=0.02;if(particles[i].life<=0)particles.splice(i,1)}
+  for(let i=flashes.length-1;i>=0;i--){flashes[i].radius+=4;flashes[i].alpha-=0.04;if(flashes[i].alpha<=0)flashes.splice(i,1)}
+}
+
+function draw(){
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0a1a2e');bg.addColorStop(0.5,'#0d2f3f');bg.addColorStop(1,'#0a1a2e');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='rgba(0,188,212,0.04)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+
+  // Ripples
+  for(const r of ripples){
+    ctx.strokeStyle=`rgba(128,222,234,${r.alpha*0.6})`;ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);ctx.stroke();
+    if(r.radius>10){ctx.strokeStyle=`rgba(128,222,234,${r.alpha*0.25})`;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(r.x,r.y,r.radius-8,0,Math.PI*2);ctx.stroke()}
+  }
+
+  // Flashes
+  for(const f of flashes){
+    const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.radius);
+    g.addColorStop(0,f.color+`${f.alpha*0.5})`);g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.radius,0,Math.PI*2);ctx.fill();
+  }
+
+  // Orbs
+  for(const orb of orbs){
+    const c=COLORS[orb.color],pulse=1+Math.sin(orb.pulse)*0.05,r=orb.radius*pulse;
+    const glow=ctx.createRadialGradient(orb.x,orb.y,r*0.5,orb.x,orb.y,r*2.5);
+    glow.addColorStop(0,c.glow+'0.4)');glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(orb.x,orb.y,r*2.5,0,Math.PI*2);ctx.fill();
+    const bodyG=ctx.createRadialGradient(orb.x-r*0.3,orb.y-r*0.3,r*0.1,orb.x,orb.y,r);
+    bodyG.addColorStop(0,'#fff');bodyG.addColorStop(0.3,c.fill);bodyG.addColorStop(1,c.fill);
+    ctx.fillStyle=bodyG;ctx.beginPath();ctx.arc(orb.x,orb.y,r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.beginPath();ctx.arc(orb.x-r*0.25,orb.y-r*0.25,r*0.35,0,Math.PI*2);ctx.fill();
+    if(orb.mergeCount>0){ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font=`bold ${12+orb.mergeCount*2}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(`x${orb.mergeCount+1}`,orb.x,orb.y)}
+  }
+
+  // Aim line
+  if(isDragging&&aimPos&&!ballActive){
+    const dx=aimPos.x-launchPos.x,dy=aimPos.y-launchPos.y,len=Math.sqrt(dx*dx+dy*dy);
+    if(len>10){
+      ctx.strokeStyle='rgba(0,188,212,0.5)';ctx.lineWidth=2;ctx.setLineDash([6,6]);
+      ctx.beginPath();ctx.moveTo(launchPos.x,launchPos.y);ctx.lineTo(aimPos.x,aimPos.y);ctx.stroke();
+      ctx.setLineDash([]);
+      // Direction arrow
+      const dirX=-dx/len,dirY=-dy/len;
+      ctx.strokeStyle='rgba(0,188,212,0.4)';ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(launchPos.x,launchPos.y);ctx.lineTo(launchPos.x+dirX*150,launchPos.y+dirY*150);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Launch point
+  if(!ballActive){
+    const lp=1+Math.sin(Date.now()*0.004)*0.15;
+    ctx.fillStyle='rgba(0,188,212,0.3)';ctx.beginPath();ctx.arc(launchPos.x,launchPos.y,20*lp,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#00bcd4';ctx.beginPath();ctx.arc(launchPos.x,launchPos.y,BALL_RADIUS+2,0,Math.PI*2);ctx.fill();
+  }
+
+  // Trail
+  for(let i=0;i<trail.length;i++){
+    const alpha=(i/trail.length)*0.5,size=(i/trail.length)*BALL_RADIUS;
+    ctx.fillStyle=`rgba(0,188,212,${alpha})`;ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,size,0,Math.PI*2);ctx.fill();
+  }
+
+  // Ball
+  if(ball&&ball.alive){
+    ctx.shadowColor='#00bcd4';ctx.shadowBlur=20;
+    ctx.fillStyle='#4dd0e1';ctx.beginPath();ctx.arc(ball.x,ball.y,BALL_RADIUS,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.beginPath();ctx.arc(ball.x-2,ball.y-2,BALL_RADIUS*0.4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(`${ball.bounces}/${MAX_BOUNCES}`,ball.x,ball.y-14);
+  }
+
+  // Particles
+  for(const p of particles){
+    if(p.isText){ctx.fillStyle=`rgba(255,255,255,${Math.min(1,p.life)})`;ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.fillText(p.text,p.x,p.y)}
+    else{ctx.fillStyle=`${p.color}${Math.min(1,p.life)})`;ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill()}
+  }
+  if(comboCount>1){ctx.fillStyle=`rgba(128,222,234,${Math.min(1,comboCount*0.3)})`;ctx.font='bold 36px sans-serif';ctx.textAlign='center';ctx.fillText(`${comboCount}x COMBO!`,W/2,H/2-60)}
+
+  if(!ballActive&&shotCount===0){ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('발사 지점을 드래그하여 조준하세요',W/2,H-30)}
+}
+
+function gameLoop(){update();draw();requestAnimationFrame(gameLoop)}
+
+function showComplete(){
+  const cfg=levels[Math.min(level-1,levels.length-1)];
+  let stars=1;if(shotCount<=cfg.par)stars=3;else if(shotCount<=cfg.par+1)stars=2;
+  document.getElementById('lcStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('lcTitle').textContent=`레벨 ${level} 클리어!`;
+  document.getElementById('lcInfo').textContent=`점수: ${score} | 발사: ${shotCount}회 (기준: ${cfg.par}회)`;
+  document.getElementById('levelComplete').style.display='flex';totalScore+=score;
+  playSound(523,0.2,'sine',0.15);setTimeout(()=>playSound(659,0.2,'sine',0.15),150);setTimeout(()=>playSound(784,0.3,'sine',0.15),300);
+}
+function startGame(){document.getElementById('startScreen').style.display='none';document.getElementById('levelComplete').style.display='none';level=1;totalScore=0;initLevel(level);gameActive=true}
+function nextLevel(){document.getElementById('levelComplete').style.display='none';level++;initLevel(level);gameActive=true}
+function retryLevel(){document.getElementById('levelComplete').style.display='none';initLevel(level);gameActive=true}
+gameLoop();
+</script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>블랙홀 (Black Hole)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;touch-action:none;font-family:'Segoe UI',sans-serif;user-select:none}
+canvas{display:block}
+#ui{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;pointer-events:none;z-index:10}
+#ui>div{background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;font-size:15px;color:#ce93d8;font-weight:bold}
+#startScreen{position:fixed;inset:0;background:radial-gradient(ellipse at center,#1a0a2e 0%,#0a0a1a 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#startScreen h1{font-size:52px;margin-bottom:8px;background:linear-gradient(90deg,#ce93d8,#ba68c8,#9c27b0);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#startScreen p{color:#ce93d8;margin-bottom:30px;font-size:16px;text-align:center;line-height:1.6}
+#startScreen button{background:linear-gradient(135deg,#7b1fa2,#ab47bc);color:#fff;border:none;padding:16px 48px;border-radius:30px;font-size:20px;cursor:pointer;font-weight:bold;box-shadow:0 4px 20px rgba(123,31,162,0.5)}
+#levelComplete{position:fixed;inset:0;background:rgba(10,10,26,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:100}
+#levelComplete h2{font-size:32px;margin-bottom:12px}
+#lcStars{font-size:48px;color:#ffd54f;margin-bottom:8px}
+#lcInfo{font-size:18px;color:#ce93d8;margin-bottom:24px}
+#levelComplete button{background:linear-gradient(135deg,#7b1fa2,#ab47bc);color:#fff;border:none;padding:14px 36px;border-radius:30px;font-size:18px;cursor:pointer;font-weight:bold;margin:6px;box-shadow:0 4px 15px rgba(123,31,162,0.4)}
+#skillInfo{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(123,31,162,0.4);padding:10px 24px;border-radius:20px;color:#e1bee7;font-size:14px;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>블랙홀</h1>
+  <p>탭하면 중력장이 생겨 구슬을 끌어당겨요!<br>같은 색 구슬을 충돌시켜 합치세요!<br><br>꾹 누르면 더 강하게 끌어당겨요</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="scoreDisplay">점수: 0</div>
+  <div id="tapDisplay">스킬: 0</div>
+</div>
+<div id="skillInfo">탭: 끌어당기기 | 꾹 누르기: 강력 흡수</div>
+<div id="levelComplete">
+  <h2 id="lcTitle">레벨 클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+
+const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+function playSound(f,d,t='sine',v=0.12){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d)}
+function playPull(){playSound(180,0.3,'sine',0.08);playSound(120,0.4,'sine',0.05)}
+function playMerge(c){const b=400+c*100;playSound(b,0.5,'sine',0.2);playSound(b*1.5,0.3,'sine',0.1)}
+function playCharge(){playSound(80,0.15,'sine',0.04)}
+
+const COLORS=[
+  {fill:'#ef5350',glow:'rgba(239,83,80,'},
+  {fill:'#42a5f5',glow:'rgba(66,165,245,'},
+  {fill:'#66bb6a',glow:'rgba(102,187,106,'},
+  {fill:'#ffa726',glow:'rgba(255,167,38,'},
+  {fill:'#ab47bc',glow:'rgba(171,71,188,'},
+];
+
+let orbs=[],blackholes=[],particles=[],flashes=[];
+let tapCount=0,score=0,totalScore=0,level=1,gameActive=false,comboCount=0;
+const FRICTION=0.985,ORB_RADIUS=22;
+
+// Active gravity well (hold)
+let activeWell=null,holdTimer=0;
+
+const levels=[
+  {colors:2,perColor:2,par:2},{colors:2,perColor:3,par:3},
+  {colors:3,perColor:2,par:3},{colors:3,perColor:3,par:4},
+  {colors:4,perColor:2,par:4},{colors:4,perColor:3,par:5},
+  {colors:3,perColor:4,par:5},{colors:5,perColor:2,par:5},
+  {colors:4,perColor:4,par:6},{colors:5,perColor:3,par:7},
+];
+
+function initLevel(l){
+  const cfg=levels[Math.min(l-1,levels.length-1)];
+  orbs=[];blackholes=[];particles=[];flashes=[];
+  tapCount=0;score=0;comboCount=0;activeWell=null;holdTimer=0;
+  const margin=80;
+  for(let c=0;c<cfg.colors;c++){
+    for(let n=0;n<cfg.perColor;n++){
+      let x,y,ok,att=0;
+      do{x=margin+Math.random()*(W-margin*2);y=margin+60+Math.random()*(H-margin*2-120);ok=true;
+        for(const o of orbs){const dx=x-o.x,dy=y-o.y;if(Math.sqrt(dx*dx+dy*dy)<ORB_RADIUS*3.5){ok=false;break}}att++}while(!ok&&att<100);
+      orbs.push({x,y,vx:0,vy:0,radius:ORB_RADIUS,color:c,mergeCount:0,pulse:Math.random()*Math.PI*2});
+    }
+  }
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById('levelDisplay').textContent=`레벨 ${level}`;
+  document.getElementById('scoreDisplay').textContent=`점수: ${totalScore+score}`;
+  document.getElementById('tapDisplay').textContent=`스킬: ${tapCount}`;
+}
+
+// Input - hold for stronger pull
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();if(!gameActive)return;
+  tapCount++;comboCount=0;
+  activeWell={x:e.clientX,y:e.clientY,strength:0,age:0,maxAge:120,particles:[]};
+  holdTimer=0;
+  playPull();
+  updateUI();
+});
+canvas.addEventListener('pointermove',e=>{
+  e.preventDefault();
+  if(activeWell){activeWell.x=e.clientX;activeWell.y=e.clientY}
+});
+canvas.addEventListener('pointerup',e=>{
+  e.preventDefault();
+  if(activeWell){
+    blackholes.push({...activeWell,dying:true,dieTimer:20});
+    activeWell=null;
+  }
+});
+
+// Background stars
+const bgStars=[];
+for(let i=0;i<60;i++)bgStars.push({x:Math.random()*2000,y:Math.random()*2000,s:Math.random()*2+0.5,a:Math.random()*0.5+0.1,sp:Math.random()*0.02});
+
+function update(){
+  // Active gravity well
+  if(activeWell){
+    activeWell.age++;
+    activeWell.strength=Math.min(8,activeWell.age*0.08);
+    if(activeWell.age%8===0)playCharge();
+
+    // Pull orbs toward well
+    for(const orb of orbs){
+      const dx=activeWell.x-orb.x,dy=activeWell.y-orb.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>10){
+        const force=activeWell.strength/(dist*0.3);
+        orb.vx+=dx/dist*force;
+        orb.vy+=dy/dist*force;
+      }
+    }
+
+    // Spiral particles
+    if(activeWell.age%3===0){
+      const angle=activeWell.age*0.15;
+      const r=100+Math.random()*80;
+      particles.push({
+        x:activeWell.x+Math.cos(angle)*r,
+        y:activeWell.y+Math.sin(angle)*r,
+        vx:(activeWell.x-(activeWell.x+Math.cos(angle)*r))*0.03,
+        vy:(activeWell.y-(activeWell.y+Math.sin(angle)*r))*0.03,
+        life:1,color:'rgba(206,147,216,',size:3+Math.random()*2
+      });
+    }
+  }
+
+  // Dying blackholes (residual pull)
+  for(let i=blackholes.length-1;i>=0;i--){
+    const bh=blackholes[i];
+    bh.dieTimer--;
+    const str=bh.strength*(bh.dieTimer/20);
+    for(const orb of orbs){
+      const dx=bh.x-orb.x,dy=bh.y-orb.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>10){const force=str/(dist*0.4);orb.vx+=dx/dist*force;orb.vy+=dy/dist*force}
+    }
+    if(bh.dieTimer<=0)blackholes.splice(i,1);
+  }
+
+  // Update orbs
+  for(const orb of orbs){
+    orb.x+=orb.vx;orb.y+=orb.vy;
+    orb.vx*=FRICTION;orb.vy*=FRICTION;
+    orb.pulse+=0.03;
+    const m=10;
+    if(orb.x-orb.radius<m){orb.x=m+orb.radius;orb.vx=Math.abs(orb.vx)*0.7}
+    if(orb.x+orb.radius>W-m){orb.x=W-m-orb.radius;orb.vx=-Math.abs(orb.vx)*0.7}
+    if(orb.y-orb.radius<m+50){orb.y=m+50+orb.radius;orb.vy=Math.abs(orb.vy)*0.7}
+    if(orb.y+orb.radius>H-m-40){orb.y=H-m-40-orb.radius;orb.vy=-Math.abs(orb.vy)*0.7}
+    // Repel different colors
+    for(const o2 of orbs){
+      if(o2===orb)continue;
+      const dx=orb.x-o2.x,dy=orb.y-o2.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<orb.radius+o2.radius&&dist>0&&orb.color!==o2.color){
+        const push=(orb.radius+o2.radius-dist)*0.3;
+        orb.vx+=dx/dist*push;orb.vy+=dy/dist*push;
+      }
+    }
+  }
+
+  // Check merges
+  for(let i=orbs.length-1;i>=0;i--){
+    for(let j=i-1;j>=0;j--){
+      if(i>=orbs.length||j>=orbs.length)continue;
+      const a=orbs[i],b=orbs[j];
+      if(!a||!b||a.color!==b.color)continue;
+      const dx=a.x-b.x,dy=a.y-b.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<a.radius+b.radius-5){
+        const nx=(a.x+b.x)/2,ny=(a.y+b.y)/2;
+        const nm=Math.max(a.mergeCount,b.mergeCount)+1;
+        comboCount++;
+        const pts=100*comboCount;score+=pts;
+        // Flash
+        flashes.push({x:nx,y:ny,radius:0,maxRadius:80,alpha:1,color:COLORS[a.color].glow});
+        // Particles
+        for(let p=0;p<14;p++){
+          const ang=(Math.PI*2/14)*p,spd=2+Math.random()*3;
+          particles.push({x:nx,y:ny,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,color:COLORS[a.color].glow,size:4+Math.random()*3});
+        }
+        particles.push({x:nx,y:ny-20,vx:0,vy:-1,life:1.5,color:'rgba(255,255,255,',size:0,text:`+${pts}`,isText:true});
+        orbs.splice(i,1);
+        orbs[j]={x:nx,y:ny,vx:(a.vx+b.vx)*0.3,vy:(a.vy+b.vy)*0.3,radius:ORB_RADIUS+nm*5,color:a.color,mergeCount:nm,pulse:0};
+        playMerge(comboCount);updateUI();break;
+      }
+    }
+  }
+
+  // Win check
+  if(gameActive){
+    const cc={};for(const o of orbs)cc[o.color]=(cc[o.color]||0)+1;
+    if(Object.values(cc).every(c=>c<=1)){
+      const allStill=orbs.every(o=>Math.abs(o.vx)<0.5&&Math.abs(o.vy)<0.5);
+      if(allStill&&!activeWell&&blackholes.length===0){gameActive=false;setTimeout(()=>showComplete(),500)}
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life-=0.02;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=flashes.length-1;i>=0;i--){
+    const f=flashes[i];f.radius+=4;f.alpha-=0.04;
+    if(f.alpha<=0)flashes.splice(i,1);
+  }
+}
+
+function draw(){
+  // BG
+  const bg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.7);
+  bg.addColorStop(0,'#1a0a2e');bg.addColorStop(1,'#0a0a1a');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  // Stars
+  const time=Date.now()*0.001;
+  for(const s of bgStars){
+    const twinkle=0.5+Math.sin(time*s.sp*10+s.x)*0.5;
+    ctx.fillStyle=`rgba(200,180,255,${s.a*twinkle})`;
+    ctx.beginPath();ctx.arc(s.x%W,s.y%H,s.s,0,Math.PI*2);ctx.fill();
+  }
+
+  // Active gravity well
+  if(activeWell){
+    const aw=activeWell;
+    const str=aw.strength;
+    // Contracting rings
+    for(let r=0;r<4;r++){
+      const ring=((aw.age*3+r*40)%160);
+      const radius=160-ring;
+      if(radius<5)continue;
+      const alpha=0.15+str*0.03;
+      ctx.strokeStyle=`rgba(206,147,216,${alpha*(radius/160)})`;
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(aw.x,aw.y,radius,0,Math.PI*2);ctx.stroke();
+    }
+    // Center glow
+    const glow=ctx.createRadialGradient(aw.x,aw.y,0,aw.x,aw.y,30+str*5);
+    glow.addColorStop(0,`rgba(156,39,176,${0.3+str*0.05})`);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(aw.x,aw.y,30+str*5,0,Math.PI*2);ctx.fill();
+    // Strength indicator
+    ctx.fillStyle=`rgba(206,147,216,0.7)`;ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    const pwr=Math.min(100,Math.floor(str/8*100));
+    ctx.fillText(`${pwr}%`,aw.x,aw.y+50+str*3);
+  }
+
+  // Flashes
+  for(const f of flashes){
+    const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.radius);
+    g.addColorStop(0,f.color+`${f.alpha*0.5})`);g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.radius,0,Math.PI*2);ctx.fill();
+  }
+
+  // Orbs
+  for(const orb of orbs){
+    const c=COLORS[orb.color];
+    const pulse=1+Math.sin(orb.pulse)*0.05;
+    const r=orb.radius*pulse;
+    // Glow
+    const glow=ctx.createRadialGradient(orb.x,orb.y,r*0.5,orb.x,orb.y,r*2.5);
+    glow.addColorStop(0,c.glow+'0.4)');glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.arc(orb.x,orb.y,r*2.5,0,Math.PI*2);ctx.fill();
+    // Body
+    const bodyG=ctx.createRadialGradient(orb.x-r*0.3,orb.y-r*0.3,r*0.1,orb.x,orb.y,r);
+    bodyG.addColorStop(0,'#fff');bodyG.addColorStop(0.3,c.fill);bodyG.addColorStop(1,c.fill);
+    ctx.fillStyle=bodyG;ctx.beginPath();ctx.arc(orb.x,orb.y,r,0,Math.PI*2);ctx.fill();
+    // Highlight
+    ctx.fillStyle='rgba(255,255,255,0.4)';ctx.beginPath();
+    ctx.arc(orb.x-r*0.25,orb.y-r*0.25,r*0.35,0,Math.PI*2);ctx.fill();
+    if(orb.mergeCount>0){ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font=`bold ${12+orb.mergeCount*2}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(`x${orb.mergeCount+1}`,orb.x,orb.y)}
+  }
+
+  // Particles
+  for(const p of particles){
+    if(p.isText){ctx.fillStyle=`rgba(255,255,255,${Math.min(1,p.life)})`;ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.fillText(p.text,p.x,p.y)}
+    else{ctx.fillStyle=`${p.color}${Math.min(1,p.life)})`;ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill()}
+  }
+
+  if(comboCount>1){ctx.fillStyle=`rgba(206,147,216,${Math.min(1,comboCount*0.3)})`;ctx.font='bold 36px sans-serif';ctx.textAlign='center';ctx.fillText(`${comboCount}x COMBO!`,W/2,H/2-60)}
+}
+
+function gameLoop(){update();draw();requestAnimationFrame(gameLoop)}
+
+function showComplete(){
+  const cfg=levels[Math.min(level-1,levels.length-1)];
+  let stars=1;if(tapCount<=cfg.par)stars=3;else if(tapCount<=cfg.par+2)stars=2;
+  document.getElementById('lcStars').textContent='★'.repeat(stars)+'☆'.repeat(3-stars);
+  document.getElementById('lcTitle').textContent=`레벨 ${level} 클리어!`;
+  document.getElementById('lcInfo').textContent=`점수: ${score} | 스킬: ${tapCount}회 (기준: ${cfg.par}회)`;
+  document.getElementById('levelComplete').style.display='flex';
+  totalScore+=score;
+  playSound(523,0.2,'sine',0.15);setTimeout(()=>playSound(659,0.2,'sine',0.15),150);setTimeout(()=>playSound(784,0.3,'sine',0.15),300);
+}
+function startGame(){document.getElementById('startScreen').style.display='none';document.getElementById('levelComplete').style.display='none';level=1;totalScore=0;initLevel(level);gameActive=true}
+function nextLevel(){document.getElementById('levelComplete').style.display='none';level++;initLevel(level);gameActive=true}
+function retryLevel(){document.getElementById('levelComplete').style.display='none';initLevel(level);gameActive=true}
+gameLoop();
+</script>
+</body>
+</html>

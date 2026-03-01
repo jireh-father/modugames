@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>네온 블록 블라스트</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;touch-action:none;font-family:-apple-system,'Segoe UI',sans-serif}
+canvas{max-width:100vw;max-height:100vh;object-fit:contain}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+const W=540,H=960,c=document.getElementById('c'),ctx=c.getContext('2d');
+c.width=W;c.height=H;
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);c.style.width=W*s+'px';c.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+const GRID=7,CELL=56,PAD=2;
+const BOARD_X=(W-GRID*CELL)/2,BOARD_Y=160;
+const PIECE_AREA_Y=BOARD_Y+GRID*CELL+30;
+
+// ===== NEON BRICK COLORS =====
+const BRICKS=[
+  {name:'루비',base:'#ff1744',glow:'#ff5252',light:'#ff8a80',dark:'#c4001d',shadow:'rgba(255,23,68,0.5)'},
+  {name:'사파이어',base:'#2979ff',glow:'#448aff',light:'#82b1ff',dark:'#0039cb',shadow:'rgba(41,121,255,0.5)'},
+  {name:'에메랄드',base:'#00e676',glow:'#69f0ae',light:'#b9f6ca',dark:'#00a152',shadow:'rgba(0,230,118,0.5)'},
+  {name:'토파즈',base:'#ffea00',glow:'#ffff00',light:'#ffff8d',dark:'#c7b800',shadow:'rgba(255,234,0,0.5)'},
+  {name:'아메시스트',base:'#d500f9',glow:'#e040fb',light:'#ea80fc',dark:'#9900b0',shadow:'rgba(213,0,249,0.5)'},
+];
+
+let gameTime=0;
+
+function drawBrick(x,y,size,type,alpha){
+  let b=BRICKS[type];
+  let s=size-PAD*2;
+  let bx=x+PAD,by=y+PAD;
+  let r=s*0.15;
+
+  ctx.globalAlpha=alpha||1;
+
+  // Outer glow
+  ctx.shadowColor=b.shadow;
+  ctx.shadowBlur=size>40?12:6;
+
+  // Main brick body - gradient
+  let grad=ctx.createLinearGradient(bx,by,bx,by+s);
+  grad.addColorStop(0,b.light);
+  grad.addColorStop(0.3,b.base);
+  grad.addColorStop(0.7,b.base);
+  grad.addColorStop(1,b.dark);
+  ctx.fillStyle=grad;
+  roundRect(bx,by,s,s,r);
+
+  ctx.shadowBlur=0;
+
+  // Top bevel highlight
+  ctx.fillStyle='rgba(255,255,255,0.25)';
+  roundRect(bx+2,by+2,s-4,s*0.35,r);
+
+  // Bottom bevel shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  roundRect(bx+2,by+s*0.65,s-4,s*0.33,r);
+
+  // Inner shine (moving)
+  let shimmer=Math.sin(gameTime*3+x*0.1+y*0.1)*0.15+0.15;
+  ctx.fillStyle=`rgba(255,255,255,${shimmer})`;
+  ctx.beginPath();
+  ctx.ellipse(bx+s*0.35,by+s*0.3,s*0.2,s*0.12,-0.3,0,Math.PI*2);
+  ctx.fill();
+
+  // Edge highlight line
+  ctx.strokeStyle=b.glow;
+  ctx.lineWidth=1;
+  ctx.globalAlpha=(alpha||1)*0.5;
+  roundRectStroke(bx+1,by+1,s-2,s-2,r);
+
+  ctx.globalAlpha=1;
+  ctx.shadowBlur=0;
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();ctx.fill();
+}
+
+function roundRectStroke(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();ctx.stroke();
+}
+
+const SHAPES=[
+  [[0,0]],
+  [[0,0],[0,1]],[[0,0],[1,0]],
+  [[0,0],[0,1],[0,2]],[[0,0],[1,0],[2,0]],
+  [[0,0],[0,1],[1,0]],[[0,0],[0,1],[1,1]],[[0,0],[1,0],[1,1]],[[0,1],[1,0],[1,1]],
+  [[0,0],[0,1],[0,2],[0,3]],[[0,0],[1,0],[2,0],[3,0]],
+  [[0,0],[0,1],[1,0],[1,1]],
+  [[0,0],[0,1],[0,2],[1,0]],[[0,0],[0,1],[0,2],[1,2]],[[0,0],[1,0],[1,1],[1,2]],[[0,0],[0,1],[0,2],[1,1]],
+  [[0,0],[0,1],[0,2],[1,0],[2,0]],[[0,0],[0,1],[0,2],[1,2],[2,2]],
+  [[0,0],[1,0],[2,0],[2,1],[2,2]],[[0,2],[1,2],[2,0],[2,1],[2,2]],
+  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],
+];
+
+let board=[],pieces=[],score=0,bestScore=0,combo=0;
+let state='menu',dragging=null,clearAnim=[],shakeTimer=0,particles=[];
+let bgStars=[];
+for(let i=0;i<60;i++)bgStars.push({x:Math.random()*W,y:Math.random()*H,s:Math.random()*2+0.5,spd:Math.random()*15+5,blink:Math.random()*Math.PI*2});
+
+// Screen flash
+let screenFlash=0,screenFlashColor='#fff';
+
+function initBoard(){board=[];for(let r=0;r<GRID;r++){board[r]=[];for(let c=0;c<GRID;c++)board[r][c]=-1}}
+function newPieces(){pieces=[];for(let i=0;i<3;i++){pieces.push({shape:SHAPES[Math.floor(Math.random()*SHAPES.length)],animal:Math.floor(Math.random()*5),used:false})}}
+function initGame(){initBoard();fillHalfBoard();score=0;combo=0;newPieces();
+  // Ensure pieces can be placed, regenerate if needed
+  let tries=0;
+  while(isGameOver()&&tries<20){newPieces();tries++}
+  if(isGameOver()){initBoard();fillHalfBoard();newPieces()}
+  state='playing';loadBest()}
+
+function fillHalfBoard(){
+  let total=GRID*GRID;
+  let toFill=Math.floor(total/2);
+  let cells=[];
+  for(let r=0;r<GRID;r++)for(let cc=0;cc<GRID;cc++)cells.push([r,cc]);
+  // Shuffle
+  for(let i=cells.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]]}
+  // Fill random cells
+  for(let i=0;i<toFill;i++){
+    let[r,cc]=cells[i];
+    board[r][cc]=Math.floor(Math.random()*5);
+  }
+  // Clear any complete lines
+  let cleared=true;
+  while(cleared){
+    cleared=false;
+    let rowsToClear=[],colsToClear=[];
+    for(let r=0;r<GRID;r++){let full=true;for(let cc=0;cc<GRID;cc++)if(board[r][cc]===-1){full=false;break}if(full)rowsToClear.push(r)}
+    for(let cc=0;cc<GRID;cc++){let full=true;for(let r=0;r<GRID;r++)if(board[r][cc]===-1){full=false;break}if(full)colsToClear.push(cc)}
+    if(rowsToClear.length+colsToClear.length>0){
+      cleared=true;
+      let toClear=new Set();
+      for(let r of rowsToClear)for(let cc=0;cc<GRID;cc++)toClear.add(r*GRID+cc);
+      for(let cc of colsToClear)for(let r=0;r<GRID;r++)toClear.add(r*GRID+cc);
+      for(let key of toClear){board[Math.floor(key/GRID)][key%GRID]=-1}
+    }
+  }
+}
+function loadBest(){try{bestScore=parseInt(localStorage.getItem('neon-bb-best'))||0}catch(e){}}
+function saveBest(){try{if(score>bestScore){bestScore=score;localStorage.setItem('neon-bb-best',bestScore)}}catch(e){}}
+
+function canPlace(shape,br,bc){
+  for(let [r,c] of shape){let gr=br+r,gc=bc+c;if(gr<0||gr>=GRID||gc<0||gc>=GRID||board[gr][gc]!==-1)return false}
+  return true;
+}
+
+function placePiece(pieceIdx,br,bc){
+  let p=pieces[pieceIdx];
+  if(!canPlace(p.shape,br,bc))return false;
+  let blockCount=0;
+  for(let [r,cc] of p.shape){board[br+r][bc+cc]=p.animal;blockCount++}
+  p.used=true;score+=blockCount;
+
+  let rowsToClear=[],colsToClear=[];
+  for(let r=0;r<GRID;r++){let full=true;for(let cc=0;cc<GRID;cc++)if(board[r][cc]===-1){full=false;break}if(full)rowsToClear.push(r)}
+  for(let cc=0;cc<GRID;cc++){let full=true;for(let r=0;r<GRID;r++)if(board[r][cc]===-1){full=false;break}if(full)colsToClear.push(cc)}
+
+  let linesCleared=rowsToClear.length+colsToClear.length;
+  if(linesCleared>0){
+    combo++;
+    let lineScore=10*linesCleared*linesCleared;
+    let comboMult=Math.min(combo,10);
+    score+=lineScore*comboMult;
+
+    // Screen flash on clear
+    screenFlash=0.3;
+    screenFlashColor=linesCleared>=3?'#fff':BRICKS[p.animal].shadow;
+
+    let cellsToClear=new Set();
+    for(let r of rowsToClear)for(let cc=0;cc<GRID;cc++)cellsToClear.add(r*GRID+cc);
+    for(let cc of colsToClear)for(let r=0;r<GRID;r++)cellsToClear.add(r*GRID+cc);
+
+    for(let key of cellsToClear){
+      let r=Math.floor(key/GRID),cc=key%GRID;
+      let px=BOARD_X+cc*CELL+CELL/2,py=BOARD_Y+r*CELL+CELL/2;
+      let brickColor=board[r][cc]>=0?board[r][cc]:0;
+      // Explosion particles - lots of them!
+      for(let i=0;i<8;i++){
+        let a=Math.random()*Math.PI*2,sp=Math.random()*200+80;
+        particles.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.8+Math.random()*0.5,
+          color:BRICKS[brickColor].glow,r:Math.random()*5+2,type:'spark'});
+      }
+      // Ring wave
+      particles.push({x:px,y:py,vx:0,vy:0,life:0.5,color:BRICKS[brickColor].base,r:5,type:'ring',maxR:CELL*1.5});
+      // Ember trails
+      for(let i=0;i<3;i++){
+        let a=Math.random()*Math.PI*2,sp=Math.random()*60+30;
+        particles.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-80,life:1.2,
+          color:BRICKS[brickColor].light,r:Math.random()*2+1,type:'ember'});
+      }
+      clearAnim.push({r,c:cc,timer:0.4});
+      board[r][cc]=-1;
+    }
+
+    if(combo>1){
+      particles.push({x:W/2,y:BOARD_Y+GRID*CELL/2,vx:0,vy:0,life:1.5,
+        color:'#fff',r:0,type:'text',text:combo+'x COMBO!',size:combo>3?36:28});
+      // Extra sparkle burst for big combos
+      if(combo>=3){
+        for(let i=0;i<20;i++){
+          let a=Math.random()*Math.PI*2,sp=Math.random()*250+100;
+          particles.push({x:W/2,y:BOARD_Y+GRID*CELL/2,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+            life:1+Math.random()*0.5,color:BRICKS[Math.floor(Math.random()*5)].glow,r:Math.random()*4+1,type:'spark'});
+        }
+      }
+    }
+  }else{combo=0}
+
+  if(pieces.every(p=>p.used))newPieces();
+  if(isGameOver()){saveBest();state='gameover'}
+  return true;
+}
+
+function isGameOver(){
+  for(let p of pieces){if(p.used)continue;for(let r=0;r<GRID;r++)for(let cc=0;cc<GRID;cc++)if(canPlace(p.shape,r,cc))return false}
+  return true;
+}
+
+// Input
+function gcp(e){let r=c.getBoundingClientRect();let t=e.changedTouches?e.changedTouches[0]:e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H}}
+function getPieceAt(px,py){
+  let spacing=W/3;
+  for(let i=0;i<3;i++){
+    if(pieces[i].used)continue;
+    let shape=pieces[i].shape;
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+    let pw=(maxC-minC+1)*30,ph=(maxR-minR+1)*30;
+    let pcx=spacing*i+spacing/2,pcy=PIECE_AREA_Y+70;
+    let hitW=Math.max(pw+40,80),hitH=Math.max(ph+40,80);
+    if(px>=pcx-hitW/2&&px<=pcx+hitW/2&&py>=pcy-hitH/2&&py<=pcy+hitH/2)return{idx:i,offX:px-pcx,offY:py-pcy};
+  }
+  return null;
+}
+
+c.addEventListener('touchstart',e=>{e.preventDefault();onDown(gcp(e))});
+c.addEventListener('touchmove',e=>{e.preventDefault();onMove(gcp(e))});
+c.addEventListener('touchend',e=>{e.preventDefault();onUp()});
+c.addEventListener('mousedown',e=>{onDown(gcp(e))});
+c.addEventListener('mousemove',e=>{if(dragging)onMove(gcp(e))});
+c.addEventListener('mouseup',e=>{onUp()});
+
+function onDown(p){
+  if(state==='menu'){initGame();return}
+  if(state==='gameover'){state='menu';return}
+  if(state!=='playing')return;
+  let hit=getPieceAt(p.x,p.y);
+  if(hit)dragging={pieceIdx:hit.idx,x:p.x,y:p.y,offX:hit.offX,offY:hit.offY};
+}
+function onMove(p){if(dragging)dragging={...dragging,x:p.x,y:p.y}}
+function onUp(){
+  if(!dragging)return;
+  let piece=pieces[dragging.pieceIdx];
+  let shape=piece.shape;
+  let minR=99,maxR=-99,minC=99,maxC=-99;
+  for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+  let fw=(maxC-minC+1),fh=(maxR-minR+1);
+  let floatX=dragging.x-fw*CELL/2;
+  let floatY=dragging.y-80-fh*CELL/2;
+  let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+  let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
+  if(canPlace(shape,targetR,targetC))placePiece(dragging.pieceIdx,targetR,targetC);
+  else shakeTimer=0.2;
+  dragging=null;
+}
+
+// Game loop
+let lastTime=0;
+function update(time){
+  requestAnimationFrame(update);
+  let dt=Math.min((time-lastTime)/1000,0.05);lastTime=time;
+  gameTime+=dt;
+
+  clearAnim=clearAnim.filter(a=>{a.timer-=dt;return a.timer>0});
+
+  for(let p of particles){
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+    if(p.type==='spark'){p.vy+=200*dt;p.vx*=0.98}
+    if(p.type==='ember'){p.vy-=50*dt;p.r*=0.99}
+    if(p.type==='ring'){p.r+=(p.maxR-p.r)*4*dt}
+  }
+  particles=particles.filter(p=>p.life>0);
+
+  if(shakeTimer>0)shakeTimer-=dt;
+  if(screenFlash>0)screenFlash-=dt;
+
+  // Animate stars
+  for(let s of bgStars){s.y+=s.spd*dt;if(s.y>H){s.y=-5;s.x=Math.random()*W}}
+
+  draw();
+}
+
+function draw(){
+  // Dark background with subtle gradient
+  let bgGrad=ctx.createLinearGradient(0,0,0,H);
+  bgGrad.addColorStop(0,'#0a0a2e');bgGrad.addColorStop(0.5,'#0d0d1a');bgGrad.addColorStop(1,'#1a0a2e');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H);
+
+  // Background stars
+  for(let s of bgStars){
+    let blink=Math.sin(gameTime*2+s.blink)*0.3+0.7;
+    ctx.fillStyle=`rgba(255,255,255,${blink*0.4})`;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.s,0,Math.PI*2);ctx.fill();
+  }
+
+  if(state==='menu'){drawMenu();return}
+  if(state==='gameover'){drawGame();drawGameOver();return}
+  drawGame();
+
+  // Screen flash overlay
+  if(screenFlash>0){
+    ctx.globalAlpha=screenFlash*0.3;
+    ctx.fillStyle=screenFlashColor;ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;
+  }
+}
+
+function drawMenu(){
+  // Animated title with glow
+  ctx.shadowColor='#ff1744';ctx.shadowBlur=20;
+  ctx.fillStyle='#ff1744';ctx.font='bold 46px sans-serif';ctx.textAlign='center';
+  ctx.fillText('네온 블록',W/2,240);
+  ctx.shadowColor='#2979ff';
+  ctx.fillStyle='#2979ff';
+  ctx.fillText('블라스트!',W/2,300);
+  ctx.shadowBlur=0;
+
+  // Sample bricks with animation
+  for(let i=0;i<5;i++){
+    let bounceY=Math.sin(gameTime*2+i*0.8)*8;
+    drawBrick(W/2+(i-2)*80-30,370+bounceY,60,i,1);
+  }
+
+  // Start button with pulse
+  let pulse=Math.sin(gameTime*3)*0.1+0.9;
+  ctx.shadowColor='#ff1744';ctx.shadowBlur=20*pulse;
+  ctx.fillStyle='#ff1744';
+  roundRect(W/2-110,500,220,65,15);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';ctx.font='bold 28px sans-serif';
+  ctx.fillText('시작하기',W/2,543);
+
+  ctx.fillStyle='#888';ctx.font='18px sans-serif';
+  ctx.fillText('최고점수: '+bestScore.toLocaleString(),W/2,620);
+
+  ctx.fillStyle='#555';ctx.font='14px sans-serif';
+  ctx.fillText('블록을 드래그하여 7×7 보드에 배치하세요',W/2,700);
+  ctx.fillText('가로 또는 세로 줄을 채우면 클리어!',W/2,725);
+}
+
+function drawGame(){
+  let sx=0,sy=0;
+  if(shakeTimer>0){sx=(Math.random()-0.5)*8;sy=(Math.random()-0.5)*8}
+  ctx.save();ctx.translate(sx,sy);
+
+  // Score - neon style
+  ctx.shadowColor='#ff1744';ctx.shadowBlur=8;
+  ctx.fillStyle='#ff5252';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+  ctx.fillText('SCORE',30,40);ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';ctx.font='bold 34px sans-serif';
+  ctx.fillText(score.toLocaleString(),30,80);
+
+  ctx.shadowColor='#2979ff';ctx.shadowBlur=8;
+  ctx.fillStyle='#448aff';ctx.font='bold 16px sans-serif';ctx.textAlign='right';
+  ctx.fillText('BEST',W-30,40);ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';ctx.font='bold 34px sans-serif';
+  ctx.fillText(bestScore.toLocaleString(),W-30,80);
+
+  if(combo>0){
+    let comboGlow=Math.sin(gameTime*5)*0.3+0.7;
+    ctx.shadowColor='#ffea00';ctx.shadowBlur=15*comboGlow;
+    ctx.fillStyle='#ffea00';ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+    ctx.fillText(combo+'x COMBO',W/2,78);
+    ctx.shadowBlur=0;
+  }
+
+  // Board background with border glow
+  ctx.shadowColor='rgba(41,121,255,0.3)';ctx.shadowBlur=15;
+  ctx.fillStyle='#12122a';
+  roundRect(BOARD_X-8,BOARD_Y-8,GRID*CELL+16,GRID*CELL+16,12);
+  ctx.shadowBlur=0;
+  // Board border
+  ctx.strokeStyle='rgba(41,121,255,0.3)';ctx.lineWidth=2;
+  roundRectStroke(BOARD_X-8,BOARD_Y-8,GRID*CELL+16,GRID*CELL+16,12);
+
+  // Grid cells
+  for(let r=0;r<GRID;r++){
+    for(let cc=0;cc<GRID;cc++){
+      let x=BOARD_X+cc*CELL,y=BOARD_Y+r*CELL;
+      ctx.fillStyle=(r+cc)%2===0?'#16163a':'#1a1a40';
+      roundRect(x+1,y+1,CELL-2,CELL-2,4);
+
+      if(board[r][cc]>=0){
+        let clearing=clearAnim.find(a=>a.r===r&&a.c===cc);
+        if(clearing){
+          let scale=clearing.timer/0.4;
+          let cs=CELL*scale;
+          // White flash on clearing
+          ctx.fillStyle='rgba(255,255,255,'+(scale*0.5)+')';
+          roundRect(x+1,y+1,CELL-2,CELL-2,4);
+          drawBrick(x+(CELL-cs)/2,y+(CELL-cs)/2,cs,board[r][cc],scale);
+        }else{
+          drawBrick(x,y,CELL,board[r][cc],1);
+        }
+      }
+    }
+  }
+
+  // Ghost preview
+  if(dragging){
+    let piece=pieces[dragging.pieceIdx];
+    let shape=piece.shape;
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+
+    // Floating piece center = where the shape's top-left cell visually sits
+    let fw=(maxC-minC+1),fh=(maxR-minR+1);
+    let floatX=dragging.x-fw*CELL/2;
+    let floatY=dragging.y-80-fh*CELL/2;
+    let targetC=Math.floor((floatX+CELL/2-BOARD_X)/CELL);
+    let targetR=Math.floor((floatY+CELL/2-BOARD_Y)/CELL);
+    let valid=canPlace(shape,targetR,targetC);
+
+    if(targetR>=-(fh)&&targetR<GRID+fh&&targetC>=-(fw)&&targetC<GRID+fw){
+      for(let [r,cc] of shape){
+        let gr=targetR+r,gc=targetC+cc;
+        if(gr>=0&&gr<GRID&&gc>=0&&gc<GRID){
+          let gx=BOARD_X+gc*CELL,gy=BOARD_Y+gr*CELL;
+          if(valid){
+            drawBrick(gx,gy,CELL,piece.animal,0.35);
+          }else{
+            ctx.fillStyle='rgba(255,0,0,0.15)';roundRect(gx+2,gy+2,CELL-4,CELL-4,4);
+          }
+        }
+      }
+    }
+    // Floating piece
+    for(let [r,cc] of shape){
+      let px=floatX+(cc-minC)*CELL;
+      let py=floatY+(r-minR)*CELL;
+      drawBrick(px,py,CELL,piece.animal,0.85);
+    }
+  }
+
+  // Piece tray
+  ctx.fillStyle='#12122a';
+  roundRect(15,PIECE_AREA_Y-5,W-30,H-PIECE_AREA_Y-5,10);
+  ctx.strokeStyle='rgba(100,100,200,0.2)';ctx.lineWidth=1;
+  roundRectStroke(15,PIECE_AREA_Y-5,W-30,H-PIECE_AREA_Y-5,10);
+
+  let spacing=W/3;
+  for(let i=0;i<3;i++){
+    if(!pieces[i]||pieces[i].used)continue;
+    if(dragging&&dragging.pieceIdx===i)continue;
+    let shape=pieces[i].shape;
+    let animal=pieces[i].animal;
+    let minR=99,maxR=-99,minC=99,maxC=-99;
+    for(let [r,cc] of shape){minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,cc);maxC=Math.max(maxC,cc)}
+    let pw=(maxC-minC+1),ph=(maxR-minR+1);
+    let sz=30;
+    let pcx=spacing*i+spacing/2,pcy=PIECE_AREA_Y+70;
+    let ox=pcx-pw*sz/2,oy=pcy-ph*sz/2;
+
+    let placeable=false;
+    for(let r=0;r<GRID&&!placeable;r++)for(let cc=0;cc<GRID&&!placeable;cc++)if(canPlace(shape,r,cc))placeable=true;
+
+    for(let [r,cc] of shape) drawBrick(ox+cc*sz,oy+r*sz,sz,animal,placeable?1:0.2);
+  }
+
+  // Near-complete line highlight
+  for(let r=0;r<GRID;r++){
+    let filled=0;for(let cc=0;cc<GRID;cc++)if(board[r][cc]>=0)filled++;
+    if(filled>=GRID-1){
+      let pulse=Math.sin(gameTime*4)*0.15+0.25;
+      ctx.strokeStyle=`rgba(255,234,0,${pulse})`;ctx.lineWidth=2;
+      roundRectStroke(BOARD_X,BOARD_Y+r*CELL,GRID*CELL,CELL,2);
+    }
+  }
+  for(let cc=0;cc<GRID;cc++){
+    let filled=0;for(let r=0;r<GRID;r++)if(board[r][cc]>=0)filled++;
+    if(filled>=GRID-1){
+      let pulse=Math.sin(gameTime*4)*0.15+0.25;
+      ctx.strokeStyle=`rgba(255,234,0,${pulse})`;ctx.lineWidth=2;
+      roundRectStroke(BOARD_X+cc*CELL,BOARD_Y,CELL,GRID*CELL,2);
+    }
+  }
+
+  // Particles
+  for(let p of particles){
+    ctx.globalAlpha=Math.max(0,Math.min(1,p.life));
+    if(p.type==='spark'){
+      ctx.shadowColor=p.color;ctx.shadowBlur=6;
+      ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+      // Trail
+      ctx.globalAlpha*=0.4;
+      ctx.beginPath();ctx.arc(p.x-p.vx*0.02,p.y-p.vy*0.02,p.r*0.7,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+    }else if(p.type==='ring'){
+      ctx.strokeStyle=p.color;ctx.lineWidth=3;ctx.shadowColor=p.color;ctx.shadowBlur=10;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.stroke();
+      ctx.shadowBlur=0;
+    }else if(p.type==='ember'){
+      ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    }else if(p.type==='text'){
+      ctx.shadowColor='#ffea00';ctx.shadowBlur=15;
+      ctx.fillStyle=p.color;ctx.font='bold '+p.size+'px sans-serif';ctx.textAlign='center';
+      ctx.fillText(p.text,p.x,p.y);
+      ctx.shadowBlur=0;
+    }
+  }
+  ctx.globalAlpha=1;ctx.shadowBlur=0;
+
+  ctx.restore();
+}
+
+function drawGameOver(){
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
+
+  ctx.shadowColor='#ff1744';ctx.shadowBlur=20;
+  ctx.fillStyle='#1a1a2e';
+  roundRect(W/2-170,H/2-180,340,360,20);
+  ctx.shadowBlur=0;
+  ctx.strokeStyle='#ff1744';ctx.lineWidth=2;
+  roundRectStroke(W/2-170,H/2-180,340,360,20);
+
+  // Animated sad brick
+  let bounce=Math.sin(gameTime*2)*5;
+  drawBrick(W/2-30,H/2-160+bounce,60,0,1);
+
+  ctx.shadowColor='#ff1744';ctx.shadowBlur=10;
+  ctx.fillStyle='#ff5252';ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+  ctx.fillText('게임 오버',W/2,H/2-60);
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle='#fff';ctx.font='26px sans-serif';
+  ctx.fillText(score.toLocaleString()+' 점',W/2,H/2-10);
+
+  if(score>=bestScore&&score>0){
+    let glow=Math.sin(gameTime*4)*0.3+0.7;
+    ctx.shadowColor='#ffea00';ctx.shadowBlur=10*glow;
+    ctx.fillStyle='#ffea00';ctx.font='bold 20px sans-serif';
+    ctx.fillText('NEW RECORD!',W/2,H/2+30);
+    ctx.shadowBlur=0;
+  }
+
+  let pulse=Math.sin(gameTime*3)*0.1+0.9;
+  ctx.shadowColor='#2979ff';ctx.shadowBlur=12*pulse;
+  ctx.fillStyle='#2979ff';
+  roundRect(W/2-90,H/2+60,180,55,12);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';ctx.font='bold 24px sans-serif';
+  ctx.fillText('다시하기',W/2,H/2+95);
+}
+
+requestAnimationFrame(update);
+</script>
+</body></html>

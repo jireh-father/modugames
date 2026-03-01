@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>모두게임즈 프로토타입</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1e;color:#fff;font-family:-apple-system,sans-serif;padding:20px;min-height:100vh}
+h1{text-align:center;font-size:28px;margin:20px 0 5px}
+.sub{text-align:center;color:#888;margin-bottom:30px;font-size:14px}
+h2{font-size:20px;margin:30px 0 15px;padding-left:10px;border-left:3px solid #48f}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{background:#1a1a2e;border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s;border:1px solid #2a2a4e;text-decoration:none;color:#fff;display:block}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(72,130,255,0.2);border-color:#48f}
+.card .icon{font-size:36px;margin-bottom:8px}
+.card .name{font-size:18px;font-weight:bold;margin-bottom:4px}
+.card .desc{font-size:13px;color:#aaa;margin-bottom:8px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{background:#2a2a4e;padding:2px 8px;border-radius:10px;font-size:11px;color:#8af}
+footer{text-align:center;color:#555;margin-top:40px;padding:20px;font-size:12px}
+</style>
+</head><body>
+<h1>모두게임즈 프로토타입</h1>
+<p class="sub">게임 프로토타입 모음</p>
+
+<h2>신규 게임</h2>
+<div class="grid">
+  <a class="card" href="survival-arena/"><div class="icon">🏟️</div><div class="name">서바이벌 아레나</div><div class="desc">360° 자동공격 서바이벌</div><div class="tags"><span class="tag">액션</span><span class="tag">서바이벌</span></div></a>
+  <a class="card" href="merge-battle/"><div class="icon">🔗</div><div class="name">머지 배틀</div><div class="desc">유닛 합성 & 웨이브 전투</div><div class="tags"><span class="tag">전략</span><span class="tag">머지</span></div></a>
+  <a class="card" href="tower-defense/"><div class="icon">🏰</div><div class="name">타워 디펜스</div><div class="desc">S자 경로 타워 배치</div><div class="tags"><span class="tag">전략</span><span class="tag">디펜스</span></div></a>
+  <a class="card" href="bullet-hell/"><div class="icon">💥</div><div class="name">총알 지옥</div><div class="desc">보스 러쉬 탄막 슈팅</div><div class="tags"><span class="tag">액션</span><span class="tag">슈팅</span></div></a>
+  <a class="card" href="idle-factory/"><div class="icon">🏭</div><div class="name">아이들 팩토리</div><div class="desc">자원 생산 & 공장 경영</div><div class="tags"><span class="tag">방치형</span><span class="tag">경영</span></div></a>
+  <a class="card" href="animal-block-blast/"><div class="icon">🐰</div><div class="name">애니멀 블록 블라스트</div><div class="desc">귀여운 동물 블록 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">블록</span></div></a>
+  <a class="card" href="neon-block-blast/"><div class="icon">💎</div><div class="name">네온 블록 블라스트</div><div class="desc">화려한 네온 벽돌 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">네온</span></div></a>
+</div>
+
+<h2>퍼즐 & 실험</h2>
+<div class="grid">
+  <a class="card" href="push-pull-v3/"><div class="icon">🐾</div><div class="name">밀당 v3</div><div class="desc">동물 숲 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">귀여움</span></div></a>
+  <a class="card" href="push-pull-v2/"><div class="icon">🎯</div><div class="name">밀당 v2</div><div class="desc">전략 배치 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">전략</span></div></a>
+  <a class="card" href="push-pull/"><div class="icon">⚡</div><div class="name">밀당</div><div class="desc">블랙홀+파동 하이브리드</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">하이브리드</span></div></a>
+  <a class="card" href="blackhole/"><div class="icon">🕳️</div><div class="name">블랙홀</div><div class="desc">중력 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">물리</span></div></a>
+  <a class="card" href="ripple/"><div class="icon">🌊</div><div class="name">파동</div><div class="desc">파동 전파 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">파동</span></div></a>
+  <a class="card" href="mochi-drop/"><div class="icon">🍡</div><div class="name">모찌 드롭</div><div class="desc">합체 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">합체</span></div></a>
+  <a class="card" href="crack/"><div class="icon">💎</div><div class="name">크랙</div><div class="desc">균열 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">파괴</span></div></a>
+  <a class="card" href="one-shot/"><div class="icon">🎯</div><div class="name">원샷</div><div class="desc">한방 퍼즐</div><div class="tags"><span class="tag">퍼즐</span><span class="tag">정밀</span></div></a>
+  <a class="card" href="soldier-runner/"><div class="icon">🎖️</div><div class="name">솔저 러너</div><div class="desc">병사 수집 런 게임</div><div class="tags"><span class="tag">액션</span><span class="tag">런너</span></div></a>
+</div>
+
+<h2>기타</h2>
+<div class="grid">
+  <a class="card" href="skillshot/"><div class="icon">🎱</div><div class="name">스킬샷</div><div class="desc">정밀 조준 게임</div><div class="tags"><span class="tag">액션</span><span class="tag">스킬</span></div></a>
+  <a class="card" href="split/"><div class="icon">✂️</div><div class="name">스플릿</div><div class="desc">분할 퍼즐</div><div class="tags"><span class="tag">퍼즐</span></div></a>
+  <a class="card" href="vortex/"><div class="icon">🌀</div><div class="name">소용돌이</div><div class="desc">소용돌이 퍼즐</div><div class="tags"><span class="tag">퍼즐</span></div></a>
+</div>
+
+<footer>모두게임즈 &copy; 2026 - 프로토타입 모음</footer>
+</body></html>

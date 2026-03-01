@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>쩍! (Crack!)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a237e;
+  overflow: hidden;
+  touch-action: none;
+  font-family: 'Segoe UI', sans-serif;
+  user-select: none;
+}
+canvas { display: block; }
+#ui {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; pointer-events: none; z-index: 10;
+}
+#ui > div {
+  background: rgba(0,0,0,0.5); padding: 8px 16px;
+  border-radius: 20px; font-size: 15px; color: #e3f2fd; font-weight: bold;
+}
+#startScreen {
+  position: fixed; inset: 0;
+  background: linear-gradient(180deg, #0d47a1 0%, #1a237e 50%, #0d47a1 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#startScreen h1 {
+  font-size: 52px; margin-bottom: 8px;
+  text-shadow: 0 0 30px rgba(100,181,246,0.8);
+}
+#startScreen p { color: #90caf9; margin-bottom: 30px; font-size: 16px; text-align: center; line-height: 1.6; }
+#startScreen button {
+  background: linear-gradient(135deg, #1565c0, #42a5f5);
+  color: #fff; border: none; padding: 16px 48px; border-radius: 30px;
+  font-size: 20px; cursor: pointer; font-weight: bold;
+  box-shadow: 0 4px 20px rgba(21,101,192,0.5);
+}
+#levelComplete {
+  position: fixed; inset: 0; background: rgba(13,71,161,0.95);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#levelComplete h2 { font-size: 32px; margin-bottom: 12px; }
+#lcStars { font-size: 48px; color: #ffd54f; margin-bottom: 8px; }
+#lcInfo { font-size: 18px; color: #90caf9; margin-bottom: 24px; }
+#levelComplete button {
+  background: linear-gradient(135deg, #1565c0, #42a5f5);
+  color: #fff; border: none; padding: 14px 36px; border-radius: 30px;
+  font-size: 18px; cursor: pointer; font-weight: bold; margin: 6px;
+  box-shadow: 0 4px 15px rgba(21,101,192,0.4);
+}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>쩍!</h1>
+  <p>얼음을 탭해서 깨고<br>갇힌 보석을 구출하세요!<br>탭 횟수 제한이 있어요!</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="scoreDisplay">점수: 0</div>
+  <div id="tapsLeft">남은 탭: 5</div>
+</div>
+<div id="levelComplete">
+  <h2 id="lcTitle">레벨 클리어!</h2>
+  <div id="lcStars"></div>
+  <div id="lcInfo"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, dur, type='sine', vol=0.12) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+function playCrack() {
+  playSound(100 + Math.random() * 50, 0.2, 'sawtooth', 0.15);
+  playSound(800 + Math.random() * 400, 0.1, 'sine', 0.05);
+  setTimeout(() => playSound(60, 0.15, 'sawtooth', 0.1), 50);
+}
+function playGemCollect() {
+  playSound(600, 0.3, 'sine', 0.12);
+  setTimeout(() => playSound(800, 0.2, 'sine', 0.1), 100);
+}
+function playFall() {
+  playSound(100, 0.4, 'sine', 0.06);
+}
+
+// Game state
+let cells = [];       // Voronoi-like cells
+let edges = [];       // Edges between cells (crackable)
+let gems = [];        // Gems trapped in cells
+let fallingPieces = [];
+let collectedGems = [];
+let sparkles = [];
+let tapsRemaining = 5;
+let score = 0;
+let totalScore = 0;
+let level = 1;
+let gameActive = false;
+let shakeTimer = 0;
+let shakeX = 0, shakeY = 0;
+
+// Ice surface area
+const ICE_MARGIN = 30;
+const ICE_TOP = 80;
+let iceBottom;
+const BUCKET_HEIGHT = 80;
+
+// Level configs
+const levelConfigs = [
+  { cells: 12, gems: 3, taps: 4, par: 2 },
+  { cells: 16, gems: 4, taps: 4, par: 3 },
+  { cells: 20, gems: 5, taps: 5, par: 3 },
+  { cells: 24, gems: 6, taps: 5, par: 4 },
+  { cells: 28, gems: 7, taps: 6, par: 4 },
+  { cells: 32, gems: 8, taps: 6, par: 5 },
+  { cells: 36, gems: 9, taps: 7, par: 5 },
+  { cells: 40, gems: 10, taps: 7, par: 6 },
+];
+
+// Generate Voronoi-like grid using relaxed random points
+function generateCells(count) {
+  iceBottom = H - BUCKET_HEIGHT - 40;
+  const iceW = W - ICE_MARGIN * 2;
+  const iceH = iceBottom - ICE_TOP;
+
+  // Generate seed points
+  const points = [];
+  for (let i = 0; i < count; i++) {
+    points.push({
+      x: ICE_MARGIN + 20 + Math.random() * (iceW - 40),
+      y: ICE_TOP + 20 + Math.random() * (iceH - 40),
+    });
+  }
+
+  // Create cells as polygons using nearest-neighbor regions
+  cells = [];
+  const GRID_RES = 4;
+  const cellPixels = new Array(count).fill(null).map(() => []);
+
+  // Assign each grid point to nearest seed
+  for (let gx = ICE_MARGIN; gx < W - ICE_MARGIN; gx += GRID_RES) {
+    for (let gy = ICE_TOP; gy < iceBottom; gy += GRID_RES) {
+      let minDist = Infinity;
+      let minIdx = 0;
+      for (let i = 0; i < points.length; i++) {
+        const dx = gx - points[i].x;
+        const dy = gy - points[i].y;
+        const d = dx * dx + dy * dy;
+        if (d < minDist) { minDist = d; minIdx = i; }
+      }
+      cellPixels[minIdx].push({ x: gx, y: gy });
+    }
+  }
+
+  for (let i = 0; i < count; i++) {
+    if (cellPixels[i].length === 0) continue;
+
+    // Find bounding hull (simplified: just use convex-ish outline)
+    const px = cellPixels[i];
+    let cx = 0, cy = 0;
+    for (const p of px) { cx += p.x; cy += p.y; }
+    cx /= px.length; cy /= px.length;
+
+    cells.push({
+      id: i,
+      center: { x: cx, y: cy },
+      seed: points[i],
+      pixels: px,
+      cracked: false,
+      falling: false,
+      fallVy: 0,
+      fallVx: 0,
+      fallRotation: 0,
+      fallRotSpeed: 0,
+      fallY: 0,
+      fallX: 0,
+      opacity: 1,
+      neighbors: [],
+      crackedEdges: new Set(),
+      hasGem: false,
+      gemColor: null,
+    });
+  }
+
+  // Find neighbors
+  const neighborSet = new Set();
+  for (let gx = ICE_MARGIN; gx < W - ICE_MARGIN; gx += GRID_RES) {
+    for (let gy = ICE_TOP; gy < iceBottom; gy += GRID_RES) {
+      // Check adjacent grid points
+      const getCell = (x, y) => {
+        let minDist = Infinity, minIdx = -1;
+        for (let i = 0; i < points.length; i++) {
+          const dx = x - points[i].x;
+          const dy = y - points[i].y;
+          const d = dx * dx + dy * dy;
+          if (d < minDist) { minDist = d; minIdx = i; }
+        }
+        return minIdx;
+      };
+      const c1 = getCell(gx, gy);
+      const c2 = getCell(gx + GRID_RES, gy);
+      const c3 = getCell(gx, gy + GRID_RES);
+      if (c1 !== c2 && c1 >= 0 && c2 >= 0) {
+        const key = Math.min(c1, c2) + ',' + Math.max(c1, c2);
+        neighborSet.add(key);
+      }
+      if (c1 !== c3 && c1 >= 0 && c3 >= 0) {
+        const key = Math.min(c1, c3) + ',' + Math.max(c1, c3);
+        neighborSet.add(key);
+      }
+    }
+  }
+
+  edges = [];
+  for (const key of neighborSet) {
+    const [a, b] = key.split(',').map(Number);
+    if (a < cells.length && b < cells.length) {
+      edges.push({ a, b, cracked: false });
+      cells[a].neighbors.push(b);
+      cells[b].neighbors.push(a);
+    }
+  }
+}
+
+function placeGems(count) {
+  gems = [];
+  const GEM_COLORS = ['#ef5350', '#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ffee58'];
+  const available = cells.filter(c => !c.falling);
+  const shuffled = available.sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+    shuffled[i].hasGem = true;
+    shuffled[i].gemColor = GEM_COLORS[i % GEM_COLORS.length];
+    gems.push({
+      cellId: shuffled[i].id,
+      color: shuffled[i].gemColor,
+      x: shuffled[i].center.x,
+      y: shuffled[i].center.y,
+      collected: false,
+      falling: false,
+      vy: 0,
+      sparkle: 0,
+    });
+  }
+}
+
+function initLevel(lvl) {
+  const config = levelConfigs[Math.min(lvl - 1, levelConfigs.length - 1)];
+  fallingPieces = [];
+  collectedGems = [];
+  sparkles = [];
+  tapsRemaining = config.taps;
+  score = 0;
+  shakeTimer = 0;
+
+  generateCells(config.cells);
+  placeGems(config.gems);
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('levelDisplay').textContent = `레벨 ${level}`;
+  document.getElementById('scoreDisplay').textContent = `점수: ${totalScore + score}`;
+  document.getElementById('tapsLeft').textContent = `남은 탭: ${tapsRemaining}`;
+}
+
+// Crack logic
+function crackAt(x, y) {
+  if (!gameActive || tapsRemaining <= 0) return;
+
+  // Find nearest cell
+  let minDist = Infinity, nearestCell = null;
+  for (const cell of cells) {
+    if (cell.falling) continue;
+    const dx = x - cell.center.x;
+    const dy = y - cell.center.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < minDist) { minDist = d; nearestCell = cell; }
+  }
+
+  if (!nearestCell || minDist > 200) return;
+
+  tapsRemaining--;
+  shakeTimer = 10;
+  playCrack();
+
+  // Crack edges around this cell and nearby cells
+  const crackRadius = 80 + Math.random() * 40;
+  for (const edge of edges) {
+    if (edge.cracked) continue;
+    const cellA = cells[edge.a];
+    const cellB = cells[edge.b];
+    if (!cellA || !cellB) continue;
+
+    const midX = (cellA.center.x + cellB.center.x) / 2;
+    const midY = (cellA.center.y + cellB.center.y) / 2;
+    const dx = x - midX;
+    const dy = y - midY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+
+    if (d < crackRadius) {
+      edge.cracked = true;
+      cellA.crackedEdges.add(edge.b);
+      cellB.crackedEdges.add(edge.a);
+
+      // Crack sparkles along edge
+      for (let s = 0; s < 3; s++) {
+        sparkles.push({
+          x: midX + (Math.random() - 0.5) * 20,
+          y: midY + (Math.random() - 0.5) * 20,
+          life: 1,
+          size: 2 + Math.random() * 3,
+        });
+      }
+    }
+  }
+
+  // Check if any cells are now disconnected (all edges cracked)
+  checkFallingCells();
+  updateUI();
+
+  // Check level complete
+  setTimeout(() => {
+    if (gameActive && (tapsRemaining <= 0 || allGemsHandled())) {
+      checkLevelComplete();
+    }
+  }, 1500);
+}
+
+function checkFallingCells() {
+  // A cell falls if all its edges to neighbors are cracked
+  // OR if it's connected only to falling cells
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const cell of cells) {
+      if (cell.falling) continue;
+      if (cell.neighbors.length === 0) continue;
+
+      const allCracked = cell.neighbors.every(nId => {
+        return cell.crackedEdges.has(nId) || cells[nId].falling;
+      });
+
+      if (allCracked) {
+        cell.falling = true;
+        cell.fallVy = 0;
+        cell.fallVx = (Math.random() - 0.5) * 2;
+        cell.fallRotSpeed = (Math.random() - 0.5) * 0.05;
+        cell.fallY = 0;
+        cell.fallX = 0;
+        cell.fallRotation = 0;
+        changed = true;
+        playFall();
+
+        // Check if this cell has a gem
+        if (cell.hasGem) {
+          const gem = gems.find(g => g.cellId === cell.id && !g.collected);
+          if (gem) {
+            gem.falling = true;
+            score += 100;
+
+            // Collect sparkle
+            for (let i = 0; i < 8; i++) {
+              sparkles.push({
+                x: gem.x + (Math.random() - 0.5) * 30,
+                y: gem.y + (Math.random() - 0.5) * 30,
+                life: 1.5,
+                size: 3 + Math.random() * 4,
+                color: gem.color,
+              });
+            }
+            playGemCollect();
+            updateUI();
+          }
+        }
+      }
+    }
+  }
+}
+
+function allGemsHandled() {
+  return gems.every(g => g.falling || g.collected);
+}
+
+function checkLevelComplete() {
+  if (!gameActive) return;
+  const collected = gems.filter(g => g.falling).length;
+  const total = gems.length;
+
+  if (tapsRemaining <= 0 || collected === total) {
+    gameActive = false;
+    setTimeout(() => {
+      const config = levelConfigs[Math.min(level - 1, levelConfigs.length - 1)];
+      let starCount = 0;
+      if (collected === total) {
+        starCount = 1;
+        const tapsUsed = config.taps - tapsRemaining;
+        if (tapsUsed <= config.par) starCount = 3;
+        else if (tapsUsed <= config.par + 1) starCount = 2;
+      }
+
+      const starStr = '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
+      document.getElementById('lcStars').textContent = starStr;
+      document.getElementById('lcTitle').textContent = collected === total ? `레벨 ${level} 클리어!` : '실패...';
+      document.getElementById('lcInfo').textContent = `보석: ${collected}/${total} | 점수: ${score}`;
+      document.getElementById('levelComplete').style.display = 'flex';
+      totalScore += score;
+
+      if (collected === total) {
+        playSound(523, 0.2, 'sine', 0.15);
+        setTimeout(() => playSound(659, 0.2, 'sine', 0.15), 150);
+        setTimeout(() => playSound(784, 0.3, 'sine', 0.15), 300);
+      } else {
+        playSound(200, 0.5, 'sawtooth', 0.1);
+      }
+    }, 1000);
+  }
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  crackAt(e.clientX, e.clientY);
+});
+
+function update() {
+  // Screen shake
+  if (shakeTimer > 0) {
+    shakeTimer--;
+    shakeX = (Math.random() - 0.5) * shakeTimer;
+    shakeY = (Math.random() - 0.5) * shakeTimer;
+  } else {
+    shakeX = shakeY = 0;
+  }
+
+  // Update falling cells
+  for (const cell of cells) {
+    if (!cell.falling) continue;
+    cell.fallVy += 0.4;
+    cell.fallY += cell.fallVy;
+    cell.fallX += cell.fallVx;
+    cell.fallRotation += cell.fallRotSpeed;
+    cell.opacity = Math.max(0, 1 - cell.fallY / (H * 0.8));
+  }
+
+  // Update gems
+  for (const gem of gems) {
+    if (!gem.falling) {
+      gem.sparkle += 0.05;
+      continue;
+    }
+    const cell = cells[gem.cellId];
+    if (cell) {
+      gem.x = cell.center.x + cell.fallX;
+      gem.y = cell.center.y + cell.fallY;
+    }
+  }
+
+  // Update sparkles
+  for (let i = sparkles.length - 1; i >= 0; i--) {
+    sparkles[i].life -= 0.03;
+    if (sparkles[i].life <= 0) sparkles.splice(i, 1);
+  }
+}
+
+function draw() {
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0d47a1');
+  bg.addColorStop(0.5, '#1a237e');
+  bg.addColorStop(1, '#0d47a1');
+  ctx.fillStyle = bg;
+  ctx.fillRect(-10, -10, W + 20, H + 20);
+
+  // Draw non-falling cells (ice surface)
+  for (const cell of cells) {
+    if (cell.falling) continue;
+    drawCell(cell, 0, 0, 0, 1);
+  }
+
+  // Draw crack lines
+  for (const edge of edges) {
+    if (!edge.cracked) continue;
+    const cellA = cells[edge.a];
+    const cellB = cells[edge.b];
+    if (!cellA || !cellB) continue;
+    if (cellA.falling && cellB.falling) continue;
+
+    const midX = (cellA.center.x + cellB.center.x) / 2;
+    const midY = (cellA.center.y + cellB.center.y) / 2;
+
+    // Draw crack line perpendicular to edge
+    const dx = cellB.center.x - cellA.center.x;
+    const dy = cellB.center.y - cellA.center.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = -dy / len;
+    const ny = dx / len;
+    const crackLen = len * 0.6;
+
+    ctx.strokeStyle = 'rgba(200,230,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(midX - nx * crackLen, midY - ny * crackLen);
+
+    // Jagged line
+    const steps = 5;
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      const px = midX + (-1 + 2 * t) * nx * crackLen;
+      const py = midY + (-1 + 2 * t) * ny * crackLen;
+      const jitter = (Math.random() - 0.5) * 6;
+      ctx.lineTo(px + dx / len * jitter, py + dy / len * jitter);
+    }
+    ctx.stroke();
+
+    // Glow
+    ctx.strokeStyle = 'rgba(150,210,255,0.3)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+  }
+
+  // Draw falling cells
+  for (const cell of cells) {
+    if (!cell.falling) continue;
+    drawCell(cell, cell.fallX, cell.fallY, cell.fallRotation, cell.opacity);
+  }
+
+  // Draw gems
+  for (const gem of gems) {
+    if (gem.collected) continue;
+    const cell = cells[gem.cellId];
+    const alpha = cell.falling ? cell.opacity : 1;
+    if (alpha <= 0) continue;
+
+    ctx.globalAlpha = alpha;
+    const gx = gem.x;
+    const gy = gem.y;
+    const size = 12;
+
+    // Gem glow
+    const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, size * 2.5);
+    glow.addColorStop(0, gem.color + '80');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(gx, gy, size * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gem body (diamond shape)
+    ctx.fillStyle = gem.color;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - size);
+    ctx.lineTo(gx + size, gy);
+    ctx.lineTo(gx, gy + size * 0.6);
+    ctx.lineTo(gx - size, gy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - size);
+    ctx.lineTo(gx + size * 0.4, gy - size * 0.3);
+    ctx.lineTo(gx, gy - size * 0.1);
+    ctx.lineTo(gx - size * 0.4, gy - size * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sparkle
+    if (!cell.falling) {
+      const sparkAlpha = (Math.sin(gem.sparkle * 3) + 1) * 0.3;
+      ctx.fillStyle = `rgba(255,255,255,${sparkAlpha})`;
+      const sx = gx + Math.cos(gem.sparkle) * 8;
+      const sy = gy + Math.sin(gem.sparkle) * 8;
+      drawStar(sx, sy, 4, 2);
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  // Sparkle effects
+  for (const s of sparkles) {
+    ctx.fillStyle = (s.color || 'rgba(200,230,255,') + (s.color ? '' : '') ;
+    ctx.globalAlpha = Math.min(1, s.life);
+    drawStar(s.x, s.y, s.size, s.size * 0.4);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+function drawCell(cell, offX, offY, rot, alpha) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if (rot !== 0) {
+    ctx.translate(cell.center.x + offX, cell.center.y + offY);
+    ctx.rotate(rot);
+    ctx.translate(-(cell.center.x + offX), -(cell.center.y + offY));
+  }
+
+  // Draw cell pixels as ice
+  const grad = ctx.createRadialGradient(
+    cell.center.x + offX, cell.center.y + offY, 0,
+    cell.center.x + offX, cell.center.y + offY, 60
+  );
+  grad.addColorStop(0, 'rgba(200,230,255,0.35)');
+  grad.addColorStop(1, 'rgba(150,200,240,0.2)');
+  ctx.fillStyle = grad;
+
+  for (const p of cell.pixels) {
+    ctx.fillRect(p.x + offX, p.y + offY, 4, 4);
+  }
+
+  // Cell border (subtle)
+  ctx.strokeStyle = 'rgba(180,220,255,0.15)';
+  ctx.lineWidth = 1;
+
+  ctx.restore();
+}
+
+function drawStar(x, y, outerR, innerR) {
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const angle = (Math.PI / 2) * i;
+    ctx.moveTo(x + Math.cos(angle) * outerR, y + Math.sin(angle) * outerR);
+    ctx.lineTo(x + Math.cos(angle + Math.PI / 4) * innerR, y + Math.sin(angle + Math.PI / 4) * innerR);
+    ctx.lineTo(x + Math.cos(angle + Math.PI / 2) * outerR, y + Math.sin(angle + Math.PI / 2) * outerR);
+  }
+  ctx.fill();
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('levelComplete').style.display = 'none';
+  level = 1;
+  totalScore = 0;
+  initLevel(level);
+  gameActive = true;
+}
+
+function nextLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  level++;
+  initLevel(level);
+  gameActive = true;
+}
+
+function retryLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  initLevel(level);
+  gameActive = true;
+}
+
+gameLoop();
+</script>
+</body>
+</html>

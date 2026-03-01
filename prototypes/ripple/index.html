@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>파동 (Ripple)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a1628;
+  overflow: hidden;
+  touch-action: none;
+  font-family: 'Segoe UI', sans-serif;
+  user-select: none;
+}
+canvas { display: block; }
+#ui {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px;
+  color: #fff;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui > div { background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 20px; }
+#message {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #fff; font-size: 28px; font-weight: bold;
+  text-align: center; pointer-events: none; opacity: 0;
+  text-shadow: 0 2px 20px rgba(0,150,255,0.8);
+  z-index: 20;
+  transition: opacity 0.3s;
+}
+#startScreen {
+  position: fixed; inset: 0;
+  background: linear-gradient(180deg, #0a1628 0%, #0d2847 50%, #0a1628 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#startScreen h1 {
+  font-size: 52px; margin-bottom: 8px;
+  background: linear-gradient(90deg, #4fc3f7, #81d4fa, #b3e5fc);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+#startScreen p { color: #81d4fa; margin-bottom: 40px; font-size: 18px; }
+#startScreen button {
+  background: linear-gradient(135deg, #1e88e5, #42a5f5);
+  color: #fff; border: none; padding: 16px 48px; border-radius: 30px;
+  font-size: 20px; cursor: pointer; font-weight: bold;
+  box-shadow: 0 4px 20px rgba(30,136,229,0.5);
+}
+#startScreen button:active { transform: scale(0.95); }
+#levelComplete {
+  position: fixed; inset: 0;
+  background: rgba(10,22,40,0.9);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; z-index: 100;
+}
+#levelComplete h2 { font-size: 32px; margin-bottom: 12px; }
+#stars { font-size: 48px; margin-bottom: 8px; }
+#levelScore { font-size: 20px; color: #81d4fa; margin-bottom: 32px; }
+#levelComplete button {
+  background: linear-gradient(135deg, #1e88e5, #42a5f5);
+  color: #fff; border: none; padding: 14px 40px; border-radius: 30px;
+  font-size: 18px; cursor: pointer; font-weight: bold; margin: 6px;
+  box-shadow: 0 4px 20px rgba(30,136,229,0.4);
+}
+</style>
+</head>
+<body>
+<div id="startScreen">
+  <h1>파동</h1>
+  <p>탭으로 파동을 일으켜 같은 색 구슬을 합치세요!</p>
+  <button onclick="startGame()">시작하기</button>
+</div>
+<div id="ui">
+  <div id="levelDisplay">레벨 1</div>
+  <div id="scoreDisplay">점수: 0</div>
+  <div id="tapDisplay">탭: 0</div>
+</div>
+<div id="message"></div>
+<div id="levelComplete">
+  <h2 id="completeTitle">레벨 클리어!</h2>
+  <div id="stars"></div>
+  <div id="levelScore"></div>
+  <button onclick="nextLevel()">다음 레벨</button>
+  <button onclick="retryLevel()">다시 도전</button>
+</div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, dur, type = 'sine', vol = 0.15) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
+function playRippleSound() {
+  playSound(300, 0.4, 'sine', 0.1);
+  playSound(450, 0.3, 'sine', 0.06);
+}
+function playMergeSound(combo) {
+  const base = 400 + combo * 100;
+  playSound(base, 0.5, 'sine', 0.2);
+  playSound(base * 1.5, 0.3, 'sine', 0.1);
+  setTimeout(() => playSound(base * 2, 0.4, 'sine', 0.08), 100);
+}
+
+// Colors
+const COLORS = [
+  { fill: '#ef5350', glow: 'rgba(239,83,80,0.5)', name: 'red' },
+  { fill: '#42a5f5', glow: 'rgba(66,165,245,0.5)', name: 'blue' },
+  { fill: '#66bb6a', glow: 'rgba(102,187,106,0.5)', name: 'green' },
+  { fill: '#ffa726', glow: 'rgba(255,167,38,0.5)', name: 'orange' },
+  { fill: '#ab47bc', glow: 'rgba(171,71,188,0.5)', name: 'purple' },
+  { fill: '#ffee58', glow: 'rgba(255,238,88,0.5)', name: 'yellow' },
+];
+
+// Game state
+let orbs = [];
+let ripples = [];
+let particles = [];
+let mergeFlashes = [];
+let tapCount = 0;
+let score = 0;
+let totalScore = 0;
+let level = 1;
+let gameActive = false;
+let comboCount = 0;
+let comboTimer = 0;
+let pendingMerges = 0;
+
+const FRICTION = 0.985;
+const RIPPLE_SPEED = 6;
+const RIPPLE_FORCE = 3.5;
+const ORB_BASE_RADIUS = 22;
+
+// Level configs
+const levels = [
+  { colors: 2, orbsPerColor: 2, par: 2 },
+  { colors: 2, orbsPerColor: 3, par: 3 },
+  { colors: 3, orbsPerColor: 2, par: 3 },
+  { colors: 3, orbsPerColor: 3, par: 4 },
+  { colors: 4, orbsPerColor: 2, par: 4 },
+  { colors: 4, orbsPerColor: 3, par: 5 },
+  { colors: 3, orbsPerColor: 4, par: 5 },
+  { colors: 5, orbsPerColor: 2, par: 5 },
+  { colors: 4, orbsPerColor: 4, par: 6 },
+  { colors: 5, orbsPerColor: 3, par: 7 },
+];
+
+function initLevel(lvl) {
+  const config = levels[Math.min(lvl - 1, levels.length - 1)];
+  orbs = [];
+  ripples = [];
+  particles = [];
+  mergeFlashes = [];
+  tapCount = 0;
+  score = 0;
+  comboCount = 0;
+  pendingMerges = 0;
+
+  const margin = 80;
+  const usedColors = COLORS.slice(0, config.colors);
+
+  for (let c = 0; c < config.colors; c++) {
+    for (let n = 0; n < config.orbsPerColor; n++) {
+      let x, y, valid;
+      let attempts = 0;
+      do {
+        x = margin + Math.random() * (W - margin * 2);
+        y = margin + 60 + Math.random() * (H - margin * 2 - 60);
+        valid = true;
+        for (const orb of orbs) {
+          const dx = x - orb.x;
+          const dy = y - orb.y;
+          if (Math.sqrt(dx * dx + dy * dy) < ORB_BASE_RADIUS * 3) {
+            valid = false;
+            break;
+          }
+        }
+        attempts++;
+      } while (!valid && attempts < 100);
+
+      orbs.push({
+        x, y, vx: 0, vy: 0,
+        radius: ORB_BASE_RADIUS,
+        color: c,
+        mergeCount: 0,
+        pulsePhase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('levelDisplay').textContent = `레벨 ${level}`;
+  document.getElementById('scoreDisplay').textContent = `점수: ${totalScore + score}`;
+  document.getElementById('tapDisplay').textContent = `탭: ${tapCount}`;
+}
+
+// Input
+function handleTap(x, y) {
+  if (!gameActive) return;
+  tapCount++;
+  comboCount = 0;
+
+  ripples.push({
+    x, y,
+    radius: 0,
+    maxRadius: Math.min(W, H) * 0.6,
+    alpha: 1,
+    force: RIPPLE_FORCE,
+  });
+
+  // Small particles at tap point
+  for (let i = 0; i < 8; i++) {
+    const angle = (Math.PI * 2 / 8) * i;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * 2,
+      vy: Math.sin(angle) * 2,
+      life: 1,
+      color: 'rgba(150,210,255,',
+      size: 3,
+    });
+  }
+
+  playRippleSound();
+  updateUI();
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  handleTap(e.clientX, e.clientY);
+});
+
+// Water background particles
+const waterParticles = [];
+for (let i = 0; i < 40; i++) {
+  waterParticles.push({
+    x: Math.random() * 2000,
+    y: Math.random() * 2000,
+    size: Math.random() * 3 + 1,
+    speed: Math.random() * 0.3 + 0.1,
+    alpha: Math.random() * 0.3 + 0.05,
+  });
+}
+
+function update() {
+  // Update ripples
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.radius += RIPPLE_SPEED;
+    r.alpha = Math.max(0, 1 - r.radius / r.maxRadius);
+
+    // Apply force to orbs
+    for (const orb of orbs) {
+      const dx = orb.x - r.x;
+      const dy = orb.y - r.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 0 && Math.abs(dist - r.radius) < 30) {
+        const intensity = 1 - Math.abs(dist - r.radius) / 30;
+        const forceMag = r.force * r.alpha * intensity;
+        orb.vx += (dx / dist) * forceMag;
+        orb.vy += (dy / dist) * forceMag;
+      }
+    }
+
+    if (r.radius >= r.maxRadius) ripples.splice(i, 1);
+  }
+
+  // Update orbs
+  for (const orb of orbs) {
+    orb.x += orb.vx;
+    orb.y += orb.vy;
+    orb.vx *= FRICTION;
+    orb.vy *= FRICTION;
+    orb.pulsePhase += 0.03;
+
+    // Wall bounce
+    const margin = 10;
+    if (orb.x - orb.radius < margin) { orb.x = margin + orb.radius; orb.vx = Math.abs(orb.vx) * 0.7; }
+    if (orb.x + orb.radius > W - margin) { orb.x = W - margin - orb.radius; orb.vx = -Math.abs(orb.vx) * 0.7; }
+    if (orb.y - orb.radius < margin + 50) { orb.y = margin + 50 + orb.radius; orb.vy = Math.abs(orb.vy) * 0.7; }
+    if (orb.y + orb.radius > H - margin) { orb.y = H - margin - orb.radius; orb.vy = -Math.abs(orb.vy) * 0.7; }
+
+    // Repel different-color orbs (prevent overlap)
+    for (const other of orbs) {
+      if (other === orb) continue;
+      const dx = orb.x - other.x;
+      const dy = orb.y - other.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = orb.radius + other.radius;
+      if (dist < minDist && dist > 0) {
+        if (orb.color !== other.color) {
+          const push = (minDist - dist) * 0.3;
+          orb.vx += (dx / dist) * push;
+          orb.vy += (dy / dist) * push;
+        }
+      }
+    }
+  }
+
+  // Check merges
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    for (let j = i - 1; j >= 0; j--) {
+      if (i >= orbs.length || j >= orbs.length) continue;
+      const a = orbs[i];
+      const b = orbs[j];
+      if (!a || !b) continue;
+      if (a.color !== b.color) continue;
+
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < a.radius + b.radius - 5) {
+        // Merge!
+        const newX = (a.x + b.x) / 2;
+        const newY = (a.y + b.y) / 2;
+        const newMerge = Math.max(a.mergeCount, b.mergeCount) + 1;
+        const newRadius = ORB_BASE_RADIUS + newMerge * 5;
+
+        comboCount++;
+        const points = 100 * comboCount;
+        score += points;
+
+        // Merge flash
+        mergeFlashes.push({
+          x: newX, y: newY, radius: 0, maxRadius: 80, alpha: 1,
+          color: COLORS[a.color].glow,
+        });
+
+        // Score popup particle
+        particles.push({
+          x: newX, y: newY - 20,
+          vx: 0, vy: -1,
+          life: 1.5,
+          color: 'rgba(255,255,255,',
+          size: 0,
+          text: `+${points}`,
+          isText: true,
+        });
+
+        // Merge particles
+        for (let p = 0; p < 16; p++) {
+          const angle = (Math.PI * 2 / 16) * p;
+          const speed = 2 + Math.random() * 3;
+          particles.push({
+            x: newX, y: newY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            color: COLORS[a.color].glow.replace('0.5', ''),
+            size: 4 + Math.random() * 3,
+          });
+        }
+
+        // Create secondary ripple from merge
+        ripples.push({
+          x: newX, y: newY,
+          radius: 0,
+          maxRadius: 120 + newMerge * 30,
+          alpha: 0.7,
+          force: RIPPLE_FORCE * 0.6,
+        });
+
+        // Replace with merged orb
+        orbs.splice(i, 1);
+        if (j < orbs.length) {
+          orbs[j] = {
+            x: newX, y: newY,
+            vx: (a.vx + b.vx) * 0.3,
+            vy: (a.vy + b.vy) * 0.3,
+            radius: newRadius,
+            color: a.color,
+            mergeCount: newMerge,
+            pulsePhase: 0,
+          };
+        }
+
+        playMergeSound(comboCount);
+        updateUI();
+        break;
+      }
+    }
+  }
+
+  // Check win condition: each color has at most 1 orb
+  if (gameActive) {
+    const colorCounts = {};
+    for (const orb of orbs) {
+      colorCounts[orb.color] = (colorCounts[orb.color] || 0) + 1;
+    }
+    const allMerged = Object.values(colorCounts).every(c => c <= 1);
+    if (allMerged && ripples.length === 0) {
+      // Check if all orbs are mostly still
+      const allStill = orbs.every(o => Math.abs(o.vx) < 0.5 && Math.abs(o.vy) < 0.5);
+      if (allStill) {
+        gameActive = false;
+        setTimeout(() => showLevelComplete(), 500);
+      }
+    }
+  }
+
+  // Update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.02;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Update merge flashes
+  for (let i = mergeFlashes.length - 1; i >= 0; i--) {
+    const f = mergeFlashes[i];
+    f.radius += 4;
+    f.alpha -= 0.04;
+    if (f.alpha <= 0) mergeFlashes.splice(i, 1);
+  }
+
+  // Update water bg
+  for (const wp of waterParticles) {
+    wp.y -= wp.speed;
+    wp.x += Math.sin(wp.y * 0.01) * 0.3;
+    if (wp.y < -10) { wp.y = H + 10; wp.x = Math.random() * W; }
+  }
+}
+
+function draw() {
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a1628');
+  grad.addColorStop(0.5, '#0d2847');
+  grad.addColorStop(1, '#0a1e3a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Water particles
+  for (const wp of waterParticles) {
+    ctx.beginPath();
+    ctx.arc(wp.x, wp.y, wp.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(100,180,255,${wp.alpha})`;
+    ctx.fill();
+  }
+
+  // Ripples
+  for (const r of ripples) {
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(120,200,255,${r.alpha * 0.6})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    if (r.radius > 10) {
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.radius - 8, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(120,200,255,${r.alpha * 0.25})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // Merge flashes
+  for (const f of mergeFlashes) {
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius);
+    g.addColorStop(0, f.color.replace('0.5', `${f.alpha * 0.5}`));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Orbs
+  for (const orb of orbs) {
+    const c = COLORS[orb.color];
+    const pulse = 1 + Math.sin(orb.pulsePhase) * 0.05;
+    const r = orb.radius * pulse;
+
+    // Glow
+    const glow = ctx.createRadialGradient(orb.x, orb.y, r * 0.5, orb.x, orb.y, r * 2.5);
+    glow.addColorStop(0, c.glow);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    const bodyGrad = ctx.createRadialGradient(orb.x - r * 0.3, orb.y - r * 0.3, r * 0.1, orb.x, orb.y, r);
+    bodyGrad.addColorStop(0, '#fff');
+    bodyGrad.addColorStop(0.3, c.fill);
+    bodyGrad.addColorStop(1, c.fill);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(orb.x - r * 0.25, orb.y - r * 0.25, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Merge count indicator
+    if (orb.mergeCount > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = `bold ${12 + orb.mergeCount * 2}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`x${orb.mergeCount + 1}`, orb.x, orb.y);
+    }
+  }
+
+  // Particles
+  for (const p of particles) {
+    if (p.isText) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(1, p.life)})`;
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+    } else {
+      ctx.fillStyle = `${p.color}${Math.min(1, p.life)})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Combo display
+  if (comboCount > 1) {
+    ctx.fillStyle = `rgba(255,255,100,${Math.min(1, comboCount * 0.3)})`;
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${comboCount}x COMBO!`, W / 2, H / 2 - 60);
+  }
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  level = 1;
+  totalScore = 0;
+  initLevel(level);
+  gameActive = true;
+}
+
+function showLevelComplete() {
+  const config = levels[Math.min(level - 1, levels.length - 1)];
+  const par = config.par;
+  let starCount = 1;
+  if (tapCount <= par) starCount = 3;
+  else if (tapCount <= par + 2) starCount = 2;
+
+  const starStr = '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
+  document.getElementById('stars').textContent = starStr;
+  document.getElementById('stars').style.color = '#ffd54f';
+  document.getElementById('completeTitle').textContent = `레벨 ${level} 클리어!`;
+  document.getElementById('levelScore').textContent = `점수: ${score} | 탭: ${tapCount}회 (기준: ${par}회)`;
+  document.getElementById('levelComplete').style.display = 'flex';
+
+  totalScore += score;
+  playSound(523, 0.2, 'sine', 0.15);
+  setTimeout(() => playSound(659, 0.2, 'sine', 0.15), 150);
+  setTimeout(() => playSound(784, 0.3, 'sine', 0.15), 300);
+}
+
+function nextLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  level++;
+  initLevel(level);
+  gameActive = true;
+}
+
+function retryLevel() {
+  document.getElementById('levelComplete').style.display = 'none';
+  initLevel(level);
+  gameActive = true;
+}
+
+gameLoop();
+</script>
+</body>
+</html>
