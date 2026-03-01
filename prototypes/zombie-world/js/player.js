@@ -1,8 +1,8 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=15';
-import { findPath, drawPathDebug } from './pathfinding.js?v=15';
-import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=15';
-import { registerZone } from './input.js?v=15';
+import { W, WORLD_W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=16';
+import { findPath, drawPathDebug } from './pathfinding.js?v=16';
+import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=16';
+import { registerZone } from './input.js?v=16';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -38,12 +38,22 @@ export function initPlayer() {
   registerZone(
     { x: 0, y: FIELD_TOP, w: W, h: FIELD_BOTTOM - FIELD_TOP },
     {
-      onTap(x, y) {
+      onTap(sx, y) {
         if (state.screen !== 'playing') return;
         const p = state.player;
 
         // 타워 위에 있으면 필드 탭 무시
         if (p.onTower >= 0) return;
+
+        // 스크린→월드 좌표 변환
+        const x = sx + state.camera.x;
+
+        // 건물에 걸려있으면 먼저 밀어냄 (pathfinding 시작점 보정)
+        if (collidesWithBuilding(p.x, p.y, p.size)) {
+          const pushed = pushOutOfBuildings(p.x, p.y, p.size);
+          p.x = pushed.x;
+          p.y = pushed.y;
+        }
 
         // 타워 클릭 체크
         for (let i = 0; i < state.towers.length; i++) {
@@ -168,10 +178,12 @@ export function updatePlayer(dt) {
       } else if (!collidesWithBuilding(p.x, newY, p.size)) {
         p.y = newY; // Y만 이동 (벽을 따라 수직 슬라이딩)
       } else {
-        // 모서리에 완전히 걸림 → 건물에서 밀어낸 후 이동
+        // 모서리에 완전히 걸림 → 건물에서 밀어내고 다음 웨이포인트로 건너뜀
         const pushed = pushOutOfBuildings(p.x, p.y, p.size);
         p.x = pushed.x;
         p.y = pushed.y;
+        // 현재 웨이포인트 건너뛰기 (무한 멈춤 방지)
+        if (p.pathIdx < p.path.length) p.pathIdx++;
       }
     }
   }
@@ -194,7 +206,7 @@ export function updatePlayer(dt) {
     if (p.moveNoiseTimer <= 0) {
       p.moveNoiseTimer = 0.5;
       const noiseRange = p.shoeType === 'stealth' ? 0
-                       : p.shoeType === 'silent' ? 15
+                       : p.shoeType === 'silent' ? 60
                        : p.moveNoiseRange;
       if (noiseRange > 0) {
         emitSound(p.x, p.y, noiseRange, 0.3, 'footstep');
@@ -235,8 +247,15 @@ export function updatePlayer(dt) {
     if (p.hitFlash < 0) p.hitFlash = 0;
   }
 
+  // ── 건물 겹침 보정 (매 프레임 — 멈춰있어도 건물 안이면 밀어냄) ──
+  if (collidesWithBuilding(p.x, p.y, p.size)) {
+    const pushed = pushOutOfBuildings(p.x, p.y, p.size);
+    p.x = pushed.x;
+    p.y = pushed.y;
+  }
+
   // ── 경계 클램핑 ──
-  p.x = Math.max(p.size, Math.min(W - p.size, p.x));
+  p.x = Math.max(p.size, Math.min(WORLD_W - p.size, p.x));
   p.y = Math.max(FIELD_TOP + p.size, Math.min(FIELD_BOTTOM - p.size, p.y));
 }
 

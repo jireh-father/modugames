@@ -1,5 +1,6 @@
 // ── 게임 상수 ──
-export const W = 540, H = 960;
+export const W = 540, H = 960;               // 뷰포트(캔버스) 크기
+export const WORLD_W = 5400;                 // 월드 너비 (뷰포트의 10배)
 export const HUD_H = 48;
 export const FIELD_TOP = HUD_H;              // 48 - field starts after HUD
 export const WALL_Y = 520;                   // wall arc center Y
@@ -12,14 +13,14 @@ export const ITEM_BAR_H = 35;               // 인벤토리 바 높이
 export const DIAL_R = 80;                    // half-circle dial radius
 
 // ── 무기 프로필 (사정거리, 공격력, 소리 범위) ──
-// 소리 크기 등급: 0 무음 | 30 미미 | 50 작음 | 80 보통 | 120 큼 | 180 매우큼 | 250 폭발급
+// 소리 크기 등급 (4x 확대): 0 무음 | 120 미미 | 200 작음 | 320 보통 | 480 큼 | 720 매우큼 | 1000 폭발급
 export const WEAPON_PROFILES = {
-  pistol:   { range: 400, damage: 2, originSound: 120, impactSound: 50,  penetrate: 0 },
-  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 30,  penetrate: 1 },
-  sniper:   { range: 9999, damage: 5, originSound: 250, impactSound: 80,  penetrate: 99 },
-  mg:       { range: 350, damage: 1, originSound: 180, impactSound: 30,  penetrate: 0 },
-  crossbow: { range: 450, damage: 4, originSound: 30,  impactSound: 30,  penetrate: 1 },
-  flamethrower: { range: 180, damage: 3, originSound: 80, impactSound: 0, penetrate: 0 },
+  pistol:   { range: 400, damage: 2, originSound: 480, impactSound: 200,  penetrate: 0 },
+  bow:      { range: 500, damage: 3, originSound: 0,   impactSound: 120,  penetrate: 1 },
+  sniper:   { range: 9999, damage: 5, originSound: 1000, impactSound: 320,  penetrate: 99 },
+  mg:       { range: 350, damage: 1, originSound: 720, impactSound: 120,  penetrate: 0 },
+  crossbow: { range: 450, damage: 4, originSound: 120,  impactSound: 120,  penetrate: 1 },
+  flamethrower: { range: 180, damage: 3, originSound: 320, impactSound: 0, penetrate: 0 },
   flashlight: { range: 0, damage: 0, originSound: 0, impactSound: 0, penetrate: 0 },
 };
 
@@ -114,17 +115,20 @@ export const state = {
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
   ],
 
-  // 타워 3개 (좌/중/우 고정)
+  // 카메라 (뷰포트 좌상단 월드 좌표)
+  camera: { x: 0 },
+
+  // 타워 3개 (넓은 월드에 분산 배치)
   towers: [
-    { hp: 200, maxHp: 200, x: 90 },
-    { hp: 200, maxHp: 200, x: 270 },
-    { hp: 200, maxHp: 200, x: 450 },
+    { hp: 200, maxHp: 200, x: 900 },
+    { hp: 200, maxHp: 200, x: 2700 },
+    { hp: 200, maxHp: 200, x: 4500 },
   ],
   activeTower: 1, // 플레이어가 올라가 있는 타워 인덱스
 
   // 플레이어
   player: {
-    x: 270,
+    x: 2700,
     y: 590,
     hp: 100,
     maxHp: 100,
@@ -136,7 +140,7 @@ export const state = {
     moving: false,
     hitFlash: 0,
     targetTower: -1,     // pathfind 목표 타워
-    moveNoiseRange: 40,  // 이동 소음 범위
+    moveNoiseRange: 160,  // 이동 소음 범위 (4x)
     moveNoiseTimer: 0,
     shoeType: null,      // null | 'silent' | 'stealth'
     shoeTimer: 0,
@@ -153,11 +157,11 @@ export const state = {
   // 건물 (장애물)
   buildings: [],
 
-  // 벽의 문 (3곳)
+  // 벽의 문 (넓은 월드: 타워 위치에 맞춤)
   doors: [
-    { x: 135, open: false },
-    { x: 270, open: false },
-    { x: 405, open: false },
+    { x: 900, open: false },
+    { x: 2700, open: false },
+    { x: 4500, open: false },
   ],
 
   // 낮/밤
@@ -242,24 +246,25 @@ export function resetGame() {
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
     { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
   ];
+  state.camera = { x: 0 };
   state.towers = [
-    { hp: 200, maxHp: 200, x: 90 },
-    { hp: 200, maxHp: 200, x: 270 },
-    { hp: 200, maxHp: 200, x: 450 },
+    { hp: 200, maxHp: 200, x: 900 },
+    { hp: 200, maxHp: 200, x: 2700 },
+    { hp: 200, maxHp: 200, x: 4500 },
   ];
   state.activeTower = 1;
   state.player = {
-    x: 270, y: 590, hp: 100, maxHp: 100, speed: 200, size: 16,
+    x: 2700, y: 590, hp: 100, maxHp: 100, speed: 200, size: 16,
     onTower: 1, path: [], pathIdx: 0, moving: false, hitFlash: 0,
-    targetTower: -1, moveNoiseRange: 40, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
+    targetTower: -1, moveNoiseRange: 160, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
   };
   state.hunger = 100;
   state.animals = [];
   state.buildings = [];
   state.doors = [
-    { x: 135, open: false },
-    { x: 270, open: false },
-    { x: 405, open: false },
+    { x: 900, open: false },
+    { x: 2700, open: false },
+    { x: 4500, open: false },
   ];
   state.day = 1;
   state.isNight = false;
@@ -321,9 +326,9 @@ export function getCurrentTower() {
 
 // 타워 위치 상수
 export const TOWER_POSITIONS = [
-  { x: 90 },
-  { x: 270 },
-  { x: 450 },
+  { x: 900 },
+  { x: 2700 },
+  { x: 4500 },
 ];
 
 // 발사 기준점 (타워 위 = 타워 좌표, 지상 = 플레이어 좌표)
@@ -332,6 +337,23 @@ export function getFireOrigin() {
     return { x: state.towers[state.player.onTower].x, y: TOWER_Y };
   }
   return { x: state.player.x, y: state.player.y };
+}
+
+// ── 카메라 업데이트: 플레이어/타워 추적 ──
+export function updateCamera() {
+  const p = state.player;
+  let targetX;
+  if (p.onTower >= 0) {
+    targetX = state.towers[p.onTower].x;
+  } else {
+    targetX = p.x;
+  }
+  // 카메라 중심을 타겟에 맞춤
+  const desired = targetX - W / 2;
+  // 부드러운 추적 (lerp)
+  state.camera.x += (desired - state.camera.x) * 0.1;
+  // 월드 경계 클램프
+  state.camera.x = Math.max(0, Math.min(WORLD_W - W, state.camera.x));
 }
 
 // ── 소리 시스템 ──

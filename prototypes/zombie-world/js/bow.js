@@ -1,9 +1,9 @@
 // ── 활 시스템: 화살통 + 활 (좌우 조준 + 당기기=거리) ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y, getFireOrigin } from './game.js?v=15';
-import { registerZone } from './input.js?v=15';
-import { fireProjectile } from './projectiles.js?v=15';
-import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=15';
-import { spawnParticles } from './particles.js?v=15';
+import { state, W, H, WORLD_W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y, getFireOrigin } from './game.js?v=16';
+import { registerZone } from './input.js?v=16';
+import { fireProjectile } from './projectiles.js?v=16';
+import { playBowDraw, playBowRelease, playArrowNock, playArrowPick } from './audio.js?v=16';
+import { spawnParticles } from './particles.js?v=16';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -140,7 +140,7 @@ function updateTargetFromAim() {
   targetY = origin.y - Math.sin(state.aimAngle) * dist;
 
   // 필드 경계 클램핑
-  targetX = Math.max(20, Math.min(W - 20, targetX));
+  targetX = Math.max(20, Math.min(WORLD_W - 20, targetX));
   targetY = Math.max(FIELD_TOP + 10, Math.min(origin.y - 30, targetY));
 }
 

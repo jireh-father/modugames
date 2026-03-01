@@ -1,9 +1,9 @@
 // ── 좀비 시스템 (소리-유인 AI, 웨이브, 충돌) ──
-import { W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=15';
-import { getWallY, getWallSegments } from './wall.js?v=15';
+import { W, WORLD_W, state, WALL_Y, TOWER_Y, WEAPON_PROFILES, emitSound } from './game.js?v=16';
+import { getWallY, getWallSegments } from './wall.js?v=16';
 import { playZombieHit, playZombieDeath, playWallHit, playWallBreak, playTowerHit,
          playSplitterSplit, playRammerCharge, playChainLightning,
-         playFreezeApply, playPoisonApply } from './audio.js?v=15';
+         playFreezeApply, playPoisonApply } from './audio.js?v=16';
 
 const WALL_SEGMENTS = getWallSegments();
 
@@ -63,7 +63,7 @@ function spawnZombie(type, x, hpMul = 1, speedMul = 1, overrides = {}) {
     targetX: null,
     targetY: null,
     moveDir: null,       // 이동 방향 벡터 {x, y} — 타겟 통과 후에도 유지
-    hearingRange: 300,
+    hearingRange: 1200,
     noiseTimer: 0,
     soundThreshold: 0,   // 현재 반응 중인 소리 크기 (이보다 작은 소리 무시)
     soundCooldown: 0,    // threshold 유지 시간 (초)
@@ -160,7 +160,7 @@ function updateZombies(dt) {
       let newX = z.x + Math.cos(wanderAngle) * wanderSpeed * dt;
       let newY = z.y + Math.sin(wanderAngle) * wanderSpeed * dt;
 
-      newX = Math.max(5, Math.min(W - 5, newX));
+      newX = Math.max(5, Math.min(WORLD_W - 5, newX));
       newY = Math.max(48, Math.min(640, newY));
 
       if (!zombieCollidesBuilding(newX, newY, z.size)) {
@@ -219,7 +219,7 @@ function updateZombies(dt) {
         z.noiseTimer = 0.5;
         const shuffleTarget = (z.targetX != null && z.targetY != null)
           ? { x: z.targetX, y: z.targetY } : null;
-        emitSound(z.x, z.y, 60, 0.3, 'zombie_shuffle', shuffleTarget);
+        emitSound(z.x, z.y, 240, 0.3, 'zombie_shuffle', shuffleTarget);
       }
 
       // 타겟 방향으로 직선 이동 (타겟 지나쳐도 계속 진행)
@@ -260,7 +260,7 @@ function updateZombies(dt) {
         newY += ny * moveSpeed * dt;
       }
 
-      newX = Math.max(5, Math.min(W - 5, newX));
+      newX = Math.max(5, Math.min(WORLD_W - 5, newX));
       newY = Math.max(48, Math.min(640, newY));
 
       // ── 건물 충돌 체크 — 슬라이딩: 막히면 각 축 개별 시도 ──
@@ -502,7 +502,7 @@ function startWave(stageNum) {
     for (let i = 0; i < count; i++) {
       let x, y, tries = 0;
       do {
-        x = 30 + Math.random() * (W - 60);
+        x = 30 + Math.random() * (WORLD_W - 60);
         y = 60 + Math.random() * 440;
         tries++;
       } while (tries < 20 && zombieCollidesBuilding(x, y, sz));

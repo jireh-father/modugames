@@ -1,9 +1,9 @@
 // ── A* Grid Pathfinding ──
-import { W, state, FIELD_TOP, WALL_Y, FIELD_BOTTOM, TOWER_Y } from './game.js?v=15';
+import { W, WORLD_W, state, FIELD_TOP, WALL_Y, FIELD_BOTTOM, TOWER_Y } from './game.js?v=16';
 
 // ── Grid constants ──
-export const GRID = 20;
-export const COLS = Math.ceil(W / GRID);           // 27
+export const GRID = 40; // 넓은 월드에서 성능 유지를 위해 타일 크기 증가
+export const COLS = Math.ceil(WORLD_W / GRID);     // 270 (넓은 월드)
 export const ROWS = Math.ceil((FIELD_BOTTOM - FIELD_TOP) / GRID); // 30
 
 // ── Coordinate conversion helpers ──
@@ -65,13 +65,13 @@ export function buildGrid() {
     }
   }
 
-  // ── Carve door openings (2 tiles wide at each door.x) ──
+  // ── Carve door openings (3 tiles wide at each door.x) ──
   for (const door of state.doors) {
     const doorC = Math.floor(door.x / GRID);
     for (let dr = 0; dr < 2; dr++) {
       const r = wallRow + dr;
       if (r >= 0 && r < ROWS) {
-        for (let dc = 0; dc < 2; dc++) {
+        for (let dc = -1; dc <= 1; dc++) {
           const c = doorC + dc;
           if (c >= 0 && c < COLS) {
             grid[r * COLS + c] = 0;
@@ -178,7 +178,7 @@ export function findPath(fromX, fromY, toX, toY) {
   inOpen[startKey] = 1;
 
   let iterations = 0;
-  const MAX_ITERATIONS = 2000;
+  const MAX_ITERATIONS = 5000;
 
   while (open.length > 0 && iterations < MAX_ITERATIONS) {
     iterations++;

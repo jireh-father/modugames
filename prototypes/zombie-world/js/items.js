@@ -1,10 +1,10 @@
 // ── 아이템 드랍 & 줍기 시스템 (좀비 월드) ──
-import { state, W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=15';
+import { state, W, WORLD_W, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=16';
 import { playItemPickup, playItemDrop, playBrickRepair, playMedkitUse,
          playBombThrow, playMolotovThrow, playMinePlaced,
          playShieldActivate, playBuffActivate, playFreezeActivate,
-         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=15';
-import { spawnParticles } from './particles.js?v=15';
+         playToyActivate, playFirecrackerThrow, playRadioActivate } from './audio.js?v=16';
+import { spawnParticles } from './particles.js?v=16';
 
 // 자동 적용 아이템 (탄약류) - 줍자마자 바로 적용
 const AUTO_APPLY_IDS = new Set([
@@ -181,7 +181,7 @@ export function useInventoryItem(itemId, targetX, targetY) {
         damage: 2,
         timer: 3,
       });
-      emitSound(targetX, targetY, 50, 3, 'fire');
+      emitSound(targetX, targetY, 200, 3, 'fire');
       playMolotovThrow();
       break;
     case 'bomb':
@@ -192,22 +192,22 @@ export function useInventoryItem(itemId, targetX, targetY) {
         }
       }
       spawnParticles(targetX, targetY, 'explosion');
-      emitSound(targetX, targetY, 200, 1.0, 'explosion');
+      emitSound(targetX, targetY, 800, 1.0, 'explosion');
       playBombThrow();
       break;
     case 'toy':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 80 });
-      emitSound(targetX, targetY, 80, 5, 'toy');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 5, maxTimer: 5, type: 'toy', range: 320 });
+      emitSound(targetX, targetY, 320, 5, 'toy');
       playToyActivate();
       break;
     case 'firecracker':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 180, explodeOnEnd: true });
-      emitSound(targetX, targetY, 180, 3, 'firecracker');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 3, maxTimer: 3, type: 'firecracker', range: 720, explodeOnEnd: true });
+      emitSound(targetX, targetY, 720, 3, 'firecracker');
       playFirecrackerThrow();
       break;
     case 'radio':
-      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 120 });
-      emitSound(targetX, targetY, 120, 10, 'radio');
+      state.soundLures.push({ x: targetX, y: targetY, timer: 10, maxTimer: 10, type: 'radio', range: 480 });
+      emitSound(targetX, targetY, 480, 10, 'radio');
       playRadioActivate();
       break;
     case 'shield':
@@ -276,7 +276,7 @@ export function updateSoundLures(dt) {
           }
         }
         spawnParticles(lure.x, lure.y, 'explosion', { count: 15 });
-        emitSound(lure.x, lure.y, 200, 1.0, 'explosion');
+        emitSound(lure.x, lure.y, 800, 1.0, 'explosion');
       }
       state.soundLures.splice(i, 1);
     }
@@ -363,7 +363,7 @@ export function tryDropItem(zombieType, combo, deathX, deathY, dropCount) {
 function dropSingleItem(deathX, deathY) {
   const item = pickWeightedItem();
   // 좀비 사망 위치에 바로 놓기 (경계 클램핑)
-  const screenX = Math.max(20, Math.min(W - 20, deathX));
+  const screenX = Math.max(20, Math.min(WORLD_W - 20, deathX));
   const screenY = Math.max(FIELD_TOP + 20, Math.min(FIELD_BOTTOM - 20, deathY));
 
   playItemDrop();

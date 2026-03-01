@@ -1,11 +1,11 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=15';
-import { registerZone } from './input.js?v=15';
-import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=15';
-import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=15';
-import { openSettings } from './settings.js?v=15';
-import { generateBuildings } from './buildings.js?v=15';
-import { buildGrid } from './pathfinding.js?v=15';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=16';
+import { registerZone } from './input.js?v=16';
+import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=16';
+import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=16';
+import { openSettings } from './settings.js?v=16';
+import { generateBuildings } from './buildings.js?v=16';
+import { buildGrid } from './pathfinding.js?v=16';
 
 let gameOverTriggered = false;
 let newBestScore = false;

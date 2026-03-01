@@ -1,5 +1,5 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=15';
+import { W, H, WORLD_W, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=16';
 
 /**
  * 필드 배경 그리기 – 폐허 도시 (Ruined City)
@@ -11,9 +11,9 @@ const _rubbleRng = (() => {
   return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
 })();
 const _rubbleData = [];
-for (let i = 0; i < 120; i++) {
+for (let i = 0; i < 600; i++) {
   _rubbleData.push({
-    x: _rubbleRng() * 540,
+    x: _rubbleRng() * 5400,
     y: 48 + _rubbleRng() * 592,
     r: 1 + _rubbleRng() * 2.5,
     brown: _rubbleRng() < 0.5,
@@ -36,19 +36,19 @@ export function drawField(ctx) {
   skyGrad.addColorStop(0, `rgb(${topR},${topG},${topB})`);
   skyGrad.addColorStop(1, `rgb(${botR},${botG},${botB})`);
   ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, W, FIELD_TOP + 40);
+  ctx.fillRect(0, 0, WORLD_W, FIELD_TOP + 40);
 
   // ── 지면: 어두운 아스팔트 ──
   const gv = Math.round(0x2a + (0x1a - 0x2a) * nd);
   ctx.fillStyle = `rgb(${gv},${gv},${gv})`;
-  ctx.fillRect(0, FIELD_TOP, W, FIELD_BOTTOM - FIELD_TOP);
+  ctx.fillRect(0, FIELD_TOP, WORLD_W, FIELD_BOTTOM - FIELD_TOP);
 
   // ── 수평 도로 (WALL_Y - 200 부근) ──
   const roadY = WALL_Y - 200;
   const roadH = 40;
   const rv = Math.round(0x22 + (0x14 - 0x22) * nd);
   ctx.fillStyle = `rgb(${rv},${rv},${rv})`;
-  ctx.fillRect(0, roadY - roadH / 2, W, roadH);
+  ctx.fillRect(0, roadY - roadH / 2, WORLD_W, roadH);
 
   // 수평 도로 중앙 파선 (흰색)
   ctx.save();
@@ -57,13 +57,13 @@ export function drawField(ctx) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(0, roadY);
-  ctx.lineTo(W, roadY);
+  ctx.lineTo(WORLD_W, roadY);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  // ── 수직 도로 (벽 세그먼트 사이 x=135, 270, 405) ──
-  const vertXs = [135, 270, 405];
+  // ── 수직 도로 (타워 위치에 맞춰 분산) ──
+  const vertXs = [900, 1800, 2700, 3600, 4500];
   const vertW = 30;
   for (const rx of vertXs) {
     ctx.fillStyle = `rgb(${rv},${rv},${rv})`;
@@ -94,7 +94,7 @@ export function drawField(ctx) {
   ctx.lineWidth = 1;
   // 수평
   for (const oy of [roadY - roadH / 2, roadY + roadH / 2]) {
-    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(W, oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(WORLD_W, oy); ctx.stroke();
   }
   // 수직
   for (const rx of vertXs) {
@@ -118,20 +118,23 @@ export function drawField(ctx) {
   ctx.strokeStyle = `rgba(255,255,255,${0.02 + nd * 0.01})`;
   ctx.lineWidth = 1;
   const gridSize = 40;
-  for (let x = 0; x <= W; x += gridSize) {
+  // 카메라 범위 내 격자만 그리기 (성능 최적화)
+  const camL = state.camera.x - 40;
+  const camR = state.camera.x + W + 40;
+  for (let x = Math.floor(camL / gridSize) * gridSize; x <= camR; x += gridSize) {
     ctx.beginPath(); ctx.moveTo(x, FIELD_TOP); ctx.lineTo(x, FIELD_BOTTOM); ctx.stroke();
   }
   for (let y = FIELD_TOP; y <= FIELD_BOTTOM; y += gridSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(camL, y); ctx.lineTo(camR, y); ctx.stroke();
   }
 
   // ── 스폰 영역 (y=48 ~ y=150): 빨간 틴트 ──
   ctx.fillStyle = `rgba(180,30,30,${0.04 + nd * 0.02})`;
-  ctx.fillRect(0, FIELD_TOP, W, 102);
+  ctx.fillRect(0, FIELD_TOP, WORLD_W, 102);
 
   // ── 성벽 아래 ~ FIELD_BOTTOM: 어두운 내부 영역 ──
   ctx.fillStyle = `rgba(20,18,15,${0.2 + nd * 0.15})`;
-  ctx.fillRect(0, WALL_Y + 20, W, FIELD_BOTTOM - WALL_Y - 20);
+  ctx.fillRect(0, WALL_Y + 20, WORLD_W, FIELD_BOTTOM - WALL_Y - 20);
 }
 
 /**
