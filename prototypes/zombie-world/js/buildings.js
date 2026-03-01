@@ -1,5 +1,5 @@
 // ── 건물 (폐허 도시 장애물) ──
-import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=18';
+import { W, state, FIELD_TOP, WALL_Y, TOWER_POSITIONS } from './game.js?v=19';
 
 // ── 건물 유형별 비주얼 ──
 const BUILDING_VISUALS = {

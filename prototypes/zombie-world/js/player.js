@@ -1,11 +1,11 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=18';
-import { findPath, drawPathDebug } from './pathfinding.js?v=18';
-import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=18';
-import { registerZone } from './input.js?v=18';
-import { world, canMove, startTransition } from './world.js?v=18';
-import { enterInterior, getNearbyBuilding } from './interior.js?v=18';
-import { getFatigueSpeedMul } from './fatigue.js?v=18';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=19';
+import { findPath, drawPathDebug } from './pathfinding.js?v=19';
+import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=19';
+import { registerZone } from './input.js?v=19';
+import { world, canMove, startTransition } from './world.js?v=19';
+import { enterInterior, getNearbyBuilding } from './interior.js?v=19';
+import { getFatigueSpeedMul } from './fatigue.js?v=19';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {

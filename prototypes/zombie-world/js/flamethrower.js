@@ -1,8 +1,8 @@
 // ── 화염방사기 시스템: 연료 + 지속 발사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=18';
-import { registerZone } from './input.js?v=18';
-import { spawnParticles } from './particles.js?v=18';
-import { playFlameLoop, playFlameStop } from './audio.js?v=18';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, emitSound, getFireOrigin } from './game.js?v=19';
+import { registerZone } from './input.js?v=19';
+import { spawnParticles } from './particles.js?v=19';
+import { playFlameLoop, playFlameStop } from './audio.js?v=19';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
