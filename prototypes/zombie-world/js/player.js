@@ -7,6 +7,7 @@ import { world, canMove, startTransition } from './world.js?v=19';
 import { enterInterior, getNearbyBuilding } from './interior.js?v=19';
 import { getFatigueSpeedMul } from './fatigue.js?v=19';
 import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=19';
+import { getWeatherEffects } from './weather.js?v=19';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -203,7 +204,8 @@ export function updatePlayer(dt) {
       const hpRatio = Math.max(0.3, p.hp / p.maxHp);
       const fatigueMul = getFatigueSpeedMul();
       const baseSpeed = state.riding ? VEHICLE_TYPES[state.riding.type].speed : p.speed;
-      const moveSpeed = baseSpeed * hpRatio * fatigueMul;
+      const weatherMul = getWeatherEffects(state.currentWeather).moveMul;
+      const moveSpeed = baseSpeed * hpRatio * fatigueMul * weatherMul;
       const step = moveSpeed * dt;
 
       let newX = p.x + nx * step;

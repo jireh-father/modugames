@@ -219,6 +219,9 @@ export const state = {
   slowMo: false,
   slowMoTimer: 0,
 
+  // 날씨
+  currentWeather: 'clear',
+
   // 월드
   currentChunk: null,
   worldTime: 0,
@@ -320,6 +323,7 @@ export function resetGame() {
   state.dayNightTimer = 0;
   state.slowMo = false;
   state.slowMoTimer = 0;
+  state.currentWeather = 'clear';
   state.currentChunk = null;
   state.worldTime = 0;
   state.interior = null;
@@ -371,8 +375,12 @@ export function getFireOrigin() {
 // ── 소리 시스템 ──
 export function emitSound(x, y, range, duration = 1.0, type = 'generic', target = null) {
   if (range <= 0) return;
+  // 날씨 소리 배율
+  const weatherSoundMul = state.currentWeather === 'rain' ? 0.5
+                        : state.currentWeather === 'storm' ? 1.3
+                        : 1.0;
   // 밤에는 소리가 40% 더 멀리 퍼짐
-  const actualRange = state.isNight ? range * 1.4 : range;
+  const actualRange = (state.isNight ? range * 1.4 : range) * weatherSoundMul;
   // loudness = 원본 range (밤 보정 전). 좀비가 소리 크기 비교에 사용
   // target = 소리의 원래 목적지 좌표 (체인 전파 시 원래 충격 지점 유지용)
   state.soundSources.push({ x, y, intensity: 1, range: actualRange, loudness: range, timer: duration, duration, type, target });

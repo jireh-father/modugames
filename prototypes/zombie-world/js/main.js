@@ -34,6 +34,7 @@ import { initWorldMap, drawWorldMap } from './worldmap.js?v=19';
 import { initInterior, updateInterior, drawInterior } from './interior.js?v=19';
 import { updateFatigue, getAimWobble } from './fatigue.js?v=19';
 import { updateVehicles, checkVehicleCollisions, drawVehicles, drawDismountButton } from './vehicle.js?v=19';
+import { updateWeather, drawWeatherOverlay, getWeatherEffects } from './weather.js?v=19';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -128,6 +129,11 @@ function update(dt, realDt) {
 
   // 낮/밤 사이클
   updateDayNight(dt);
+
+  // 날씨 업데이트
+  if (state.currentChunk) {
+    updateWeather(dt, state.currentChunk.cx, state.currentChunk.cy, state.worldTime);
+  }
 
   // 조준 다이얼
   updateDial(dt);
@@ -373,6 +379,9 @@ function draw() {
 
   // 밤 오버레이
   drawNightOverlay(ctx);
+
+  // 날씨 오버레이
+  drawWeatherOverlay(ctx);
 
   // 맵 전환 오버레이
   drawTransitionOverlay(ctx);

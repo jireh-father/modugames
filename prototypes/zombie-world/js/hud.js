@@ -7,6 +7,7 @@ import { openSettings } from './settings.js?v=19';
 import { world } from './world.js?v=19';
 import { hasSave, loadGame, deleteSave, saveGame } from './save.js?v=19';
 import { VEHICLE_TYPES } from './vehicle.js?v=19';
+import { getWeatherIcon } from './weather.js?v=19';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -156,10 +157,11 @@ export function drawHUD(ctx) {
       ? 'BASE' : `(${world.currentCx},${world.currentCy})`;
     const day = Math.floor(state.worldTime / 360) + 1;
 
+    const wIcon = getWeatherIcon(state.currentWeather);
     ctx.textAlign = 'center';
     ctx.fillStyle = state.isNight ? '#8888cc' : '#c0a060';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(`${loc} ${icon} Day${day}  x${zombieCount}`, W / 2, 20);
+    ctx.fillText(`${loc} ${icon}${wIcon} Day${day}  x${zombieCount}`, W / 2, 20);
   }
 
   // 콤보 (중앙 아래)

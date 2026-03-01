@@ -3,6 +3,7 @@ import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, TOWER_Y, e
 import { registerZone } from './input.js?v=19';
 import { spawnParticles } from './particles.js?v=19';
 import { playFlameLoop, playFlameStop } from './audio.js?v=19';
+import { getWeatherEffects } from './weather.js?v=19';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;
@@ -86,11 +87,13 @@ export function updateFlamethrower(dt) {
 
   const f = state.flamethrower;
 
-  if (gunHeld && f.fuel > 0) {
+  const weatherFx = getWeatherEffects(state.currentWeather);
+
+  if (gunHeld && f.fuel > 0 && weatherFx.fireFuelMul !== Infinity) {
     f.firing = true;
 
-    // 연료 소모
-    const effectiveRate = state.buffs.speedTimer > 0 ? FUEL_RATE * 0.7 : FUEL_RATE;
+    // 연료 소모 (날씨 영향)
+    const effectiveRate = (state.buffs.speedTimer > 0 ? FUEL_RATE * 0.7 : FUEL_RATE) * weatherFx.fireFuelMul;
     f.fuel -= effectiveRate * dt;
     if (f.fuel <= 0) {
       f.fuel = 0;
