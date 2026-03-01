@@ -241,6 +241,9 @@ function completeTransition() {
   world.transitioning = false;
   world.transDir = null;
   world.transProgress = 0;
+
+  // 청크 캐시 제한 (매 전환마다 체크)
+  purgeDistantChunks();
 }
 
 // ── 청크 엔티티 저장 ──
@@ -315,6 +318,36 @@ export function initWorld() {
   world.discovered.add(chunkKey(0, 0));
 
   return baseChunk;
+}
+
+// ── 청크 캐시 제한 (먼 청크 퍼지) ──
+const MAX_CACHED_CHUNKS = 20;
+export function purgeDistantChunks() {
+  if (world.chunks.size <= MAX_CACHED_CHUNKS) return;
+
+  const entries = [...world.chunks.entries()];
+  // 현재 청크와의 거리 기준 정렬 (먼 순)
+  entries.sort((a, b) => {
+    const [aCx, aCy] = a[0].split(',').map(Number);
+    const [bCx, bCy] = b[0].split(',').map(Number);
+    const aDist = Math.hypot(aCx - world.currentCx, aCy - world.currentCy);
+    const bDist = Math.hypot(bCx - world.currentCx, bCy - world.currentCy);
+    return bDist - aDist;
+  });
+
+  // 현재 + 인접 청크 키 (제거 불가)
+  const protectedKeys = new Set();
+  protectedKeys.add(chunkKey(world.currentCx, world.currentCy));
+  for (const { cx, cy } of getAdjacentCoords(world.currentCx, world.currentCy)) {
+    protectedKeys.add(chunkKey(cx, cy));
+  }
+
+  // 먼 청크부터 삭제
+  while (world.chunks.size > MAX_CACHED_CHUNKS) {
+    const [key] = entries.shift();
+    if (protectedKeys.has(key)) continue;
+    world.chunks.delete(key);
+  }
 }
 
 // ── 인접 청크 틱-라이트 업데이트 (소리 전파) ──

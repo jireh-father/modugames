@@ -108,10 +108,10 @@ export const state = {
 
   // 성벽 (4구간)
   walls: [
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
   ],
 
   // 타워 3개
@@ -128,7 +128,7 @@ export const state = {
     y: 590,
     hp: 100,
     maxHp: 100,
-    speed: 200,
+    speed: 220,
     size: 16,
     onTower: 1,      // -1 = 지상, 0/1/2 = 타워 인덱스
     path: [],
@@ -145,7 +145,7 @@ export const state = {
   // 배고픔
   hunger: 100,
   hungerMax: 100,
-  hungerRate: 100 / 180, // 180초(3분)에 소진
+  hungerRate: 100 / 240, // 240초(4분)에 소진
 
   // 피로
   fatigue: 100,
@@ -262,10 +262,10 @@ export function resetGame() {
   };
   state.flashlight = { on: false, battery: 0, batteryMax: 100, drainRate: 100 / 30 };
   state.walls = [
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
-    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
+    { hp: 100, maxHp: 100, rebuilding: false, rebuildTimer: 0, upgrades: 0 },
   ];
   state.towers = [
     { hp: 200, maxHp: 200, x: 90 },
@@ -274,7 +274,7 @@ export function resetGame() {
   ];
   state.activeTower = 1;
   state.player = {
-    x: 270, y: 590, hp: 100, maxHp: 100, speed: 200, size: 16,
+    x: 270, y: 590, hp: 100, maxHp: 100, speed: 220, size: 16,
     onTower: 1, path: [], pathIdx: 0, moving: false, hitFlash: 0,
     targetTower: -1, moveNoiseRange: 160, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
   };

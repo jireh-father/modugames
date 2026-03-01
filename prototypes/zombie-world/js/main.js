@@ -118,7 +118,7 @@ function update(dt, realDt) {
     const chunk = initWorld();
     loadChunkEntities(chunk);
     state.currentChunk = chunk;
-    state.inventory.push({ id: 'food', count: 3 });
+    state.inventory.push({ id: 'food', count: 5 });
   }
 
   // ── 맵 전환 중이면 게임 업데이트 건너뜀 ──

@@ -124,13 +124,22 @@ export function useInventoryItem(itemId, targetX, targetY) {
 
   switch (itemId) {
     case 'brick': {
-      // 가장 가까운 벽 구간에 +25
+      // 가장 가까운 벽 구간 찾기
       const segCenters = [67, 202, 337, 472];
       let best = 0;
       for (let i = 1; i < 4; i++) {
         if (Math.abs(targetX - segCenters[i]) < Math.abs(targetX - segCenters[best])) best = i;
       }
-      state.walls[best].hp = Math.min(state.walls[best].maxHp, state.walls[best].hp + 25);
+      const wall = state.walls[best];
+      if (wall.hp >= wall.maxHp && wall.upgrades < 3) {
+        // 풀 HP일 때 업그레이드 (+50 maxHP, 최대 3회 = 250)
+        wall.upgrades++;
+        wall.maxHp = 100 + wall.upgrades * 50;
+        wall.hp = wall.maxHp;
+      } else {
+        // 수리 (+25 HP)
+        wall.hp = Math.min(wall.maxHp, wall.hp + 25);
+      }
       playBrickRepair();
       break;
     }

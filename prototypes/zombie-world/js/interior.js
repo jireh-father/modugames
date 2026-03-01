@@ -83,6 +83,17 @@ export function generateInterior(building) {
   return { items, zombies, hasBed, cleared: false };
 }
 
+// ── 베이스 캠프 내부 생성 (안전, 침대 항상 있음) ──
+export function generateBaseCampInterior() {
+  return {
+    items: [],
+    zombies: [],
+    hasBed: true,
+    cleared: true,
+    isBaseCamp: true,
+  };
+}
+
 // ── 초기화 (입력 존 등록) ──
 export function initInterior() {
   // 내부 전체 영역 탭 핸들러
@@ -144,6 +155,24 @@ export function enterInterior(building) {
   }
   state.interior = building._interior;
   state.interiorBuilding = building;
+  state.interiorPlayer = {
+    x: ROOM_X + ROOM_W / 2,
+    y: ROOM_Y + ROOM_H - 40,
+    targetX: ROOM_X + ROOM_W / 2,
+    targetY: ROOM_Y + ROOM_H - 40,
+    attackTimer: 0,
+  };
+  state.screen = 'interior';
+}
+
+// ── 베이스 캠프 진입 ──
+let _baseCampInterior = null;
+export function enterBaseCamp() {
+  if (!_baseCampInterior) {
+    _baseCampInterior = generateBaseCampInterior();
+  }
+  state.interior = _baseCampInterior;
+  state.interiorBuilding = { type: 'basecamp', x: 0, y: 0, w: 100, h: 100 };
   state.interiorPlayer = {
     x: ROOM_X + ROOM_W / 2,
     y: ROOM_Y + ROOM_H - 40,
@@ -304,10 +333,18 @@ export function drawInterior(ctx) {
   ctx.strokeRect(ROOM_X, ROOM_Y, ROOM_W, ROOM_H);
 
   // 건물 유형 제목
-  ctx.fillStyle = '#aaa';
+  const isBaseCamp = interior.isBaseCamp;
+  ctx.fillStyle = isBaseCamp ? '#88ccaa' : '#aaa';
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(building.type.toUpperCase(), W / 2, 40);
+  ctx.fillText(isBaseCamp ? 'BASE CAMP' : building.type.toUpperCase(), W / 2, 40);
+
+  // 베이스 캠프 안전 표시
+  if (isBaseCamp) {
+    ctx.fillStyle = '#4a8866';
+    ctx.font = '10px monospace';
+    ctx.fillText('SAFE ZONE', W / 2, 52);
+  }
 
   // 침대
   if (interior.hasBed) {

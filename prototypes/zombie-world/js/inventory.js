@@ -355,10 +355,12 @@ export function drawInventoryDragOverlay(ctx) {
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(170,120,68,0.15)';
         ctx.fillRect(sx, WALL_Y - 20, segWidths, 40);
+        const w = state.walls[best];
+        const label = (w.hp >= w.maxHp && (w.upgrades || 0) < 3) ? '벽 강화 ★' : '벽 수리';
         ctx.fillStyle = 'rgba(170,120,68,0.8)';
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('벽 수리', segCenters[best], WALL_Y - 25);
+        ctx.fillText(label, segCenters[best], WALL_Y - 25);
       } else {
         // 타워 영역 하이라이트 (타워 수리)
         let bestTower = 0;

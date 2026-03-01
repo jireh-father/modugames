@@ -84,31 +84,48 @@ export function drawWalls(ctx) {
       continue;
     }
 
-    // Normal wall - color by HP
+    // Normal wall - color by HP and upgrade level
     const hpRatio = w.hp / w.maxHp;
+    const ups = w.upgrades || 0;
     let color;
-    if (hpRatio > 0.6) color = '#778866';      // green-gray (healthy)
-    else if (hpRatio > 0.3) color = '#aa9944';  // yellow (damaged)
-    else color = '#aa4444';                       // red (critical)
+    if (hpRatio > 0.6) {
+      // 업그레이드 레벨에 따라 색상 변화
+      color = ups >= 3 ? '#556688' : ups >= 2 ? '#667766' : ups >= 1 ? '#6f8060' : '#778866';
+    } else if (hpRatio > 0.3) {
+      color = '#aa9944';
+    } else {
+      color = '#aa4444';
+    }
+
+    const wallH = WALL_H + ups * 3; // 업그레이드마다 두꺼워짐
+    const wallY = wy - ups * 1.5;   // 위아래 대칭 확장
 
     ctx.fillStyle = color;
-    ctx.fillRect(seg.x, wy, seg.w, WALL_H);
+    ctx.fillRect(seg.x, wallY, seg.w, wallH);
 
     // Stone texture lines
     ctx.strokeStyle = 'rgba(0,0,0,0.2)';
     ctx.lineWidth = 1;
     for (let j = 0; j < 4; j++) {
       ctx.beginPath();
-      ctx.moveTo(seg.x + j * 30 + 15, wy);
-      ctx.lineTo(seg.x + j * 30 + 15, wy + WALL_H);
+      ctx.moveTo(seg.x + j * 30 + 15, wallY);
+      ctx.lineTo(seg.x + j * 30 + 15, wallY + wallH);
       ctx.stroke();
+    }
+
+    // 업그레이드 표시 (작은 별 아이콘)
+    if (ups > 0) {
+      ctx.fillStyle = '#ffdd44';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('★'.repeat(ups), seg.x + seg.w / 2, wallY - 10);
     }
 
     // HP bar above wall
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(seg.x, wy - 6, seg.w, 4);
+    ctx.fillRect(seg.x, wallY - 6, seg.w, 4);
     ctx.fillStyle = hpRatio > 0.6 ? '#44ff44' : hpRatio > 0.3 ? '#ffff44' : '#ff4444';
-    ctx.fillRect(seg.x, wy - 6, seg.w * hpRatio, 4);
+    ctx.fillRect(seg.x, wallY - 6, seg.w * hpRatio, 4);
   }
 
   // ── Draw doors between wall segments ──

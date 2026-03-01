@@ -1,10 +1,10 @@
 // ── 플레이어 캐릭터 시스템 (지상 이동, 타워 승하강) ──
-import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound } from './game.js?v=20';
+import { W, state, TOWER_Y, FIELD_TOP, FIELD_BOTTOM, emitSound, isBaseMap } from './game.js?v=20';
 import { findPath, drawPathDebug } from './pathfinding.js?v=20';
 import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=20';
 import { registerZone } from './input.js?v=20';
 import { world, canMove, startTransition } from './world.js?v=20';
-import { enterInterior, getNearbyBuilding } from './interior.js?v=20';
+import { enterInterior, enterBaseCamp, getNearbyBuilding } from './interior.js?v=20';
 import { getFatigueSpeedMul } from './fatigue.js?v=20';
 import { VEHICLE_TYPES, getNearbyVehicle, boardVehicle, dismountVehicle, DISMOUNT_BTN } from './vehicle.js?v=20';
 import { getWeatherEffects } from './weather.js?v=20';
@@ -132,15 +132,16 @@ export function initPlayer() {
   );
 }
 
-// ── initDescendButton: 내려가기 버튼 존 등록 ──
+// ── initDescendButton: 내려가기 버튼 + 베이스캠프 버튼 존 등록 ──
 
 const DESCEND_BTN = { w: 80, h: 36 };
+const BASECAMP_BTN = { w: 90, h: 36 };
 
 export function initDescendButton() {
   // 버튼 위치는 활성 타워 아래에 동적으로 결정되므로
   // 넓은 영역을 등록하고 탭 시 버튼 영역 내인지 체크
   registerZone(
-    { x: 0, y: TOWER_Y + 20, w: W, h: 60 },
+    { x: 0, y: TOWER_Y + 20, w: W, h: 80 },
     {
       onTap(x, y) {
         if (state.screen !== 'playing') return;
@@ -148,6 +149,19 @@ export function initDescendButton() {
         if (p.onTower < 0) return;
 
         const tower = state.towers[p.onTower];
+
+        // 베이스 캠프 버튼 (베이스맵 전용, 내려가기 버튼 아래)
+        if (isBaseMap()) {
+          const bcBtnX = tower.x - BASECAMP_BTN.w / 2;
+          const bcBtnY = TOWER_Y + 68;
+          if (x >= bcBtnX && x <= bcBtnX + BASECAMP_BTN.w &&
+              y >= bcBtnY && y <= bcBtnY + BASECAMP_BTN.h) {
+            descendFromTower();
+            enterBaseCamp();
+            return;
+          }
+        }
+
         const btnX = tower.x - DESCEND_BTN.w / 2;
         const btnY = TOWER_Y + 28;
 
@@ -455,6 +469,39 @@ export function drawDescendButton(ctx) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('내려가기', btnX + btnW / 2 + 8, btnY + btnH / 2);
+
+  // ── 베이스 캠프 버튼 (베이스맵 전용) ──
+  if (isBaseMap()) {
+    const bcW = BASECAMP_BTN.w;
+    const bcH = BASECAMP_BTN.h;
+    const bcX = tower.x - bcW / 2;
+    const bcY = TOWER_Y + 68;
+    const bcR = 8;
+
+    ctx.fillStyle = '#4a8866';
+    ctx.beginPath();
+    ctx.moveTo(bcX + bcR, bcY);
+    ctx.lineTo(bcX + bcW - bcR, bcY);
+    ctx.arcTo(bcX + bcW, bcY, bcX + bcW, bcY + bcR, bcR);
+    ctx.lineTo(bcX + bcW, bcY + bcH - bcR);
+    ctx.arcTo(bcX + bcW, bcY + bcH, bcX + bcW - bcR, bcY + bcH, bcR);
+    ctx.lineTo(bcX + bcR, bcY + bcH);
+    ctx.arcTo(bcX, bcY + bcH, bcX, bcY + bcH - bcR, bcR);
+    ctx.lineTo(bcX, bcY + bcR);
+    ctx.arcTo(bcX, bcY, bcX + bcR, bcY, bcR);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#3a7755';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BASE CAMP', bcX + bcW / 2, bcY + bcH / 2);
+  }
 
   ctx.restore();
 }

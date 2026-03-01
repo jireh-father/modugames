@@ -8,7 +8,11 @@ import { state } from './game.js?v=20';
  * @param {string} type - 파티클 종류
  * @param {object} opts - 추가 옵션
  */
+const MAX_PARTICLES = 200;
+
 export function spawnParticles(x, y, type, opts = {}) {
+  // 파티클 수 제한
+  if (state.particles.length >= MAX_PARTICLES) return;
   switch (type) {
     case 'muzzleFlash': {
       // 총구 화염

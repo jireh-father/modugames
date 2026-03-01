@@ -36,6 +36,8 @@ export function saveGame() {
     isNight: state.isNight,
     dayNightTimer: state.dayNightTimer,
     wave: state.wave,
+    currentWeather: state.currentWeather,
+    walls: state.walls.map(w => ({ hp: w.hp, maxHp: w.maxHp, upgrades: w.upgrades || 0 })),
     worldSeed: world.seed,
     currentCx: world.currentCx,
     currentCy: world.currentCy,
@@ -86,7 +88,19 @@ export function loadGame() {
     state.isNight = data.isNight;
     state.dayNightTimer = data.dayNightTimer;
     state.wave = data.wave;
+    state.currentWeather = data.currentWeather || 'clear';
     state.sleeping = false;
+
+    // 벽 업그레이드 복원
+    if (data.walls) {
+      for (let i = 0; i < 4; i++) {
+        if (data.walls[i]) {
+          state.walls[i].hp = data.walls[i].hp;
+          state.walls[i].maxHp = data.walls[i].maxHp;
+          state.walls[i].upgrades = data.walls[i].upgrades || 0;
+        }
+      }
+    }
 
     // 무기 상태 복원
     if (data.pistol) Object.assign(state.pistol, data.pistol);
