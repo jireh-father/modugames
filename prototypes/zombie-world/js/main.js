@@ -30,6 +30,7 @@ import { initFlashlight, updateFlashlight, drawFlashlightControls } from './flas
 import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=17';
 import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition } from './world.js?v=17';
 import { setWorldRef } from './game.js?v=17';
+import { initWorldMap, drawWorldMap } from './worldmap.js?v=17';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -63,6 +64,7 @@ initSettings();
 initPlayer();
 initDescendButton();
 initFlashlight();
+initWorldMap();
 
 // ── 월드 시스템 연결 ──
 setWorldRef(world);
@@ -359,6 +361,11 @@ function draw() {
   // 게임 오버
   if (state.screen === 'gameover') {
     drawGameOver(ctx);
+  }
+
+  // 세계지도
+  if (state.screen === 'worldmap') {
+    drawWorldMap(ctx);
   }
 }
 

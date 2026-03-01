@@ -11,8 +11,9 @@ let newBestScore = false;
 let newBestWave = false;
 let congratsTimer = 0;
 
-// 일시정지 메뉴 버튼 영역
+// 일시정지/지도 메뉴 버튼 영역
 const PAUSE_BTN = { x: W - 44, y: 4, w: 40, h: 40 };
+const MAP_BTN = { x: W - 88, y: 4, w: 40, h: 40 };
 const MENU_BTN_W = 200;
 const MENU_BTN_H = 50;
 const MENU_Y_START = H * 0.4;
@@ -35,6 +36,20 @@ export function initHUD() {
         if (state.screen === 'playing') {
           state.screen = 'paused';
           playUIPause();
+        }
+      },
+    },
+    20
+  );
+
+  // 지도 버튼 (HUD 영역)
+  registerZone(
+    MAP_BTN,
+    {
+      onTap() {
+        if (state.screen === 'playing') {
+          state.screen = 'worldmap';
+          playUIClick();
         }
       },
     },
@@ -209,6 +224,16 @@ export function drawHUD(ctx) {
     ctx.font = '9px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('GYRO', W / 2, 12);
+  }
+
+  // 지도 버튼 (M 아이콘)
+  if (state.screen === 'playing') {
+    ctx.fillStyle = 'rgba(80,120,80,0.5)';
+    ctx.fillRect(MAP_BTN.x + 4, MAP_BTN.y + 4, 32, 32);
+    ctx.fillStyle = '#aaccaa';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('M', MAP_BTN.x + 20, MAP_BTN.y + 26);
   }
 
   // 일시정지 버튼 (II 아이콘)
