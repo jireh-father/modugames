@@ -31,6 +31,7 @@ import { spawnAnimals, updateAnimals, drawAnimals } from './animals.js?v=18';
 import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition, updateAdjacentChunks } from './world.js?v=18';
 import { setWorldRef } from './game.js?v=18';
 import { initWorldMap, drawWorldMap } from './worldmap.js?v=18';
+import { initInterior, updateInterior, drawInterior } from './interior.js?v=18';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -65,6 +66,7 @@ initPlayer();
 initDescendButton();
 initFlashlight();
 initWorldMap();
+initInterior();
 
 // ── 월드 시스템 연결 ──
 setWorldRef(world);
@@ -93,6 +95,15 @@ function loop(time) {
 }
 
 function update(dt, realDt) {
+  // 내부 화면 업데이트
+  if (state.screen === 'interior') {
+    state.time += dt;
+    state.worldTime += dt;
+    updateInterior(dt);
+    if (isGameOver()) triggerGameOver();
+    return;
+  }
+
   if (state.screen !== 'playing') return;
 
   state.time += dt;
@@ -249,6 +260,11 @@ function draw() {
 
   if (state.screen === 'settings') {
     drawSettings(ctx);
+    return;
+  }
+
+  if (state.screen === 'interior') {
+    drawInterior(ctx);
     return;
   }
 

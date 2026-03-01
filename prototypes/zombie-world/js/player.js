@@ -4,6 +4,7 @@ import { findPath, drawPathDebug } from './pathfinding.js?v=18';
 import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=18';
 import { registerZone } from './input.js?v=18';
 import { world, canMove, startTransition } from './world.js?v=18';
+import { enterInterior, getNearbyBuilding } from './interior.js?v=18';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -74,6 +75,22 @@ export function initPlayer() {
               }
             }
             return;
+          }
+        }
+
+        // 건물 탭 → 가까우면 진입
+        for (const b of state.buildings) {
+          if (!b.type) continue; // 베이스맵 건물은 진입 불가
+          if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
+            const cx = b.x + b.w / 2;
+            const cy = b.y + b.h / 2;
+            const playerDist = Math.hypot(p.x - cx, p.y - cy);
+            if (playerDist < Math.max(b.w, b.h) / 2 + 30) {
+              enterInterior(b);
+              return;
+            }
+            // 멀면 건물 앞까지 이동
+            break;
           }
         }
 

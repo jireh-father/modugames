@@ -209,6 +209,11 @@ export const state = {
   // 월드
   currentChunk: null,
   worldTime: 0,
+
+  // 내부 (인테리어)
+  interior: null,
+  interiorBuilding: null,
+  interiorPlayer: null,
 };
 
 export function resetGame() {
@@ -297,6 +302,9 @@ export function resetGame() {
   state.slowMoTimer = 0;
   state.currentChunk = null;
   state.worldTime = 0;
+  state.interior = null;
+  state.interiorBuilding = null;
+  state.interiorPlayer = null;
 }
 
 export function getTotalAmmo() {

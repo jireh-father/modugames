@@ -50,7 +50,8 @@ function touchDown(id, cx, cy) {
   for (const h of handlers) {
     if ((state.screen === 'paused' || state.screen === 'settings') && h.priority !== -1 && h.priority !== 100) continue;
     if (state.screen === 'worldmap' && h.priority !== 50) continue;
-    if (state.screen !== 'playing' && state.screen !== 'paused' && state.screen !== 'settings' && state.screen !== 'worldmap' && h.priority >= 0) continue;
+    if (state.screen === 'interior' && h.priority !== 60) continue;
+    if (state.screen !== 'playing' && state.screen !== 'paused' && state.screen !== 'settings' && state.screen !== 'worldmap' && state.screen !== 'interior' && h.priority >= 0) continue;
     if (!inZone(cx, cy, h.zone)) continue;
 
     // onStart가 false를 반환하면 이 핸들러를 건너뛰고 다음 핸들러 시도
