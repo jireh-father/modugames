@@ -5,6 +5,7 @@ import { collidesWithBuilding, pushOutOfBuildings } from './buildings.js?v=18';
 import { registerZone } from './input.js?v=18';
 import { world, canMove, startTransition } from './world.js?v=18';
 import { enterInterior, getNearbyBuilding } from './interior.js?v=18';
+import { getFatigueSpeedMul } from './fatigue.js?v=18';
 
 // ── 내부: 타워 탑승 ──
 function climbTower(index) {
@@ -178,7 +179,8 @@ export function updatePlayer(dt) {
       const ny = dy / dist;
       // HP 비례 이동속도 (최소 30%)
       const hpRatio = Math.max(0.3, p.hp / p.maxHp);
-      const moveSpeed = p.speed * hpRatio;
+      const fatigueMul = getFatigueSpeedMul();
+      const moveSpeed = p.speed * hpRatio * fatigueMul;
       const step = moveSpeed * dt;
 
       let newX = p.x + nx * step;

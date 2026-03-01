@@ -32,6 +32,7 @@ import { world, initWorld, setChunkLoaders, loadChunkEntities, updateTransition,
 import { setWorldRef } from './game.js?v=18';
 import { initWorldMap, drawWorldMap } from './worldmap.js?v=18';
 import { initInterior, updateInterior, drawInterior } from './interior.js?v=18';
+import { updateFatigue, getAimWobble } from './fatigue.js?v=18';
 
 // ── 캔버스 셋업 ──
 const canvas = document.getElementById('c');
@@ -99,7 +100,8 @@ function update(dt, realDt) {
   if (state.screen === 'interior') {
     state.time += dt;
     state.worldTime += dt;
-    updateInterior(dt);
+    updateFatigue(dt);
+    if (!state.sleeping) updateInterior(dt);
     if (isGameOver()) triggerGameOver();
     return;
   }
@@ -141,6 +143,13 @@ function update(dt, realDt) {
   updateSniper(dt);
   updateMG(dt);
   updateFlamethrower(dt);
+
+  // 피로 업데이트
+  updateFatigue(dt);
+
+  // 피로에 의한 조준 흔들림
+  const wobble = getAimWobble();
+  if (wobble > 0) state.aimAngle += (Math.random() - 0.5) * wobble;
 
   // 버프 타이머
   if (state.buffs.shieldTimer > 0) state.buffs.shieldTimer -= dt;
@@ -252,6 +261,31 @@ function update(dt, realDt) {
   }
 }
 
+function drawSleepOverlay(ctx) {
+  if (!state.sleeping) return;
+  ctx.fillStyle = 'rgba(0,0,20,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#88aacc';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  const sleepLabel = state.sleepType === 'forced' ? 'EXHAUSTED...' : 'Sleeping...';
+  ctx.fillText(sleepLabel, W / 2, H / 2 - 30);
+
+  const barW = 200;
+  const barH = 12;
+  const progress = Math.min(1, state.sleepTimer / state.sleepDuration);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(W / 2 - barW / 2, H / 2, barW, barH);
+  ctx.fillStyle = '#44cccc';
+  ctx.fillRect(W / 2 - barW / 2, H / 2, barW * progress, barH);
+
+  const zzAlpha = 0.3 + Math.sin(state.time * 3) * 0.3;
+  ctx.fillStyle = `rgba(136,170,204,${zzAlpha})`;
+  ctx.font = 'bold 32px monospace';
+  ctx.fillText('Z z z', W / 2, H / 2 - 70);
+}
+
 function draw() {
   if (state.screen === 'title') {
     drawTitle(ctx);
@@ -265,6 +299,7 @@ function draw() {
 
   if (state.screen === 'interior') {
     drawInterior(ctx);
+    drawSleepOverlay(ctx);
     return;
   }
 
@@ -386,6 +421,8 @@ function draw() {
   if (state.screen === 'worldmap') {
     drawWorldMap(ctx);
   }
+
+  drawSleepOverlay(ctx);
 }
 
 requestAnimationFrame(loop);

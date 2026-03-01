@@ -196,6 +196,18 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'right';
   ctx.fillText('🍖', hpBarX - 3, 37);
 
+  // 피로 바 (배고픔 바 아래)
+  const fatigueRatio = Math.max(0, state.fatigue / state.fatigueMax);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(hpBarX, 39, hpBarW, 4);
+  const fatigueFlash = fatigueRatio < 0.3 && Math.sin(state.time * 8) > 0;
+  ctx.fillStyle = fatigueFlash ? '#ff4444' : fatigueRatio > 0.5 ? '#44cccc' : fatigueRatio > 0.25 ? '#cccc44' : '#cc4444';
+  ctx.fillRect(hpBarX, 39, hpBarW * fatigueRatio, 4);
+  ctx.fillStyle = '#ccc';
+  ctx.font = 'bold 7px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('Zz', hpBarX - 3, 43);
+
   // 타워 상태 점 3개 (베이스맵 전용)
   if (isBaseMap()) {
     const dotY = 43;

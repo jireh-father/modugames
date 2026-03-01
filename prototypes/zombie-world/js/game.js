@@ -147,6 +147,15 @@ export const state = {
   hungerMax: 100,
   hungerRate: 100 / 180, // 180초(3분)에 소진
 
+  // 피로
+  fatigue: 100,
+  fatigueMax: 100,
+  fatigueRate: 100 / 600,  // 10분에 소진
+  sleeping: false,
+  sleepTimer: 0,
+  sleepDuration: 0,
+  sleepType: null,
+
   // 동물
   animals: [],
 
@@ -263,6 +272,11 @@ export function resetGame() {
     targetTower: -1, moveNoiseRange: 160, moveNoiseTimer: 0, shoeType: null, shoeTimer: 0,
   };
   state.hunger = 100;
+  state.fatigue = 100;
+  state.sleeping = false;
+  state.sleepTimer = 0;
+  state.sleepDuration = 0;
+  state.sleepType = null;
   state.animals = [];
   state.buildings = [];
   state.doors = [

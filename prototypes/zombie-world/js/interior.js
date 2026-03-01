@@ -1,7 +1,8 @@
 // ── 건물 내부 시스템 ──
-import { W, H, state, emitSound } from './game.js?v=18';
+import { W, H, state, emitSound, isBaseMap } from './game.js?v=18';
 import { seededRng, chunkSeed, world } from './world.js?v=18';
 import { registerZone } from './input.js?v=18';
+import { startSleep } from './fatigue.js?v=18';
 
 // ── 건물 유형별 루트 테이블 ──
 const LOOT_TABLES = {
@@ -103,11 +104,12 @@ export function initInterior() {
           return;
         }
 
-        // 침대 탭 (수면 기능은 Task 6에서 구현)
-        if (interior.hasBed) {
+        // 침대 탭 → 수면
+        if (interior.hasBed && !state.sleeping) {
           if (x >= BED_POS.x && x <= BED_POS.x + BED_POS.w &&
               y >= BED_POS.y && y <= BED_POS.y + BED_POS.h) {
-            // sleep placeholder — Task 6에서 연결
+            const duration = isBaseMap() ? 10 : 20;
+            startSleep(duration, 'bed');
             return;
           }
         }
