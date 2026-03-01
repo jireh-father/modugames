@@ -1,9 +1,9 @@
 // ── 저격총 시스템: 볼트액션 + 권총식 탄창 ──
-import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=19';
-import { registerZone } from './input.js?v=19';
-import { fireProjectile } from './projectiles.js?v=19';
-import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=19';
-import { spawnParticles } from './particles.js?v=19';
+import { state, W, H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, FIELD_TOP, TOWER_Y } from './game.js?v=20';
+import { registerZone } from './input.js?v=20';
+import { fireProjectile } from './projectiles.js?v=20';
+import { playSniperShot, playSniperBoltUp, playSniperBoltDown, playSniperLoad, playScopeZoom } from './audio.js?v=20';
+import { spawnParticles } from './particles.js?v=20';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;

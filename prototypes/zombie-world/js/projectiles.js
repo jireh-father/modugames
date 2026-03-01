@@ -1,6 +1,6 @@
 // ── 2D 탑다운 발사체 시스템 ──
-import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=19';
-import { isInsideBuilding } from './buildings.js?v=19';
+import { state, W, TOWER_Y, WEAPON_PROFILES, emitSound, getFireOrigin } from './game.js?v=20';
+import { isInsideBuilding } from './buildings.js?v=20';
 
 export const PROJ_TO_WEAPON = {
   bullet: 'pistol', arrow: 'bow', sniper: 'sniper', mgBullet: 'mg', bolt: 'crossbow'

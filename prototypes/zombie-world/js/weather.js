@@ -1,5 +1,5 @@
 // ── 날씨 시스템 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=19';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=20';
 
 // ── 날씨 타입 ──
 const WEATHER_TYPES = ['clear', 'rain', 'fog', 'storm'];

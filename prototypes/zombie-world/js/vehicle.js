@@ -1,5 +1,5 @@
 // ── 탈것 시스템 ──
-import { W, state, emitSound, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=19';
+import { W, state, emitSound, FIELD_TOP, FIELD_BOTTOM } from './game.js?v=20';
 
 // ── 탈것 타입 설정 ──
 export const VEHICLE_TYPES = {

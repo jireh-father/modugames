@@ -1,8 +1,8 @@
 // ── 건물 내부 시스템 ──
-import { W, H, state, emitSound, isBaseMap } from './game.js?v=19';
-import { seededRng, chunkSeed, world } from './world.js?v=19';
-import { registerZone } from './input.js?v=19';
-import { startSleep } from './fatigue.js?v=19';
+import { W, H, state, emitSound, isBaseMap } from './game.js?v=20';
+import { seededRng, chunkSeed, world } from './world.js?v=20';
+import { registerZone } from './input.js?v=20';
+import { startSleep } from './fatigue.js?v=20';
 
 // ── 건물 유형별 루트 테이블 ──
 const LOOT_TABLES = {

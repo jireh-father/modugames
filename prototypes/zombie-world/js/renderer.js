@@ -1,6 +1,6 @@
 // ── 탑다운 2D 필드 렌더링 ──
-import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=19';
-import { world } from './world.js?v=19';
+import { W, H, state, FIELD_TOP, FIELD_BOTTOM, TOWER_Y, WALL_Y, WEAPON_PROFILES, getFireOrigin } from './game.js?v=20';
+import { world } from './world.js?v=20';
 
 /**
  * 필드 배경 그리기 – 폐허 도시 (Ruined City)
