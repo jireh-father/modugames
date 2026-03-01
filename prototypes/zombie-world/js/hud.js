@@ -641,8 +641,8 @@ export function drawTitle(ctx) {
   ctx.fillText('\u2699 SETTINGS', W / 2, H * 0.92);
 
   // 버전 표시
-  ctx.fillStyle = '#333';
-  ctx.font = '11px monospace';
+  ctx.fillStyle = '#666';
+  ctx.font = '12px monospace';
   ctx.fillText(VERSION, W / 2, H * 0.97);
 }
 
