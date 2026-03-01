@@ -303,7 +303,7 @@ function updateZombies(dt) {
         z.y = newY; // Y만 이동 (벽을 따라 수직 슬라이딩)
       }
 
-      // ── 벽 충돌 체크 ──
+      // ── 벽 충돌 체크 (위치 정지 + 래머 1회) ──
       const wallIdx = xToWallIdx(z.x);
       const wallY = getWallY(wallIdx);
       const wallSeg = WALL_SEGMENTS[wallIdx];
@@ -321,17 +321,6 @@ function updateZombies(dt) {
               z.rammed = true;
               playWallHit();
             }
-
-            const prevHp = state.walls[wallIdx].hp;
-            const wallDmg = z.type === 'necromancer' ? 0 : ZOMBIE_TYPES[z.type].wallDmg;
-            state.walls[wallIdx].hp -= wallDmg * dt;
-            if (state.walls[wallIdx].hp < 0) state.walls[wallIdx].hp = 0;
-
-            if (wallHitSoundTimer <= 0 && wallDmg > 0) {
-              playWallHit();
-              wallHitSoundTimer = 0.8;
-            }
-            if (prevHp > 0 && state.walls[wallIdx].hp <= 0) playWallBreak();
           }
         }
       }
@@ -397,6 +386,46 @@ function updateZombies(dt) {
       if (dist < 80) {
         z.hp = Math.min(z.maxHp, z.hp + 1 * dt);
         z.buffed = true;
+      }
+    }
+  }
+
+  // ── 벽 압력 시스템 (세그먼트별 데미지) ──
+  if (state.buffs.shieldTimer <= 0) {
+    const wallPressure = [0, 0, 0, 0];
+    const wallAttackers = [0, 0, 0, 0];
+
+    for (const z of state.zombies) {
+      if (!z.alive || z.y < WALL_Y - 50) continue;
+      const segIdx = xToWallIdx(z.x);
+      const wallY = getWallY(segIdx);
+      const wallSeg = WALL_SEGMENTS[segIdx];
+      if (z.x < wallSeg.x || z.x > wallSeg.x + wallSeg.w) continue;
+      if (state.walls[segIdx].hp <= 0) continue;
+
+      const wallDmg = z.type === 'necromancer' ? 0 : ZOMBIE_TYPES[z.type].wallDmg;
+      if (z.y >= wallY - 5) {
+        wallAttackers[segIdx]++;
+        wallPressure[segIdx] += wallDmg;
+      } else {
+        wallPressure[segIdx] += 0.5;
+      }
+    }
+
+    for (let i = 0; i < 4; i++) {
+      if (wallAttackers[i] > 0 && state.walls[i].hp > 0) {
+        const baseDmg = wallPressure[i];
+        const maxDmg = wallAttackers[i] * 3;
+        const finalDmg = Math.min(baseDmg, maxDmg);
+        const prevHp = state.walls[i].hp;
+        state.walls[i].hp -= finalDmg * dt;
+        if (state.walls[i].hp < 0) state.walls[i].hp = 0;
+
+        if (wallHitSoundTimer <= 0 && finalDmg > 0) {
+          playWallHit();
+          wallHitSoundTimer = 0.8;
+        }
+        if (prevHp > 0 && state.walls[i].hp <= 0) playWallBreak();
       }
     }
   }
