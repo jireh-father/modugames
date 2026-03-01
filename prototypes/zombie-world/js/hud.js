@@ -1,11 +1,10 @@
 // ── HUD + 무기 교체 + 게임 화면 (좀비 월드) ──
-import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo } from './game.js?v=17';
+import { state, W, H, HUD_H, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H, resetGame, getTotalAmmo, isBaseMap } from './game.js?v=17';
 import { registerZone } from './input.js?v=17';
 import { playStart, playGameOver, playNewRecord, playUIPause, playUIResume, playUIClick, playWeaponSwitch } from './audio.js?v=17';
 import { requestGyro, resetGyroRef, isGyroEnabled } from './gyro.js?v=17';
 import { openSettings } from './settings.js?v=17';
-import { generateBuildings } from './buildings.js?v=17';
-import { buildGrid } from './pathfinding.js?v=17';
+import { world } from './world.js?v=17';
 
 let gameOverTriggered = false;
 let newBestScore = false;
@@ -66,8 +65,6 @@ export function initHUD() {
             y >= restartY && y <= restartY + MENU_BTN_H) {
           gameOverTriggered = false;
           resetGame();
-          generateBuildings();
-          buildGrid();
           playStart();
           return;
         }
@@ -124,15 +121,18 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'left';
   ctx.fillText(`${state.score}`, 10, 32);
 
-  // Stage 정보 (중앙)
-  if (state.wave > 0) {
+  // 위치 + 좀비 수 (중앙)
+  {
     const zombieCount = state.zombies.filter(z => z.alive).length + state.waveSpawnQueue.length;
     const icon = state.isNight ? '\uD83C\uDF19' : '\u2600';
+    const loc = (world.currentCx === 0 && world.currentCy === 0)
+      ? 'BASE' : `(${world.currentCx},${world.currentCy})`;
+    const day = Math.floor(state.worldTime / 360) + 1;
 
     ctx.textAlign = 'center';
     ctx.fillStyle = state.isNight ? '#8888cc' : '#c0a060';
     ctx.font = 'bold 12px monospace';
-    ctx.fillText(`Stage ${state.wave} ${icon}  x${zombieCount}`, W / 2, 20);
+    ctx.fillText(`${loc} ${icon} Day${day}  x${zombieCount}`, W / 2, 20);
   }
 
   // 콤보 (중앙 아래)
@@ -181,25 +181,26 @@ export function drawHUD(ctx) {
   ctx.textAlign = 'right';
   ctx.fillText('🍖', hpBarX - 3, 37);
 
-  // 타워 상태 점 3개 (우측 배고픔 바 아래)
-  const dotY = 43;
-  const dotR = 4;
-  const dotSpacing = 14;
-  const dotStartX = W - 95 + (80 - dotSpacing * 2) / 2; // center 3 dots under HP bar
-  const labels = ['L', 'C', 'R'];
-  for (let i = 0; i < 3; i++) {
-    const t = state.towers[i];
-    const dx = dotStartX + i * dotSpacing;
-    const tHpRatio = t.hp / t.maxHp;
-    ctx.fillStyle = tHpRatio <= 0 ? '#ff4444' : tHpRatio > 0.5 ? '#44ff44' : '#ffff44';
-    ctx.beginPath();
-    ctx.arc(dx, dotY, dotR, 0, Math.PI * 2);
-    ctx.fill();
-    // label
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '7px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(labels[i], dx, dotY + 11);
+  // 타워 상태 점 3개 (베이스맵 전용)
+  if (isBaseMap()) {
+    const dotY = 43;
+    const dotR = 4;
+    const dotSpacing = 14;
+    const dotStartX = W - 95 + (80 - dotSpacing * 2) / 2;
+    const labels = ['L', 'C', 'R'];
+    for (let i = 0; i < 3; i++) {
+      const t = state.towers[i];
+      const dx = dotStartX + i * dotSpacing;
+      const tHpRatio = t.hp / t.maxHp;
+      ctx.fillStyle = tHpRatio <= 0 ? '#ff4444' : tHpRatio > 0.5 ? '#44ff44' : '#ffff44';
+      ctx.beginPath();
+      ctx.arc(dx, dotY, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(labels[i], dx, dotY + 11);
+    }
   }
 
   // 자이로 상태
@@ -539,7 +540,7 @@ export function drawTitle(ctx) {
       ctx.fillText(`BEST SCORE: ${state.bestScore}`, W / 2, H * 0.68);
     }
     if (state.bestWave > 0) {
-      ctx.fillText(`BEST STAGE: ${state.bestWave}`, W / 2, H * 0.73);
+      ctx.fillText(`BEST DAYS: ${state.bestWave}`, W / 2, H * 0.73);
     }
   }
 
@@ -572,7 +573,8 @@ export function drawPauseMenu(ctx) {
   // 현재 점수/웨이브 표시
   ctx.fillStyle = '#888';
   ctx.font = '14px monospace';
-  ctx.fillText(`SCORE: ${state.score}  |  Stage ${state.wave}`, W / 2, H * 0.34);
+  const loc = (world.currentCx === 0 && world.currentCy === 0) ? 'BASE' : `(${world.currentCx},${world.currentCy})`;
+  ctx.fillText(`SCORE: ${state.score}  |  ${loc}`, W / 2, H * 0.34);
 
   // 메뉴 버튼들
   const buttons = [
@@ -626,10 +628,11 @@ export function drawGameOver(ctx) {
   ctx.font = '14px monospace';
   ctx.fillText('SCORE', W / 2, H * 0.37 + 22);
 
-  // Stage 도달
+  // 생존 일수
+  const survivalDays = Math.floor(state.worldTime / 360) + 1;
   ctx.fillStyle = '#c0a060';
   ctx.font = 'bold 18px monospace';
-  ctx.fillText(`Stage ${state.wave}`, W / 2, H * 0.46);
+  ctx.fillText(`Day ${survivalDays}`, W / 2, H * 0.46);
 
   // 최대 콤보
   ctx.fillStyle = '#ffdd44';
@@ -723,16 +726,12 @@ export function initScreenHandlers() {
           requestGyro();
           resetGyroRef();
           resetGame();
-          generateBuildings();
-          buildGrid();
           playStart();
         } else if (state.screen === 'gameover') {
           gameOverTriggered = false;
           requestGyro();
           resetGyroRef();
           resetGame();
-          generateBuildings();
-          buildGrid();
           playStart();
         }
       },
