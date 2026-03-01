@@ -1,9 +1,9 @@
 // ── 기관총 시스템: 탄띠 + 자동 연사 ──
-import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=17';
-import { registerZone } from './input.js?v=17';
-import { fireProjectile } from './projectiles.js?v=17';
-import { playMGShot, playMGBurstEnd, playMGCock } from './audio.js?v=17';
-import { spawnParticles } from './particles.js?v=17';
+import { state, W, CONTROLS_TOP, CONTROLS_BOTTOM, SLOT_H, ITEM_BAR_H } from './game.js?v=18';
+import { registerZone } from './input.js?v=18';
+import { fireProjectile } from './projectiles.js?v=18';
+import { playMGShot, playMGBurstEnd, playMGCock } from './audio.js?v=18';
+import { spawnParticles } from './particles.js?v=18';
 
 const CTRL_Y = CONTROLS_TOP + SLOT_H + ITEM_BAR_H;
 const CTRL_H = CONTROLS_BOTTOM - CTRL_Y;

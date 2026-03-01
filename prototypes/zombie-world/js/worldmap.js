@@ -1,7 +1,7 @@
 // ── 세계지도 UI ──
-import { W, H, state } from './game.js?v=17';
-import { world, chunkKey } from './world.js?v=17';
-import { registerZone } from './input.js?v=17';
+import { W, H, state } from './game.js?v=18';
+import { world, chunkKey } from './world.js?v=18';
+import { registerZone } from './input.js?v=18';
 
 const TILE_SIZE = 20; // 미니맵에서 한 청크 크기
 
